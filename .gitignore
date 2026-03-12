@@ -1,0 +1,61 @@
+# ── PYTHON / BACKEND ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pycache
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.db
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── NODE / ANGULAR / FRONTEND ─────────────────────────────────
+node_modules/
+dist/
+.angular/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+*.tsbuildinfo
+
+# ── DOCKER ────────────────────────────────────────────────────
+.dockerignore
+
+# ── KUBERNETES / SECRETS ──────────────────────────────────────
+*-secret.yaml
+*-secrets.yaml
+kubeconfig
+*.kubeconfig
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+
+# ── EDITORS ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

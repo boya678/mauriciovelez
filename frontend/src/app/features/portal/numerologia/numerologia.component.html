@@ -1,0 +1,42 @@
+<div class="num-page">
+
+  <!-- Encabezado -->
+  <header class="num-header">
+    <div class="num-header-icon">✦</div>
+    <div>
+      <h1 class="num-title">Numerología Personal</h1>
+      <p class="num-subtitle">
+        Los números del universo hablan para
+        <strong class="gold-text">{{ clienteNombre }}</strong>
+      </p>
+    </div>
+  </header>
+
+  <!-- Números de la suerte de la semana -->
+  <section class="lucky-section">
+    <h3 class="section-label">
+      <span class="material-icons-round">stars</span>
+      Números de la Suerte · Esta Semana
+    </h3>
+    <div class="lucky-row">
+      @for (n of semanaNumeros; track n; let i = $index) {
+        <div class="lucky-ball" [style.animation-delay]="i * 0.12 + 's'">{{ n }}</div>
+      }
+    </div>
+  </section>
+
+  <!-- Tarjetas numerológicas -->
+  <section class="cards-grid">
+    @for (card of cards; track card.titulo; let i = $index) {
+      <div class="num-card" [attr.data-color]="card.color" [style.animation-delay]="i * 0.08 + 's'">
+        <div class="card-top">
+          <span class="card-icon">{{ card.icono }}</span>
+          <span class="card-titulo">{{ card.titulo }}</span>
+        </div>
+        <div class="card-numero">{{ card.numero }}</div>
+        <p class="card-desc">{{ card.descripcion }}</p>
+      </div>
+    }
+  </section>
+
+</div>

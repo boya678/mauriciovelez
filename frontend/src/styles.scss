@@ -1,0 +1,121 @@
+// ============================================================
+// PALETA DE COLORES — FUENTE ÚNICA DE VERDAD
+// ============================================================
+:root {
+  --bg-dark:        #060010;
+  --bg-medium:      #160330;
+  --bg-card:        #23065a;
+  --bg-card-hover:  #2e0870;
+
+  --gold-bright:    #FFD700;
+  --gold-mid:       #FFA500;
+  --gold-dark:      #B8860B;
+  --gold-pale:      #FFF9C0;
+
+  --accent-red:     #FF1744;
+  --accent-green:   #00E676;
+  --accent-cyan:    #00E5FF;
+  --accent-purple:  #EA80FC;
+
+  --text-primary:   #FFFFFF;
+  --text-secondary: #C9B8E8;
+  --text-muted:     #7A5FA8;
+
+  --border-gold:    1px solid rgba(255, 215, 0, 0.25);
+  --shadow-glow:    0 0 20px rgba(255, 165, 0, 0.35), 0 0 60px rgba(180, 0, 255, 0.1);
+
+  --sidebar-w:      260px;
+  --sidebar-w-sm:   72px;
+  --header-h:       64px;
+
+  --radius-md:      12px;
+  --radius-lg:      20px;
+  --transition:     all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// ============================================================
+// RESET & BASE
+// ============================================================
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+// ============================================================
+// SCROLLBAR
+// ============================================================
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-medium); }
+::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-bright); }
+
+// ============================================================
+// TYPOGRAPHY
+// ============================================================
+h1, h2, h3, h4 { font-family: 'Cinzel', serif; }
+
+// ============================================================
+// UTILITY – GOLD SHIMMER TEXT
+// ============================================================
+.gold-text {
+  background: linear-gradient(
+    90deg,
+    var(--gold-dark)   0%,
+    var(--gold-bright) 30%,
+    var(--gold-pale)   50%,
+    var(--gold-bright) 70%,
+    var(--gold-dark)   100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+// ============================================================
+// KEYFRAMES
+// ============================================================
+
+// Particles rising from bottom
+@keyframes float-up {
+  0%   { transform: translateY(0) rotate(0deg) scale(1);   opacity: 0.9; }
+  80%  { opacity: 0.4; }
+  100% { transform: translateY(-110vh) rotate(540deg) scale(0.6); opacity: 0; }
+}
+
+// Shimmer sweep on text/buttons
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+// Pulsing glow effect
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px var(--gold-mid),  0 0 20px rgba(255, 165, 0, 0.25); }
+  50%       { box-shadow: 0 0 22px var(--gold-bright), 0 0 50px rgba(255, 215, 0, 0.45); }
+}
+
+// Slide + fade in
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+// Spin (for spinner)
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// Card entrance
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}

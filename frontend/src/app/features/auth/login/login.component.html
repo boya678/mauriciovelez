@@ -1,0 +1,84 @@
+<div class="login-page">
+
+  <!-- Partículas flotantes -->
+  <div class="particles" aria-hidden="true">
+    @for (p of particles; track $index) {
+      <span
+        class="particle"
+        [style.left]="p.left"
+        [style.font-size]="p.size"
+        [style.animation-duration]="p.duration"
+        [style.animation-delay]="p.delay"
+        [style.opacity]="p.opacity"
+      >{{ p.symbol }}</span>
+    }
+  </div>
+
+  <!-- Tarjeta de login -->
+  <div class="login-card">
+
+    <!-- Marca -->
+    <div class="brand">
+      <div class="brand-icon">♦</div>
+      <h1 class="brand-title gold-text">MAURICIO VELEZ</h1>
+      <p class="brand-sub">Portal de Clientes</p>
+    </div>
+
+    <!-- Formulario -->
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate autocomplete="off">
+
+      <div class="field-group">
+        <label class="field-label" for="nombre">Nombre completo</label>
+        <div class="field-wrapper" [class.field-invalid]="isInvalid('nombre')">
+          <span class="field-icon material-icons-round">person</span>
+          <input
+            id="nombre"
+            formControlName="nombre"
+            type="text"
+            class="field-input"
+            placeholder="Tu nombre"
+          />
+        </div>
+        @if (isInvalid('nombre')) {
+          <span class="field-error">Ingresa tu nombre (mínimo 2 caracteres)</span>
+        }
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="celular">Número de celular</label>
+        <div class="field-wrapper" [class.field-invalid]="isInvalid('celular')">
+          <span class="field-icon material-icons-round">smartphone</span>
+          <input
+            id="celular"
+            formControlName="celular"
+            type="tel"
+            class="field-input"
+            placeholder="Ej: 3001234567"
+          />
+        </div>
+        @if (isInvalid('celular')) {
+          <span class="field-error">Ingresa un número válido (7–15 dígitos)</span>
+        }
+      </div>
+
+      @if (errorMsg()) {
+        <div class="alert-error" role="alert">
+          <span class="material-icons-round">warning</span>
+          {{ errorMsg() }}
+        </div>
+      }
+
+      <button type="submit" class="btn-submit" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner"></span>
+          <span>Ingresando…</span>
+        } @else {
+          <span class="material-icons-round">casino</span>
+          <span>Entrar al Portal</span>
+        }
+      </button>
+
+    </form>
+  </div>
+
+</div>

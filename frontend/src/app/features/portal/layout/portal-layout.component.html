@@ -1,0 +1,100 @@
+<div class="portal" [class.collapsed]="collapsed()" [class.mobile]="isMobile()">
+
+  <!-- Overlay móvil — toca fuera para cerrar el sidebar -->
+  @if (isMobile() && !collapsed()) {
+    <div class="sb-overlay" (click)="toggle()"></div>
+  }
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <!-- Logo + botón colapsar -->
+    <div class="sb-header">
+      <div class="sb-brand">
+        <span class="sb-diamond">♦</span>
+        @if (!collapsed()) {
+          <span class="sb-title gold-text">MAURICIO VELEZ</span>
+        }
+      </div>
+      <button class="sb-toggle" (click)="toggle()" [title]="collapsed() ? 'Expandir' : 'Colapsar'">
+        <span class="material-icons-round">{{ collapsed() ? 'menu' : 'menu_open' }}</span>
+      </button>
+    </div>
+
+    <!-- Info del usuario -->
+    <div class="sb-user" [class.sb-user--sm]="collapsed()">
+      <div class="avatar">{{ inicial }}</div>
+      @if (!collapsed()) {
+        <div class="user-text">
+          <span class="user-name">{{ cliente?.nombre }}</span>
+          <span class="user-role">{{ cliente?.vip ? '★ VIP' : 'Cliente' }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- Menú de navegación -->
+    <nav class="sb-nav">
+      <ul>
+        @for (item of menuItems; track item.route) {
+          <li>
+            <a
+              class="nav-item"
+              [routerLink]="item.route"
+              routerLinkActive="nav-item--active"
+              [title]="item.label"
+            >
+              <span class="material-icons-round nav-icon">{{ item.icon }}</span>
+              @if (!collapsed()) {
+                <span class="nav-label">{{ item.label }}</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    <!-- Pie de barra -->
+    <div class="sb-footer">
+      <button class="btn-logout" (click)="logout()" title="Cerrar sesión">
+        <span class="material-icons-round">logout</span>
+        @if (!collapsed()) {
+          <span>Cerrar sesión</span>
+        }
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ── ÁREA PRINCIPAL ──────────────────────────────────── -->
+  <div class="main">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <!-- Botón hamburguesa visible solo en móvil -->
+      @if (isMobile()) {
+        <button class="sb-toggle topbar-menu-btn" (click)="toggle()" title="Menú">
+          <span class="material-icons-round">menu</span>
+        </button>
+      }
+      <h2 class="topbar-title gold-text">Portal</h2>
+      <div class="topbar-right">
+        @if (cliente) {
+          <div class="balance-chip">
+            <span class="material-icons-round">monetization_on</span>
+            <span>$ {{ cliente.saldo | number:'1.2-2' }}</span>
+          </div>
+          @if (cliente.vip) {
+            <span class="vip-badge">★ VIP</span>
+          }
+        }
+      </div>
+    </header>
+
+    <!-- Contenido enrutado -->
+    <main class="content">
+      <router-outlet />
+    </main>
+
+  </div>
+
+</div>
