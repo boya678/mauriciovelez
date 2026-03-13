@@ -1,0 +1,4 @@
+Usuarios en origen: 5064
+Procesados: 5064
+Omitidos (celular vacio): 0
+Migracion completada.

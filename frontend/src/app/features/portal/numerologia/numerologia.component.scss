@@ -1,5 +1,6 @@
 .num-page {
   animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  max-width: 760px;
 }
 
 // ── HEADER ────────────────────────────────────────────────────
@@ -32,6 +33,211 @@
   font-size: 0.98rem;
   margin-top: 0.25rem;
 }
+
+// ── ESTADO CARGA / ERROR ──────────────────────────────────────
+.state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.state-icon {
+  font-size: 2.5rem;
+}
+
+.error-box {
+  color: var(--accent-red);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 215, 0, 0.15);
+  border-top-color: var(--gold-bright);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+// ── SECCIÓN NÚMERO ────────────────────────────────────────────
+.numero-section {
+  background: linear-gradient(148deg, rgba(45, 8, 90, 0.65), rgba(10, 0, 25, 0.8));
+  border: 1px solid rgba(255, 215, 0, 0.18);
+  border-radius: var(--radius-lg);
+  padding: 2rem 2rem 1.75rem;
+  margin-bottom: 1.75rem;
+  animation: card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  &.vip {
+    border-color: rgba(255, 215, 0, 0.45);
+    background: linear-gradient(148deg, rgba(45, 8, 90, 0.75), rgba(10, 0, 25, 0.9));
+    box-shadow:
+      0 0 0 1px rgba(255, 215, 0, 0.18),
+      0 0 48px rgba(255, 165, 0, 0.14);
+    animation: card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both,
+               vip-pulse 2.8s ease-in-out infinite;
+  }
+}
+
+.numero-badge {
+  display: inline-block;
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  margin-bottom: 1rem;
+
+  &.libre-badge {
+    background: rgba(255, 215, 0, 0.12);
+    color: var(--gold-bright);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+
+  &.vip-badge {
+    background: rgba(255, 215, 0, 0.18);
+    color: var(--gold-bright);
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 14px rgba(255, 165, 0, 0.25);
+  }
+}
+
+.numero-section-title {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin-bottom: 1.75rem;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.05em;
+}
+
+// ── DISPLAY DÍGITOS ───────────────────────────────────────────
+.numero-display {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.digit-card {
+  width: 80px;
+  height: 96px;
+  background: linear-gradient(160deg, rgba(255, 215, 0, 0.12), rgba(255, 165, 0, 0.04));
+  border: 1.5px solid rgba(255, 215, 0, 0.35);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--gold-bright);
+  text-shadow: 0 0 28px rgba(255, 215, 0, 0.7);
+  box-shadow: 0 0 20px rgba(255, 165, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: var(--transition);
+
+  &:hover {
+    transform: translateY(-6px) scale(1.06);
+    box-shadow: 0 16px 36px rgba(255, 165, 0, 0.25);
+  }
+
+  &.vip-digit {
+    border-color: rgba(234, 128, 252, 0.45);
+    background: linear-gradient(160deg, rgba(234, 128, 252, 0.14), rgba(138, 0, 200, 0.05));
+    color: var(--accent-purple);
+    text-shadow: 0 0 28px rgba(234, 128, 252, 0.75);
+    box-shadow: 0 0 20px rgba(234, 128, 252, 0.14);
+
+    &:hover { box-shadow: 0 16px 36px rgba(234, 128, 252, 0.28); }
+  }
+}
+
+// ── MÉTODO ────────────────────────────────────────────────────
+.metodo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.metodo-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.metodo-numero {
+  display: flex;
+  gap: 0.4rem;
+
+  span {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gold-mid);
+    background: rgba(255, 215, 0, 0.06);
+  }
+}
+
+// ── VIGENCIA ──────────────────────────────────────────────────
+.vigencia-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+
+  strong { color: var(--text-primary); }
+
+  .urgente {
+    color: var(--accent-red);
+    font-weight: 600;
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+}
+
+.vigencia-icon { font-size: 1.1rem; line-height: 1; }
+
+// ── KEYFRAME VIP PULSE ───────────────────────────────────────────
+@keyframes vip-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 215, 0, 0.18),
+      0 0 48px rgba(255, 165, 0, 0.14);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 215, 0, 0.45),
+      0 0 72px rgba(255, 165, 0, 0.35),
+      0 0 120px rgba(255, 165, 0, 0.12);
+  }
+}
+
+// ── RESPONSIVE ────────────────────────────────────────────────
+@media (max-width: 480px) {
+  .digit-card {
+    width: 66px;
+    height: 80px;
+    font-size: 2.4rem;
+  }
+
+  .numero-display { gap: 0.65rem; }
+}
+
 
 // ── SECCIÓN SUERTE ────────────────────────────────────────────
 .lucky-section {

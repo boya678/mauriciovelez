@@ -9,6 +9,11 @@ from app.database import Base
 
 # Importar todos los modelos para que Base.metadata los registre
 import app.models.cliente  # noqa: F401
+import app.models.numbers  # noqa: F401
+import app.models.numbers_historic  # noqa: F401
+import app.models.numbers_users  # noqa: F401
+import app.models.platform_user  # noqa: F401
+import app.models.audit_log  # noqa: F401
 
 config = context.config
 

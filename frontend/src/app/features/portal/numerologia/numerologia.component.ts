@@ -1,13 +1,22 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from '../../../../environments/environment';
 
-interface NumeroCard {
-  titulo: string;
-  numero: number | string;
-  descripcion: string;
-  icono: string;
-  color: 'gold' | 'purple' | 'red' | 'cyan' | 'green';
+export interface NumeroData {
+  numero: string;
+  numero_metodo: string;
+  fecha_asignacion: string;
+  vigencia_hasta: string;
+  dias_restantes: number;
+}
+
+export interface MisNumerosResponse {
+  nombre: string;
+  es_vip: boolean;
+  numero_libre: NumeroData;
+  numero_vip?: NumeroData;
 }
 
 @Component({
@@ -17,63 +26,35 @@ interface NumeroCard {
   templateUrl: './numerologia.component.html',
   styleUrl: './numerologia.component.scss',
 })
-export class NumerologiaComponent {
+export class NumerologiaComponent implements OnInit {
   clienteNombre: string;
+  loading = true;
+  error: string | null = null;
+  data: MisNumerosResponse | null = null;
 
-  semanaNumeros = [3, 7, 14, 22, 31, 42];
-
-  cards: NumeroCard[] = [
-    {
-      titulo: 'Número de Vida',
-      numero: 7,
-      descripcion:
-        'El buscador de la verdad. Analítico, introspectivo y espiritualmente orientado. Tu camino está marcado por la sabiduría interior.',
-      icono: '✦',
-      color: 'purple',
-    },
-    {
-      titulo: 'Número del Destino',
-      numero: 3,
-      descripcion:
-        'El comunicador creativo. Expresas ideas con originalidad y atraes abundancia a través de tu creatividad y optimismo genuino.',
-      icono: '★',
-      color: 'gold',
-    },
-    {
-      titulo: 'Número de la Suerte',
-      numero: 9,
-      descripcion:
-        'Número de completitud y fortuna. Grandes oportunidades surgen cuando los ciclos llegan a su plenitud.',
-      icono: '♦',
-      color: 'red',
-    },
-    {
-      titulo: 'Número del Alma',
-      numero: 5,
-      descripcion:
-        'Espíritu libre. Buscas libertad y experiencias nuevas. Los cambios son tus aliados y la aventura tu motor.',
-      icono: '♠',
-      color: 'cyan',
-    },
-    {
-      titulo: 'Año Personal',
-      numero: 2,
-      descripcion:
-        'Año de cooperación y relaciones. Es el momento para sembrar alianzas y confiar en los procesos que ya iniciaste.',
-      icono: '⬡',
-      color: 'green',
-    },
-    {
-      titulo: 'Número Maestro',
-      numero: 11,
-      descripcion:
-        'Eres un faro de inspiración para quienes te rodean. Tu intuición y sensibilidad son dones extraordinarios.',
-      icono: '∞',
-      color: 'gold',
-    },
-  ];
-
-  constructor(private authService: AuthService) {
+  constructor(private authService: AuthService, private http: HttpClient) {
     this.clienteNombre = authService.getCliente()?.nombre ?? 'Visitante';
   }
+
+  ngOnInit(): void {
+    const token = this.authService.getToken();
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+    this.http
+      .get<MisNumerosResponse>(`${environment.apiUrl}/numerologia/mis-numeros`, { headers })
+      .subscribe({
+        next: (res) => {
+          this.data = res;
+          this.loading = false;
+        },
+        error: () => {
+          this.error = 'No se pudo cargar tu número. Intenta de nuevo.';
+          this.loading = false;
+        },
+      });
+  }
+
+  digitos(numero: string): string[] {
+    return numero.split('');
+  }
 }
+
