@@ -93,25 +93,36 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ── 7. Secrets (solo si no existen) ───────────────────────────
-# NOTA: edita las variables de entorno antes de correr esto por primera vez
 Write-Step "Verificando secret backend-secrets..."
 $existsSecret = kubectl get secret backend-secrets -n $NAMESPACE 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "   Secret no encontrado. Creando desde variables de entorno..." -ForegroundColor Yellow
-    Write-Host "   Asegúrate de exportar DB_URL y JWT_KEY antes de correr este script." -ForegroundColor Yellow
-
-    if (-not $env:DB_URL -or -not $env:JWT_KEY) {
-        Write-Host "`n   ERROR: Debes definir las variables de entorno DB_URL y JWT_KEY" -ForegroundColor Red
-        Write-Host "   Ejemplo:" -ForegroundColor Gray
-        Write-Host '   $env:DB_URL = "postgresql://usuario:pass@host:5432/portal"' -ForegroundColor Gray
-        Write-Host '   $env:JWT_KEY = "tu_secret_aqui"' -ForegroundColor Gray
+    # Leer valores desde backend/.env
+    $envFile = "$ROOT\backend\.env"
+    if (-not (Test-Path $envFile)) {
+        Write-Host "`n   ERROR: No se encontró $envFile" -ForegroundColor Red
+        Write-Host "   Crea el archivo con las claves DATABASE_URL y JWT_SECRET_KEY" -ForegroundColor Gray
         exit 1
     }
 
+    $dotenv = @{}
+    Get-Content $envFile | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
+        $parts = $_ -split '=', 2
+        $dotenv[$parts[0].Trim()] = $parts[1].Trim().Trim('"').Trim("'")
+    }
+
+    $dbUrl  = $dotenv['DATABASE_URL']
+    $jwtKey = $dotenv['JWT_SECRET_KEY']
+
+    if (-not $dbUrl -or -not $jwtKey) {
+        Write-Host "`n   ERROR: $envFile debe contener DATABASE_URL y JWT_SECRET_KEY" -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "   Creando secret desde $envFile ..." -ForegroundColor Yellow
     kubectl create secret generic backend-secrets `
         --namespace $NAMESPACE `
-        --from-literal=DATABASE_URL=$env:DB_URL `
-        --from-literal=JWT_SECRET_KEY=$env:JWT_KEY
+        --from-literal=DATABASE_URL=$dbUrl `
+        --from-literal=JWT_SECRET_KEY=$jwtKey
     Write-OK "Secret backend-secrets creado"
 } else {
     Write-OK "Secret backend-secrets ya existe"
