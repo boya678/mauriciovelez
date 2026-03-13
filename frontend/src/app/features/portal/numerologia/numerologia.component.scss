@@ -229,13 +229,18 @@
 
 // ── RESPONSIVE ────────────────────────────────────────────────
 @media (max-width: 480px) {
-  .digit-card {
-    width: 66px;
-    height: 80px;
-    font-size: 2.4rem;
+  .numero-display {
+    gap: 0.45rem;
+    flex-wrap: nowrap;  // todos en una sola fila siempre
   }
 
-  .numero-display { gap: 0.65rem; }
+  .digit-card {
+    flex: 1 1 0;        // reparten el espacio disponible entre todos
+    min-width: 0;
+    width: auto;
+    height: 72px;
+    font-size: clamp(1.6rem, 8vw, 2.4rem);  // se adapta al viewport
+  }
 }
 
 

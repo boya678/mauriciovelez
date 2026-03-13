@@ -8,6 +8,24 @@
   gap: 12px;
   margin-bottom: 16px;
   align-items: center;
+
+  .search-bar { flex: 1; }
+}
+
+.btn-export {
+  white-space: nowrap;
+  padding: 0 18px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: var(--accent); color: #fff; }
 }
 
 .table-card { padding: 0; overflow: hidden; }

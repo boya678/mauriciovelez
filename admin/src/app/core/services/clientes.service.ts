@@ -38,4 +38,10 @@ export class ClientesService {
   delete(id: string) {
     return this.http.delete(`${this.base}/${id}`);
   }
+
+  exportAll(q = '') {
+    let params = new HttpParams();
+    if (q) params = params.set('q', q);
+    return this.http.get(`${this.base}/export`, { params, responseType: 'blob' });
+  }
 }

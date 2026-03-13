@@ -79,4 +79,15 @@ export class ClientesComponent implements OnInit {
       this.load();
     });
   }
+
+  downloadExcel() {
+    this.svc.exportAll(this.search).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'clientes.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
 }

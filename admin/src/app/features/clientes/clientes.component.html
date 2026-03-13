@@ -7,6 +7,7 @@
   <div class="search-bar">
     <input type="search" [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Buscar por nombre, celular o cc…" />
   </div>
+  <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
 </div>
 
 <div class="card table-card">

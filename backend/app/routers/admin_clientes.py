@@ -1,7 +1,10 @@
+import csv
+import io
 import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -76,6 +79,41 @@ def list_clientes(
     total = query.count()
     items = query.order_by(Cliente.nombre).offset((page - 1) * size).limit(size).all()
     return PaginatedClientes(total=total, page=page, size=size, items=items)
+
+
+@router.get("/export")
+def export_clientes(
+    q: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _user=Depends(get_current_platform_user),
+):
+    query = db.query(Cliente)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            Cliente.nombre.ilike(like)
+            | Cliente.celular.ilike(like)
+            | Cliente.cc.ilike(like)
+        )
+    items = query.order_by(Cliente.nombre).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Nombre", "Celular", "CC", "Correo", "Saldo", "VIP"])
+    for c in items:
+        writer.writerow([
+            c.nombre, c.celular, c.cc or "", c.correo or "",
+            c.saldo, "Sí" if c.vip else "No",
+        ])
+
+    # BOM UTF-8 para que Excel abra correctamente tildes y ñ
+    content = "\ufeff" + output.getvalue()
+
+    return StreamingResponse(
+        iter([content.encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=clientes.csv"},
+    )
 
 
 @router.get("/{cliente_id}", response_model=ClienteOut)
