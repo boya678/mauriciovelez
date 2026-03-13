@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: admin
   namespace: mauriciovelez
   labels:
-    app: frontend
+    app: admin
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: frontend
+      app: admin
   template:
     metadata:
       labels:
-        app: frontend
+        app: admin
     spec:
       containers:
-        - name: frontend
-          image: datara.azurecr.io/mauriciovelez-frontend:latest
+        - name: admin
+          image: datara.azurecr.io/mauriciovelez-admin:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80

@@ -2,13 +2,14 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: frontend
-  namespace: apuestas
+  namespace: mauriciovelez
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
 spec:
   ingressClassName: nginx
   rules:
-    - host: apuestas.datara.com           # <- ajusta tu dominio
+    - host: portal.mauricioveleznumerologo.com
       http:
         paths:
           - path: /
@@ -18,3 +19,7 @@ spec:
                 name: frontend
                 port:
                   number: 80
+  tls:
+    - hosts:
+        - portal.mauricioveleznumerologo.com
+      secretName: portal-mauricioveleznumerologo-tls

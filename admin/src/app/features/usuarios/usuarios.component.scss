@@ -1,0 +1,37 @@
+.table-card { padding: 0; overflow: hidden; }
+
+.center { text-align: center; }
+.mono   { font-family: 'Courier New', monospace; font-size: 13px; }
+
+.actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.check-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  input[type=checkbox] { width: auto; accent-color: var(--accent); }
+}
+
+.confirm-text {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  strong { color: var(--text); }
+}

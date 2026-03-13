@@ -1,0 +1,28 @@
+<div class="login-wrap">
+  <div class="login-box card">
+    <div class="brand">
+      <span class="brand-icon">⚡</span>
+      <div>
+        <h1>Portal Administrativo</h1>
+        <p>Mauricio Vélez</p>
+      </div>
+    </div>
+
+    <form (ngSubmit)="submit()" #f="ngForm">
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" [(ngModel)]="usuario" name="usuario" placeholder="Ingresa tu usuario" autocomplete="username" required />
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" [(ngModel)]="clave" name="clave" placeholder="••••••••" autocomplete="current-password" required />
+      </div>
+      @if (error) {
+        <p class="error-msg">{{ error }}</p>
+      }
+      <button type="submit" class="btn-primary w-full" [disabled]="loading">
+        {{ loading ? 'Ingresando…' : 'Ingresar' }}
+      </button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,52 @@
+<div class="shell" [class.sidebar-collapsed]="!sidebarOpen()">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="brand-icon">⚡</span>
+      @if (sidebarOpen()) {
+        <span class="brand-name">Admin Panel</span>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      <a routerLink="/admin/clientes" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">👥</span>
+        @if (sidebarOpen()) { <span>Clientes</span> }
+      </a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">🔐</span>
+          @if (sidebarOpen()) { <span>Usuarios</span> }
+        </a>
+        <a routerLink="/admin/audit" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">📋</span>
+          @if (sidebarOpen()) { <span>Auditoría</span> }
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      @if (sidebarOpen()) {
+        <div class="user-info">
+          <strong>{{ auth.getUser()?.nombre }}</strong>
+          <span class="badge {{ auth.getRole() }}">{{ auth.getRole() }}</span>
+        </div>
+      }
+      <button class="btn-ghost btn-sm logout-btn" (click)="auth.logout()">
+        @if (sidebarOpen()) { Salir } @else { ↩ }
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-area">
+    <header class="topbar">
+      <button class="toggle-btn" (click)="toggle()" title="Colapsar menú">
+        {{ sidebarOpen() ? '◀' : '▶' }}
+      </button>
+    </header>
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

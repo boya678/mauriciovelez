@@ -1,15 +1,16 @@
 # ============================================================
 # build-deploy.ps1
-# Construye imágenes Docker, las sube al ACR y despliega en K8s
+# Construye imágenes multi-arch (amd64+arm64), las sube al ACR y despliega en K8s
 #
 # Uso:
 #   .\build-deploy.ps1                  # build + push + deploy todo
 #   .\build-deploy.ps1 -Target backend  # solo backend
 #   .\build-deploy.ps1 -Target frontend # solo frontend
+#   .\build-deploy.ps1 -Target admin    # solo admin
 #   .\build-deploy.ps1 -SkipDeploy      # solo build y push (sin kubectl)
 # ============================================================
 param(
-    [ValidateSet("backend", "frontend", "all")]
+    [ValidateSet("backend", "frontend", "admin", "all")]
     [string]$Target = "all",
     [switch]$SkipDeploy,
     [string]$Tag = "latest"
@@ -18,10 +19,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 # ── Configuración ─────────────────────────────────────────────
-$REGISTRY  = "datara.azurecr.io"
-$NAMESPACE = "apuestas"
+$REGISTRY       = "datara.azurecr.io"
+$NAMESPACE      = "mauriciovelez"
 $BACKEND_IMAGE  = "$REGISTRY/mauriciovelez-backend:$Tag"
 $FRONTEND_IMAGE = "$REGISTRY/mauriciovelez-frontend:$Tag"
+$ADMIN_IMAGE    = "$REGISTRY/mauriciovelez-admin:$Tag"
+$PLATFORMS      = "linux/amd64,linux/arm64"
+$BUILDER_NAME   = "multiarch"
 $ROOT = $PSScriptRoot
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -38,22 +42,39 @@ Write-Step "Login en Azure Container Registry: $REGISTRY"
 az acr login --name ($REGISTRY -split '\.')[0]
 Write-OK "Login OK"
 
-# ── 2. Build + Push Backend ───────────────────────────────────
+# ── 2. Preparar builder multi-arch ────────────────────────────
+Write-Step "Configurando builder multi-arch: $BUILDER_NAME"
+$existsBuilder = docker buildx inspect $BUILDER_NAME 2>$null
+if ($LASTEXITCODE -ne 0) {
+    docker buildx create --name $BUILDER_NAME --use
+} else {
+    docker buildx use $BUILDER_NAME
+}
+docker buildx inspect --bootstrap
+Write-OK "Builder $BUILDER_NAME listo"
+
+# ── 3. Build + Push Backend ───────────────────────────────────
 if ($Target -in "backend", "all") {
-    Write-Step "Build backend  →  $BACKEND_IMAGE"
-    docker build -t $BACKEND_IMAGE "$ROOT\backend"
-    Write-Step "Push backend   →  $BACKEND_IMAGE"
-    docker push $BACKEND_IMAGE
+    Write-Step "Build + Push backend  →  $BACKEND_IMAGE  [$PLATFORMS]"
+    docker buildx use $BUILDER_NAME
+    docker buildx build --platform $PLATFORMS --push -t $BACKEND_IMAGE "$ROOT\backend"
     Write-OK "Backend image publicada"
 }
 
-# ── 3. Build + Push Frontend ──────────────────────────────────
+# ── 4. Build + Push Frontend ──────────────────────────────────
 if ($Target -in "frontend", "all") {
-    Write-Step "Build frontend  →  $FRONTEND_IMAGE"
-    docker build -t $FRONTEND_IMAGE "$ROOT\frontend"
-    Write-Step "Push frontend   →  $FRONTEND_IMAGE"
-    docker push $FRONTEND_IMAGE
+    Write-Step "Build + Push frontend  →  $FRONTEND_IMAGE  [$PLATFORMS]"
+    docker buildx use $BUILDER_NAME
+    docker buildx build --platform $PLATFORMS --push -t $FRONTEND_IMAGE "$ROOT\frontend"
     Write-OK "Frontend image publicada"
+}
+
+# ── 5. Build + Push Admin ─────────────────────────────────────
+if ($Target -in "admin", "all") {
+    Write-Step "Build + Push admin  →  $ADMIN_IMAGE  [$PLATFORMS]"
+    docker buildx use $BUILDER_NAME
+    docker buildx build --platform $PLATFORMS --push -t $ADMIN_IMAGE "$ROOT\admin"
+    Write-OK "Admin image publicada"
 }
 
 if ($SkipDeploy) {
@@ -61,7 +82,7 @@ if ($SkipDeploy) {
     exit 0
 }
 
-# ── 4. Crear namespace (si no existe) ─────────────────────────
+# ── 6. Crear namespace (si no existe) ─────────────────────────
 Write-Step "Asegurando namespace: $NAMESPACE"
 kubectl get namespace $NAMESPACE 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
@@ -71,7 +92,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-OK "Namespace $NAMESPACE ya existe"
 }
 
-# ── 5. Secrets (solo si no existen) ───────────────────────────
+# ── 7. Secrets (solo si no existen) ───────────────────────────
 # NOTA: edita las variables de entorno antes de correr esto por primera vez
 Write-Step "Verificando secret backend-secrets..."
 $existsSecret = kubectl get secret backend-secrets -n $NAMESPACE 2>$null
@@ -96,28 +117,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-OK "Secret backend-secrets ya existe"
 }
 
-# ── 6. Secret de pull del ACR ─────────────────────────────────
-Write-Step "Verificando secret acr-secret..."
-$existsAcr = kubectl get secret acr-secret -n $NAMESPACE 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "   Creando acr-secret desde credenciales ACR..." -ForegroundColor Yellow
-
-    $acrName = ($REGISTRY -split '\.')[0]
-    $acrCreds = az acr credential show --name $acrName | ConvertFrom-Json
-    $acrUser  = $acrCreds.username
-    $acrPass  = $acrCreds.passwords[0].value
-
-    kubectl create secret docker-registry acr-secret `
-        --namespace $NAMESPACE `
-        --docker-server=$REGISTRY `
-        --docker-username=$acrUser `
-        --docker-password=$acrPass
-    Write-OK "acr-secret creado"
-} else {
-    Write-OK "acr-secret ya existe"
-}
-
-# ── 7. Aplicar manifests ──────────────────────────────────────
+# ── 8. Aplicar manifests ──────────────────────────────────────
 if ($Target -in "backend", "all") {
     Write-Step "Aplicando manifests backend..."
     kubectl apply -f "$ROOT\backend\k8s\" --namespace $NAMESPACE
@@ -132,7 +132,14 @@ if ($Target -in "frontend", "all") {
     Write-OK "Frontend desplegado"
 }
 
-# ── 8. Verificar estado ───────────────────────────────────────
+if ($Target -in "admin", "all") {
+    Write-Step "Aplicando manifests admin..."
+    kubectl apply -f "$ROOT\admin\k8s\" --namespace $NAMESPACE
+    kubectl rollout restart deployment/admin --namespace $NAMESPACE
+    Write-OK "Admin desplegado"
+}
+
+# ── 9. Verificar estado ───────────────────────────────────────
 Write-Step "Estado del namespace $NAMESPACE"
 kubectl get all -n $NAMESPACE
 

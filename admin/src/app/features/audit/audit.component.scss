@@ -1,0 +1,44 @@
+.total-badge {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.toolbar {
+  margin-bottom: 16px;
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    label { margin: 0; white-space: nowrap; }
+  }
+}
+
+.table-card { padding: 0; overflow: hidden; }
+.table-wrap { overflow-x: auto; }
+
+.mono  { font-family: 'Courier New', monospace; }
+.small { font-size: 12px; }
+
+.action-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+
+  &.success { background: rgba(76,175,125,.2); color: #4caf7d; }
+  &.warning { background: rgba(240,167,50,.2); color: #f0c060; }
+  &.danger  { background: rgba(224,92,92,.2);  color: #e05c5c; }
+  &.accent  { background: rgba(79,110,247,.2); color: #7b9bff; }
+}
+
+.detail-cell {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}

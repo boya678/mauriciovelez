@@ -1,0 +1,137 @@
+<div class="page-header">
+  <h2>Usuarios de Plataforma</h2>
+  <button class="btn-primary" (click)="openCreate()">+ Nuevo usuario</button>
+</div>
+
+<div class="card table-card">
+  @if (loading()) {
+    <div class="empty-state">Cargando…</div>
+  } @else if (items().length === 0) {
+    <div class="empty-state">No hay usuarios registrados</div>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Usuario</th>
+          <th>CC</th>
+          <th class="center">Rol</th>
+          <th class="center">Estado</th>
+          <th class="center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (u of items(); track u.id) {
+          <tr>
+            <td>{{ u.nombre }}</td>
+            <td class="mono">{{ u.usuario }}</td>
+            <td>{{ u.cc }}</td>
+            <td class="center"><span class="badge {{ u.role }}">{{ u.role }}</span></td>
+            <td class="center">
+              <span class="badge" [class.active]="u.active" [class.inactive]="!u.active">
+                {{ u.active ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="center actions">
+              <button class="btn-ghost btn-sm" (click)="openEdit(u)">✏️</button>
+              <button class="btn-danger btn-sm" (click)="openDelete(u)">🗑</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>
+
+<!-- Create Modal -->
+@if (showCreate) {
+  <div class="modal-backdrop" (click)="showCreate = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Nuevo Usuario</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre completo</label>
+          <input type="text" [(ngModel)]="createForm.nombre" />
+        </div>
+        <div class="form-group">
+          <label>CC</label>
+          <input type="text" [(ngModel)]="createForm.cc" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Usuario</label>
+          <input type="text" [(ngModel)]="createForm.usuario" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" [(ngModel)]="createForm.clave" autocomplete="new-password" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Rol</label>
+        <select [(ngModel)]="createForm.role">
+          @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" (click)="showCreate = false">Cancelar</button>
+        <button class="btn-primary" (click)="submitCreate()">Crear</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Edit Modal -->
+@if (editTarget) {
+  <div class="modal-backdrop" (click)="editTarget = null">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Editar Usuario</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" [(ngModel)]="editForm.nombre" />
+        </div>
+        <div class="form-group">
+          <label>CC</label>
+          <input type="text" [(ngModel)]="editForm.cc" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nueva contraseña <span class="hint">(dejar vacío para no cambiar)</span></label>
+          <input type="password" [(ngModel)]="editForm.clave" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select [(ngModel)]="editForm.role">
+            @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
+          </select>
+        </div>
+      </div>
+      <div class="form-group check-group">
+        <label>
+          <input type="checkbox" [(ngModel)]="editForm.active" /> Activo
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" (click)="editTarget = null">Cancelar</button>
+        <button class="btn-primary" (click)="submitEdit()">Guardar</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Delete Confirm -->
+@if (deleteTarget) {
+  <div class="modal-backdrop" (click)="deleteTarget = null">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>¿Eliminar usuario?</h3>
+      <p class="confirm-text">Vas a eliminar a <strong>{{ deleteTarget.nombre }}</strong>. Esta acción no se puede deshacer.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" (click)="deleteTarget = null">Cancelar</button>
+        <button class="btn-danger" (click)="confirmDelete()">Eliminar</button>
+      </div>
+    </div>
+  </div>
+}
