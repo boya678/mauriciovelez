@@ -1,8 +1,8 @@
-import csv
 import io
 import uuid
 from typing import Optional
 
+import openpyxl
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -97,22 +97,21 @@ def export_clientes(
         )
     items = query.order_by(Cliente.nombre).all()
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Nombre", "Celular", "CC", "Correo", "Saldo", "VIP"])
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Clientes"
+    ws.append(["Nombre", "Celular", "CC", "Correo", "Saldo", "VIP"])
     for c in items:
-        writer.writerow([
-            c.nombre, c.celular, c.cc or "", c.correo or "",
-            c.saldo, "Sí" if c.vip else "No",
-        ])
+        ws.append([c.nombre, c.celular, c.cc or "", c.correo or "", float(c.saldo), "Sí" if c.vip else "No"])
 
-    # BOM UTF-8 para que Excel abra correctamente tildes y ñ
-    content = "\ufeff" + output.getvalue()
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
 
     return StreamingResponse(
-        iter([content.encode("utf-8")]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=clientes.csv"},
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=clientes.xlsx"},
     )
 
 

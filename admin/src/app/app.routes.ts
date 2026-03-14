@@ -25,6 +25,10 @@ export const routes: Routes = [
         path: 'audit',
         loadComponent: () => import('./features/audit/audit.component').then(m => m.AuditComponent),
       },
+      {
+        path: 'historico',
+        loadComponent: () => import('./features/historico/historico.component').then(m => m.HistoricoComponent),
+      },
     ],
   },
   { path: '**', redirectTo: '/login' },

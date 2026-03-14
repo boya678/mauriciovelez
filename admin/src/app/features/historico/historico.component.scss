@@ -1,0 +1,64 @@
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  input[type=date] {
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+  }
+}
+
+.btn-export {
+  white-space: nowrap;
+  padding: 0 18px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: var(--accent); color: #fff; }
+}
+
+.table-card { padding: 0; overflow: hidden; }
+.table-wrap  { overflow-x: auto; }
+.center      { text-align: center; }
+.mono        { font-family: 'Courier New', monospace; font-size: 13px; }
+
+.numero-cell {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.total-badge {
+  color: var(--text-muted);
+  font-size: 13px;
+}

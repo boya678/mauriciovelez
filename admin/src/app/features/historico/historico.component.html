@@ -1,0 +1,59 @@
+<div class="page-header">
+  <h2>Histórico de Números</h2>
+  <span class="total-badge">{{ total() | number }} registros</span>
+</div>
+
+<!-- Filtros -->
+<div class="toolbar">
+  <div class="filter-group">
+    <label>Desde</label>
+    <input type="date" [(ngModel)]="desde" />
+  </div>
+  <div class="filter-group">
+    <label>Hasta</label>
+    <input type="date" [(ngModel)]="hasta" />
+  </div>
+  <button class="btn-primary btn-sm" (click)="filtrar()">Filtrar</button>
+  <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+</div>
+
+<!-- Tabla -->
+<div class="card table-card">
+  @if (loading()) {
+    <div class="empty-state">Cargando…</div>
+  } @else if (items().length === 0) {
+    <div class="empty-state">Sin registros para el período seleccionado</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Nombre</th>
+            <th>Celular</th>
+            <th>CC</th>
+            <th class="center">Número</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of items(); track r.id) {
+            <tr>
+              <td class="mono">{{ r.fecha }}</td>
+              <td>{{ r.nombre }}</td>
+              <td>{{ r.celular }}</td>
+              <td>{{ r.cc || '—' }}</td>
+              <td class="center numero-cell">{{ r.numero }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <span>{{ (page()-1)*size + 1 }}–{{ (page()-1)*size + items().length }} de {{ total() | number }}</span>
+      <button class="btn-ghost btn-sm" (click)="prev()" [disabled]="page() === 1">‹</button>
+      <span>{{ page() }} / {{ totalPages }}</span>
+      <button class="btn-ghost btn-sm" (click)="next()" [disabled]="page() === totalPages">›</button>
+    </div>
+  }
+</div>

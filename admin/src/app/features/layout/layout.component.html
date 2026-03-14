@@ -13,6 +13,10 @@
         <span class="nav-icon">👥</span>
         @if (sidebarOpen()) { <span>Clientes</span> }
       </a>
+      <a routerLink="/admin/historico" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">🔢</span>
+        @if (sidebarOpen()) { <span>Histórico</span> }
+      </a>
       @if (auth.isAdmin()) {
         <a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-item">
           <span class="nav-icon">🔐</span>

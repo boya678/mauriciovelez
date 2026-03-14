@@ -85,7 +85,7 @@ export class ClientesComponent implements OnInit {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'clientes.csv';
+      a.download = 'clientes.xlsx';
       a.click();
       URL.revokeObjectURL(url);
     });
