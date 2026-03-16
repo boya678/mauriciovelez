@@ -82,3 +82,49 @@
   </div>
 
 </div>
+
+<!-- Modal VIP -->
+@if (showVipModal()) {
+  <div class="vip-overlay" (click)="$event.target === $event.currentTarget && cancelVipModal()">
+    <div class="vip-modal" role="dialog" aria-modal="true" aria-labelledby="vip-title">
+
+      <div class="vip-modal-icon">★</div>
+      <h2 id="vip-title" class="vip-modal-title gold-text">Acceso VIP</h2>
+      <p class="vip-modal-sub">Ingresa tu código personal para continuar</p>
+
+      <div class="field-wrapper vip-field" [class.field-invalid]="vipError()">
+        <span class="field-icon material-icons-round">vpn_key</span>
+        <input
+          type="text"
+          class="field-input"
+          [(ngModel)]="vipCode"
+          placeholder="Código VIP"
+          (keyup.enter)="submitVipCode()"
+          autocomplete="off"
+          autofocus
+        />
+      </div>
+
+      @if (vipError()) {
+        <div class="alert-error vip-alert" role="alert">
+          <span class="material-icons-round">warning</span>
+          {{ vipError() }}
+        </div>
+      }
+
+      <button class="btn-submit vip-btn" (click)="submitVipCode()" [disabled]="vipLoading()">
+        @if (vipLoading()) {
+          <span class="spinner"></span>
+          <span>Verificando…</span>
+        } @else {
+          <span class="material-icons-round">stars</span>
+          <span>Ingresar</span>
+        }
+      </button>
+
+      <button class="btn-cancel" type="button" (click)="cancelVipModal()">
+        Cancelar
+      </button>
+    </div>
+  </div>
+}

@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
@@ -16,7 +16,7 @@ interface Particle {
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, CommonModule],
+  imports: [ReactiveFormsModule, FormsModule, CommonModule],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
@@ -25,6 +25,13 @@ export class LoginComponent implements OnInit {
   loading = signal(false);
   errorMsg = signal('');
   particles: Particle[] = [];
+
+  // Estado modal VIP
+  showVipModal = signal(false);
+  vipCode = '';
+  vipError = signal('');
+  vipLoading = signal(false);
+  private pendingClienteId = '';
 
   private readonly symbols = ['♦', '★', '$', '✦', '♠', '♣', '♥', '7', '♞', '⬡'];
 
@@ -65,9 +72,16 @@ export class LoginComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
     this.authService.login(this.form.value).subscribe({
-      next: () => {
+      next: res => {
         this.loading.set(false);
-        this.router.navigate(['/portal']);
+        if (res.cliente.vip) {
+          this.pendingClienteId = res.cliente.id;
+          this.vipCode = '';
+          this.vipError.set('');
+          this.showVipModal.set(true);
+        } else {
+          this.router.navigate(['/portal']);
+        }
       },
       error: err => {
         this.loading.set(false);
@@ -76,6 +90,36 @@ export class LoginComponent implements OnInit {
         );
       },
     });
+  }
+
+  submitVipCode(): void {
+    if (!this.vipCode.trim()) {
+      this.vipError.set('Ingresa tu código VIP');
+      return;
+    }
+    this.vipLoading.set(true);
+    this.vipError.set('');
+    this.authService.verifyVip(this.pendingClienteId, this.vipCode.trim()).subscribe({
+      next: () => {
+        this.vipLoading.set(false);
+        this.showVipModal.set(false);
+        this.router.navigate(['/portal']);
+      },
+      error: err => {
+        this.vipLoading.set(false);
+        this.vipError.set(
+          err?.error?.detail ?? 'Código incorrecto. Intenta de nuevo.'
+        );
+      },
+    });
+  }
+
+  cancelVipModal(): void {
+    this.showVipModal.set(false);
+    this.authService.logout();
+    this.vipCode = '';
+    this.vipError.set('');
+    this.pendingClienteId = '';
   }
 
   isInvalid(field: string): boolean {

@@ -10,6 +10,7 @@ export interface Cliente {
   cc: string | null;
   saldo: number;
   vip: boolean;
+  codigo_vip: string | null;
 }
 
 export interface PaginatedClientes {

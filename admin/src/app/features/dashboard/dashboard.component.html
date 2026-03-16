@@ -1,0 +1,96 @@
+<div class="dash-page">
+  <div class="dash-header">
+    <h1 class="dash-title">📊 Dashboard de Aciertos</h1>
+    <div class="mes-selector">
+      <label for="mesSelect">Mes:</label>
+      <select id="mesSelect" [(ngModel)]="selectedMes" (ngModelChange)="onMesChange()">
+        @for (m of meses; track m.value) {
+          <option [value]="m.value">{{ m.label }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">Cargando estadísticas…</div>
+  } @else if (error()) {
+    <div class="error-state">{{ error() }}</div>
+  } @else if (stats) {
+
+    <!-- KPI Cards row -->
+    <div class="kpi-grid">
+
+      <div class="kpi-card">
+        <div class="kpi-icon">📦</div>
+        <div class="kpi-value">{{ stats!.numeros_entregados }}</div>
+        <div class="kpi-label">Números entregados</div>
+      </div>
+
+      <div class="kpi-card accent-gold">
+        <div class="kpi-icon">🏆</div>
+        <div class="kpi-value">{{ stats!.total_aciertos }}</div>
+        <div class="kpi-label">Total aciertos</div>
+      </div>
+
+      <div class="kpi-card accent-green">
+        <div class="kpi-icon">📈</div>
+        <div class="kpi-value">{{ stats!.efectividad_pct }}%</div>
+        <div class="kpi-label">Efectividad</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-value">{{ stats!.clientes_con_aciertos }}</div>
+        <div class="kpi-label">Clientes ganadores</div>
+      </div>
+
+      @if (stats!.numero_mas_frecuente) {
+        <div class="kpi-card accent-blue">
+          <div class="kpi-icon">🔢</div>
+          <div class="kpi-value num-hero">{{ stats!.numero_mas_frecuente }}</div>
+          <div class="kpi-label">Número más frecuente</div>
+        </div>
+      }
+
+    </div>
+
+    <!-- Tipo breakdown -->
+    <div class="section">
+      <h2 class="section-title">Desglose por tipo</h2>
+      <div class="tipo-grid">
+        <div class="tipo-card exacto">
+          <span class="tipo-count">{{ stats!.exactos }}</span>
+          <span class="tipo-label">Exacto</span>
+        </div>
+        <div class="tipo-card tres-orden">
+          <span class="tipo-count">{{ stats!.tres_orden }}</span>
+          <span class="tipo-label">3 en orden</span>
+        </div>
+        <div class="tipo-card tres-desorden">
+          <span class="tipo-count">{{ stats!.tres_desorden }}</span>
+          <span class="tipo-label">3 desorden</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top loterias -->
+    @if (stats!.top_loterias.length > 0) {
+      <div class="section">
+        <h2 class="section-title">Top loterías con más aciertos</h2>
+        <div class="loteria-list">
+          @for (l of stats!.top_loterias; track l.loteria; let i = $index) {
+            <div class="loteria-row">
+              <span class="rank">#{{ i + 1 }}</span>
+              <span class="loteria-name">{{ l.loteria }}</span>
+              <div class="bar-track">
+                <div class="bar-fill" [style.width]="barWidth(l.aciertos, maxAciertos())"></div>
+              </div>
+              <span class="loteria-count">{{ l.aciertos }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+  }
+</div>

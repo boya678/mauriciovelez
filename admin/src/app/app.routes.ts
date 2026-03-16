@@ -12,7 +12,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/layout/layout.component').then(m => m.LayoutComponent),
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'clientes', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
+      },
       {
         path: 'clientes',
         loadComponent: () => import('./features/clientes/clientes.component').then(m => m.ClientesComponent),
@@ -28,6 +32,10 @@ export const routes: Routes = [
       {
         path: 'historico',
         loadComponent: () => import('./features/historico/historico.component').then(m => m.HistoricoComponent),
+      },
+      {
+        path: 'suscripciones',
+        loadComponent: () => import('./features/suscripciones/suscripciones.component').then(m => m.SuscripcionesComponent),
       },
     ],
   },

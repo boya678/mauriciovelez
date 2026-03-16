@@ -31,8 +31,13 @@
   <!-- CONTENIDO -->
   @if (!loading && data) {
 
-    <!-- ── NÚMERO VIP (primero) ── -->
-    @if (data.es_vip && data.numero_vip) {
+    <div class="num-grid">
+
+      <!-- ── COLUMNA IZQUIERDA: números ── -->
+      <div class="num-left">
+
+        <!-- ── NÚMERO VIP (primero) ── -->
+        @if (data.es_vip && data.numero_vip) {
       <section class="numero-section vip">
         <div class="numero-badge vip-badge">★ VIP · NÚMERO PERSONAL VICTORIOSO · 3 DÍAS</div>
         <h2 class="numero-section-title">Tu Número Personal Victorioso</h2>
@@ -101,7 +106,42 @@
       </div>
     </section>
 
+      </div><!-- /num-left -->
+
+      <!-- ── COLUMNA DERECHA: victorias (solo si hay) ── -->
+      @if (!loadingAciertos && aciertos.length > 0) {
+        <div class="num-right">
+          <div class="aciertos-panel">
+            <div class="aciertos-header">
+              <span class="aciertos-icon">🏆</span>
+              <div>
+                <h3 class="aciertos-title">Tus Victorias</h3>
+                <p class="aciertos-subtitle">Últimos 2 meses</p>
+              </div>
+            </div>
+            <ul class="aciertos-list">
+              @for (a of aciertos; track $index) {
+                <li class="acierto-item">
+                  <div class="acierto-top">
+                    <span class="acierto-numero">{{ a.numero }}</span>
+                    <span class="acierto-badge tipo-{{ a.tipo }}">{{ tipoLabel(a.tipo) }}</span>
+                  </div>
+                  <div class="acierto-bottom">
+                    <span class="acierto-loteria">{{ a.loteria }}</span>
+                    <span class="acierto-sep">·</span>
+                    <span class="acierto-resultado">{{ a.resultado }}</span>
+                    <span class="acierto-sep">·</span>
+                    <span class="acierto-fecha">{{ a.fecha }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        </div><!-- /num-right -->
+      }
+
+    </div><!-- /num-grid -->
+
   }
 
 </div>
-

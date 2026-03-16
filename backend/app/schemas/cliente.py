@@ -29,3 +29,8 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     cliente: ClienteResponse
     es_nuevo: bool
+
+
+class VipVerifyRequest(BaseModel):
+    cliente_id: uuid.UUID
+    codigo: str = Field(..., min_length=1, max_length=100)

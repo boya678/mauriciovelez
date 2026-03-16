@@ -1,8 +1,10 @@
 import io
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 import openpyxl
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -12,6 +14,7 @@ from app.core.admin_security import get_current_platform_user, require_admin, re
 from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.cliente import Cliente
+from app.models.suscripcion import Suscripcion
 
 router = APIRouter(prefix="/admin/clientes", tags=["Admin Clientes"])
 
@@ -26,6 +29,7 @@ class ClienteOut(BaseModel):
     cc: Optional[str]
     saldo: float
     vip: bool
+    codigo_vip: Optional[str]
 
     model_config = {"from_attributes": True}
 
@@ -36,6 +40,7 @@ class ClienteUpdate(BaseModel):
     cc: Optional[str] = None
     saldo: Optional[float] = None
     vip: Optional[bool] = None
+    codigo_vip: Optional[str] = None
 
 
 class PaginatedClientes(BaseModel):
@@ -85,7 +90,7 @@ def list_clientes(
 def export_clientes(
     q: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    _user=Depends(get_current_platform_user),
+    _user=Depends(require_admin),
 ):
     query = db.query(Cliente)
     if q:
@@ -100,9 +105,9 @@ def export_clientes(
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Clientes"
-    ws.append(["Nombre", "Celular", "CC", "Correo", "Saldo", "VIP"])
+    ws.append(["Nombre", "Celular", "CC", "Correo", "Saldo", "VIP", "Código VIP"])
     for c in items:
-        ws.append([c.nombre, c.celular, c.cc or "", c.correo or "", float(c.saldo), "Sí" if c.vip else "No"])
+        ws.append([c.nombre, c.celular, c.cc or "", c.correo or "", float(c.saldo), "Sí" if c.vip else "No", c.codigo_vip or ""])
 
     output = io.BytesIO()
     wb.save(output)
@@ -137,9 +142,29 @@ def update_cliente(
     obj = db.get(Cliente, cliente_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    vip_antes = obj.vip
     changes = payload.model_dump(exclude_none=True)
     for key, val in changes.items():
         setattr(obj, key, val)
+
+    # Si se activa VIP y antes no lo era, crear suscripción de 1 mes
+    if not vip_antes and obj.vip:
+        now = datetime.now(timezone.utc)
+        db.add(Suscripcion(
+            cliente_id=obj.id,
+            inicio=now,
+            fin=now + relativedelta(months=1),
+            activa=True,
+        ))
+
+    # Si se desactiva VIP, desactivar todas sus suscripciones activas
+    if vip_antes and not obj.vip:
+        db.query(Suscripcion).filter(
+            Suscripcion.cliente_id == obj.id,
+            Suscripcion.activa == True,
+        ).update({"activa": False}, synchronize_session=False)
+
     _audit(db, user, "UPDATE", str(cliente_id), changes)
     db.commit()
     db.refresh(obj)

@@ -28,6 +28,9 @@
         <div class="user-text">
           <span class="user-name">{{ cliente?.nombre }}</span>
           <span class="user-role">{{ cliente?.vip ? '★ VIP' : 'Cliente' }}</span>
+          @if (cliente?.vip && vipFin) {
+            <span class="vip-expires">Vence: {{ vipFin | date:'dd/MM/yyyy' }}</span>
+          }
         </div>
       }
     </div>
@@ -85,6 +88,9 @@
           </div>
           @if (cliente.vip) {
             <span class="vip-badge">★ VIP</span>
+            @if (vipFin) {
+              <span class="vip-expiry">Vence {{ vipFin | date:'dd/MM/yyyy' }}</span>
+            }
           }
         }
       </div>

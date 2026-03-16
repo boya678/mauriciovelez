@@ -1,7 +1,8 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HistoricoService, HistoricoRow } from '../../core/services/historico.service';
+import { HistoricoService, HistoricoRow, AciertoDetalle } from '../../core/services/historico.service';
+import { AuthService } from '../../core/services/auth.service';
 
 function yesterday(): string {
   const d = new Date();
@@ -26,7 +27,13 @@ export class HistoricoComponent implements OnInit {
   desde = yesterday();
   hasta = yesterday();
 
-  constructor(private svc: HistoricoService) {}
+  // Modal aciertos
+  showModal = signal(false);
+  modalLoading = signal(false);
+  modalAciertos = signal<AciertoDetalle[]>([]);
+  modalTitle = signal('');
+
+  constructor(public auth: AuthService, private svc: HistoricoService) {}
 
   ngOnInit() { this.load(); }
 
@@ -54,5 +61,27 @@ export class HistoricoComponent implements OnInit {
       a.click();
       URL.revokeObjectURL(url);
     });
+  }
+
+  openAciertos(r: HistoricoRow) {
+    this.modalTitle.set(`Aciertos — ${r.nombre} (${r.numero})`);
+    this.modalAciertos.set([]);
+    this.showModal.set(true);
+    this.modalLoading.set(true);
+    this.svc.getAciertos(r.id).subscribe({
+      next: data => { this.modalAciertos.set(data); this.modalLoading.set(false); },
+      error: () => this.modalLoading.set(false),
+    });
+  }
+
+  closeModal() { this.showModal.set(false); }
+
+  tipoLabel(tipo: string): string {
+    const map: Record<string, string> = {
+      exacto: 'Exacto (4)',
+      tres_orden: 'Últimas 3 (orden)',
+      tres_desorden: 'Últimas 3 (desorden)',
+    };
+    return map[tipo] ?? tipo;
   }
 }

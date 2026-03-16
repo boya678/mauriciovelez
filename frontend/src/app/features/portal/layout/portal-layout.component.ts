@@ -22,6 +22,7 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
   collapsed = signal(false);
   isMobile = signal(false);
   cliente: Cliente | null = null;
+  vipFin: string | null = null;
   private subs = new Subscription();
 
   menuItems: MenuItem[] = [
@@ -36,6 +37,15 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.cliente = this.authService.getCliente();
+
+    // Cargar fecha de vencimiento VIP si aplica
+    if (this.cliente?.vip) {
+      this.subs.add(
+        this.authService.getMiSuscripcion().subscribe(res => {
+          this.vipFin = res.fin;
+        })
+      );
+    }
 
     // Detectar móvil y colapsar automáticamente
     this.subs.add(

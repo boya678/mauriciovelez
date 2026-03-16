@@ -231,3 +231,90 @@ form {
   animation: spin 0.65s linear infinite;
   flex-shrink: 0;
 }
+
+// ── VIP MODAL ─────────────────────────────────────────────────
+.vip-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in-up 0.25s ease-out both;
+}
+
+.vip-modal {
+  width: min(400px, 90vw);
+  padding: 2.5rem 2rem 2rem;
+  background: linear-gradient(
+    148deg,
+    rgba(60, 20, 10, 0.96) 0%,
+    rgba(8, 0, 18, 0.97) 100%
+  );
+  border: 1px solid rgba(255, 215, 0, 0.45);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 0, 0.1),
+    0 12px 48px rgba(0, 0, 0, 0.7),
+    0 0 80px rgba(255, 140, 0, 0.15),
+    inset 0 1px 0 rgba(255, 215, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.15rem;
+  animation: fade-in-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.vip-modal-icon {
+  font-size: 3rem;
+  color: var(--gold-bright);
+  text-shadow: 0 0 24px var(--gold-mid), 0 0 50px rgba(255, 140, 0, 0.5);
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+.vip-modal-title {
+  font-size: 1.6rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin: 0;
+  text-align: center;
+}
+
+.vip-modal-sub {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  margin: 0;
+}
+
+.vip-field {
+  width: 100%;
+}
+
+.vip-alert {
+  width: 100%;
+}
+
+.vip-btn {
+  width: 100%;
+  margin-top: 0;
+}
+
+.btn-cancel {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.5rem;
+  transition: var(--transition);
+
+  &:hover {
+    color: var(--text-secondary);
+  }
+}

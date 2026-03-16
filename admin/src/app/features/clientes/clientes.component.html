@@ -7,7 +7,9 @@
   <div class="search-bar">
     <input type="search" [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Buscar por nombre, celular o cc…" />
   </div>
-  <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+  @if (auth.isAdmin()) {
+    <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+  }
 </div>
 
 <div class="card table-card">
@@ -26,6 +28,7 @@
             <th>Correo</th>
             <th class="right">Saldo</th>
             <th class="center">VIP</th>
+            <th class="center">Cód. VIP</th>
             <th class="center">Acciones</th>
           </tr>
         </thead>
@@ -40,6 +43,7 @@
               <td class="center">
                 @if (c.vip) { <span class="badge vip">VIP</span> } @else { <span class="text-muted">—</span> }
               </td>
+              <td class="center mono code-vip">{{ c.codigo_vip || '—' }}</td>
               <td class="center actions">
                 @if (auth.canEdit()) {
                   <button class="btn-ghost btn-sm" (click)="openEdit(c)">✏️</button>
@@ -88,6 +92,13 @@
         <label>
           <input type="checkbox" [(ngModel)]="editForm.vip" /> VIP
         </label>
+      </div>
+      <div class="form-group">
+        <label>Código VIP</label>
+        <div class="input-with-btn">
+          <input type="text" [(ngModel)]="editForm.codigo_vip" placeholder="Sin código" />
+          <button type="button" class="btn-ghost btn-sm" (click)="generateCode()">Generar</button>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="btn-ghost" (click)="editTarget = null">Cancelar</button>

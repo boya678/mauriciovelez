@@ -59,7 +59,7 @@ export class ClientesComponent implements OnInit {
 
   openEdit(c: Cliente) {
     this.editTarget = c;
-    this.editForm = { nombre: c.nombre, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip };
+    this.editForm = { nombre: c.nombre, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '' };
   }
 
   saveEdit() {
@@ -89,5 +89,12 @@ export class ClientesComponent implements OnInit {
       a.click();
       URL.revokeObjectURL(url);
     });
+  }
+
+  generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    this.editForm.codigo_vip = Array.from({ length: 8 }, () =>
+      chars[Math.floor(Math.random() * chars.length)]
+    ).join('');
   }
 }

@@ -49,7 +49,7 @@ export class AuditComponent implements OnInit {
   }
 
   actionClass(action: string) {
-    const map: Record<string, string> = { CREATE: 'success', UPDATE: 'warning', DELETE: 'danger', LOGIN: 'accent' };
+    const map: Record<string, string> = { CREATE: 'success', UPDATE: 'warning', DELETE: 'danger', LOGIN: 'accent', RENOVAR: 'info' };
     return map[action] ?? '';
   }
 }

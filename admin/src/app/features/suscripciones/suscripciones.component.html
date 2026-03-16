@@ -1,0 +1,95 @@
+<div class="page">
+
+  <div class="page-header">
+    <h2>Suscripciones VIP</h2>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-bar">
+      <input
+        type="search"
+        [(ngModel)]="search"
+        (ngModelChange)="filtrar()"
+        placeholder="Buscar nombre o celular…"
+      />
+    </div>
+    <label class="check-label">
+      <input type="checkbox" [(ngModel)]="soloActivas" (change)="filtrar()" />
+      Solo activas
+    </label>
+    @if (auth.isAdmin()) {
+      <button class="btn-export" (click)="runVipCheck()" [disabled]="runningCheck()" title="Desactiva suscripciones vencidas ahora">
+        {{ runningCheck() ? '…' : '⚙ Sincronizar suscripciones' }}
+      </button>
+      <button class="btn-export" (click)="downloadExcel()">
+        ⬇ Exportar
+      </button>
+    }
+  </div>
+
+  <div class="table-wrap">
+    @if (loading()) {
+      <div class="loading">Cargando…</div>
+    } @else {
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Celular</th>
+            <th class="center">Inicio</th>
+            <th class="center">Vence</th>
+            <th class="center">Días rest.</th>
+            <th class="center">Estado</th>
+            @if (auth.isAdmin()) {
+              <th class="center">Acciones</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of items(); track s.id) {
+            <tr [class.row-vencida]="estadoBadge(s) === 'vencida'">
+              <td class="bold">{{ s.nombre }}</td>
+              <td class="mono">{{ s.celular }}</td>
+              <td class="center">{{ s.inicio | date:'dd/MM/yyyy' }}</td>
+              <td class="center">{{ s.fin | date:'dd/MM/yyyy' }}</td>
+              <td class="center">
+                @if (estadoBadge(s) === 'activa') {
+                  <span class="dias">{{ diasRestantes(s) }}</span>
+                } @else {
+                  <span class="text-muted">—</span>
+                }
+              </td>
+              <td class="center">
+                <span class="badge badge-{{ estadoBadge(s) }}">
+                  {{ estadoBadge(s) === 'activa' ? 'Activa' : 'Vencida' }}
+                </span>
+              </td>
+              @if (auth.isAdmin()) {
+                <td class="center actions">
+                  <button
+                    class="btn-sm btn-primary"
+                    (click)="renovar(s)"
+                    [disabled]="renovandoId === s.id"
+                    title="Renovar +1 mes"
+                  >
+                    {{ renovandoId === s.id ? '…' : '↺ Renovar' }}
+                  </button>
+                </td>
+              }
+            </tr>
+          }
+          @empty {
+            <tr><td colspan="7" class="empty">Sin suscripciones</td></tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <div class="pagination">
+    <button class="btn-ghost btn-sm" (click)="prev()" [disabled]="page() <= 1">‹ Ant</button>
+    <span class="page-info">Página {{ page() }} / {{ totalPages }} &nbsp;·&nbsp; {{ total() }} registros</span>
+    <button class="btn-ghost btn-sm" (click)="next()" [disabled]="page() >= totalPages">Sig ›</button>
+  </div>
+
+</div>

@@ -1,0 +1,204 @@
+.dash-page {
+  padding: 1.5rem;
+  max-width: 960px;
+}
+
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.dash-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0;
+}
+
+.mes-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #94a3b8);
+
+  select {
+    background: var(--bg-card, #1e293b);
+    color: var(--text-primary, #f1f5f9);
+    border: 1px solid var(--border, #334155);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+
+    &:focus { outline: 2px solid #6366f1; }
+  }
+}
+
+// ── KPI Cards ────────────────────────────────────────────────────────────────
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.kpi-card {
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  transition: transform 0.15s;
+
+  &:hover { transform: translateY(-2px); }
+
+  &.accent-gold { border-color: #f59e0b; }
+  &.accent-green { border-color: #22c55e; }
+  &.accent-blue  { border-color: #6366f1; }
+}
+
+.kpi-icon  { font-size: 1.6rem; }
+
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1;
+
+  &.num-hero {
+    font-family: 'Cinzel', serif;
+    font-size: 2.2rem;
+    color: #f59e0b;
+  }
+}
+
+.kpi-label {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+// ── Sections ─────────────────────────────────────────────────────────────────
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 1rem;
+}
+
+// ── Tipo breakdown ────────────────────────────────────────────────────────────
+
+.tipo-grid {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tipo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  gap: 0.3rem;
+  min-width: 130px;
+
+  &.exacto       { background: #14532d; border: 1px solid #22c55e; }
+  &.tres-orden   { background: #1e3a5f; border: 1px solid #6366f1; }
+  &.tres-desorden{ background: #3b1f5e; border: 1px solid #a855f7; }
+}
+
+.tipo-count {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.tipo-label {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+// ── Top loterias ──────────────────────────────────────────────────────────────
+
+.loteria-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.loteria-row {
+  display: grid;
+  grid-template-columns: 2rem 1fr 1fr 3rem;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+}
+
+.rank {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.loteria-name {
+  font-size: 0.9rem;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-track {
+  height: 8px;
+  background: #334155;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.loteria-count {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a855f7;
+  text-align: right;
+}
+
+// ── States ────────────────────────────────────────────────────────────────────
+
+.loading-state,
+.error-state {
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.error-state { color: #ef4444; }

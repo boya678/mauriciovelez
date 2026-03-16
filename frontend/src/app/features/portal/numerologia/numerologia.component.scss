@@ -1,6 +1,166 @@
 .num-page {
   animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  max-width: 760px;
+}
+
+// ── DOS COLUMNAS ──────────────────────────────────────────────
+.num-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.num-left { min-width: 0; }
+
+// ── PANEL ACIERTOS ────────────────────────────────────────────
+.num-right {
+  position: sticky;
+  top: 1.5rem;
+}
+
+.aciertos-panel {
+  background: linear-gradient(148deg, rgba(45, 8, 90, 0.65), rgba(10, 0, 25, 0.8));
+  border: 1px solid rgba(255, 215, 0, 0.18);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  animation: card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.aciertos-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.12);
+}
+
+.aciertos-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.aciertos-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  color: var(--gold-bright);
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.aciertos-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0.1rem 0 0;
+}
+
+.aciertos-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.aciertos-empty-icon {
+  font-size: 2rem;
+  color: rgba(255, 215, 0, 0.25);
+}
+
+.spinner-sm {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+}
+
+// ── LISTA ACIERTOS ────────────────────────────────────────────
+.aciertos-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 520px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255, 215, 0, 0.2); border-radius: 4px; }
+}
+
+.acierto-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 215, 0, 0.1);
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: rgba(255, 215, 0, 0.28); }
+}
+
+.acierto-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.acierto-numero {
+  font-family: 'Cinzel', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: 0.15em;
+}
+
+.acierto-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+
+  &.tipo-exacto {
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  &.tipo-tres_orden {
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+  &.tipo-tres_desorden {
+    background: rgba(168, 85, 247, 0.18);
+    color: #d8b4fe;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+  }
+}
+
+.acierto-bottom {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.acierto-sep { opacity: 0.4; }
+
+.acierto-resultado {
+  font-family: 'Courier New', monospace;
+  color: rgba(255, 215, 0, 0.65);
+  font-weight: 600;
 }
 
 // ── HEADER ────────────────────────────────────────────────────

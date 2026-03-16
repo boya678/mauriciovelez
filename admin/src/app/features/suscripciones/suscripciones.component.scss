@@ -1,0 +1,68 @@
+.page-header {
+  margin-bottom: 8px;
+  h2 { margin: 0; font-size: 1.4rem; }
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+  .search-bar { flex: 1; }
+}
+
+.btn-export {
+  white-space: nowrap;
+  padding: 0 18px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  &:hover { background: var(--accent); color: #fff; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.row-vencida td {
+  opacity: 0.6;
+}
+
+.badge-activa {
+  background: rgba(0, 200, 100, 0.15);
+  color: #00e676;
+  border: 1px solid rgba(0, 200, 100, 0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.badge-vencida {
+  background: rgba(255, 50, 50, 0.12);
+  color: #ff5252;
+  border: 1px solid rgba(255, 50, 50, 0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dias {
+  font-weight: 700;
+  color: var(--gold-mid, #ffa500);
+}
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+  cursor: pointer;
+
+  input { cursor: pointer; }
+}

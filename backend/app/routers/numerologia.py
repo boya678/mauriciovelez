@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.cliente import Cliente
+from app.models.loteria_resultado import LoteriaResultado
+from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers import Number
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
@@ -134,4 +136,40 @@ def get_mis_numeros(
         result["numero_vip"] = _serialize(vip_row)
 
     db.commit()
+    return result
+
+
+@router.get("/mis-aciertos")
+def get_mis_aciertos(
+    current_user: Annotated[Cliente, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+):
+    """Devuelve los aciertos del cliente autenticado en los últimos 2 meses."""
+    cutoff = date.today() - timedelta(days=60)
+
+    historicos = (
+        db.query(NumberHistoric)
+        .filter(NumberHistoric.id_user == current_user.id, NumberHistoric.date >= cutoff)
+        .order_by(NumberHistoric.date.desc())
+        .all()
+    )
+
+    result = []
+    for h in historicos:
+        aciertos = (
+            db.query(NumeroAcierto)
+            .filter(NumeroAcierto.historic_id == h.id)
+            .all()
+        )
+        for a in aciertos:
+            r = a.resultado
+            result.append({
+                "numero": h.number,
+                "fecha": h.date.isoformat(),
+                "tipo": a.tipo,
+                "loteria": r.loteria,
+                "resultado": r.resultado,
+            })
+
+    result.sort(key=lambda x: x["fecha"], reverse=True)
     return result

@@ -9,6 +9,10 @@
     </div>
 
     <nav class="sidebar-nav">
+      <a routerLink="/admin/dashboard" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">📊</span>
+        @if (sidebarOpen()) { <span>Dashboard</span> }
+      </a>
       <a routerLink="/admin/clientes" routerLinkActive="active" class="nav-item">
         <span class="nav-icon">👥</span>
         @if (sidebarOpen()) { <span>Clientes</span> }
@@ -16,6 +20,10 @@
       <a routerLink="/admin/historico" routerLinkActive="active" class="nav-item">
         <span class="nav-icon">🔢</span>
         @if (sidebarOpen()) { <span>Histórico</span> }
+      </a>
+      <a routerLink="/admin/suscripciones" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">💎</span>
+        @if (sidebarOpen()) { <span>Suscripciones</span> }
       </a>
       @if (auth.isAdmin()) {
         <a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-item">

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -44,6 +44,25 @@ export class AuthService {
           localStorage.setItem(this.CLIENTE_KEY, JSON.stringify(res.cliente));
         })
       );
+  }
+
+  verifyVip(clienteId: string, codigo: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${environment.apiUrl}/auth/verify-vip`, {
+      cliente_id: clienteId,
+      codigo,
+    });
+  }
+
+  getMiSuscripcion(): Observable<{ vip: boolean; fin: string | null }> {
+    return this.http.get<{ vip: boolean; fin: string | null }>(
+      `${environment.apiUrl}/auth/mi-suscripcion`,
+      { headers: this.authHeaders() }
+    );
+  }
+
+  private authHeaders(): HttpHeaders {
+    const token = this.getToken();
+    return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
   }
 
   logout(): void {

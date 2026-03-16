@@ -14,7 +14,9 @@
     <input type="date" [(ngModel)]="hasta" />
   </div>
   <button class="btn-primary btn-sm" (click)="filtrar()">Filtrar</button>
-  <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+  @if (auth.isAdmin()) {
+    <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+  }
 </div>
 
 <!-- Tabla -->
@@ -33,6 +35,7 @@
             <th>Celular</th>
             <th>CC</th>
             <th class="center">Número</th>
+            <th class="center">🏆</th>
           </tr>
         </thead>
         <tbody>
@@ -43,6 +46,15 @@
               <td>{{ r.celular }}</td>
               <td>{{ r.cc || '—' }}</td>
               <td class="center numero-cell">{{ r.numero }}</td>
+              <td class="center">
+                @if (r.aciertos > 0) {
+                  <button class="btn-aciertos" (click)="openAciertos(r)" title="Ver aciertos">
+                    🏆 {{ r.aciertos }}
+                  </button>
+                } @else {
+                  <span class="no-acierto">—</span>
+                }
+              </td>
             </tr>
           }
         </tbody>
@@ -57,3 +69,43 @@
     </div>
   }
 </div>
+
+<!-- Modal de aciertos -->
+@if (showModal()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ modalTitle() }}</h3>
+        <button class="modal-close" (click)="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        @if (modalLoading()) {
+          <div class="modal-empty">Cargando…</div>
+        } @else if (modalAciertos().length === 0) {
+          <div class="modal-empty">Sin aciertos registrados.</div>
+        } @else {
+          <table class="aciertos-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Lotería</th>
+                <th class="center">Resultado</th>
+                <th class="center">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (a of modalAciertos(); track a.id) {
+                <tr>
+                  <td><span class="tipo-badge tipo-{{ a.tipo }}">{{ tipoLabel(a.tipo) }}</span></td>
+                  <td>{{ a.loteria }}</td>
+                  <td class="center numero-cell">{{ a.resultado }}</td>
+                  <td class="center mono">{{ a.fecha }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+  </div>
+}

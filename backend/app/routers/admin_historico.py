@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.admin_security import get_current_platform_user
 from app.database import get_db
 from app.models.cliente import Cliente
+from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 
 router = APIRouter(prefix="/admin/historico", tags=["Admin Histórico"])
@@ -25,6 +26,7 @@ class HistoricoRow(BaseModel):
     celular: str
     cc: Optional[str]
     numero: str
+    aciertos: int = 0
 
 
 class PaginatedHistorico(BaseModel):
@@ -73,8 +75,11 @@ def list_historico(
     total = q.count()
     rows = q.offset((page - 1) * size).limit(size).all()
     items = [
-        HistoricoRow(id=r.id, fecha=r.fecha, nombre=r.nombre,
-                     celular=r.celular, cc=r.cc, numero=r.numero)
+        HistoricoRow(
+            id=r.id, fecha=r.fecha, nombre=r.nombre,
+            celular=r.celular, cc=r.cc, numero=r.numero,
+            aciertos=db.query(NumeroAcierto).filter(NumeroAcierto.historic_id == r.id).count(),
+        )
         for r in rows
     ]
     return PaginatedHistorico(total=total, page=page, size=size, items=items)
@@ -90,12 +95,37 @@ def export_historico(
     _desde, _hasta = _defaults(desde, hasta)
     rows = _build_query(db, _desde, _hasta).all()
 
+    # First pass: collect aciertos per row and determine max count for dynamic columns
+    rows_data: list[tuple] = []
+    max_aciertos = 0
+    for r in rows:
+        aciertos = (
+            db.query(NumeroAcierto)
+            .filter(NumeroAcierto.historic_id == r.id)
+            .all()
+        )
+        rows_data.append((r, aciertos))
+        if len(aciertos) > max_aciertos:
+            max_aciertos = len(aciertos)
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Histórico"
-    ws.append(["Fecha", "Nombre", "Celular", "CC", "Número"])
-    for r in rows:
-        ws.append([str(r.fecha), r.nombre, r.celular, r.cc or "", r.numero])
+
+    # Dynamic header: base columns + (Tipo N | Lotería N | Resultado N) × max_aciertos
+    header = ["Fecha", "Nombre", "Celular", "CC", "Número"]
+    for i in range(1, max_aciertos + 1):
+        header += [f"Tipo {i}", f"Lotería {i}", f"Resultado {i}"]
+    ws.append(header)
+
+    # Second pass: write rows, padding shorter rows with empty cells
+    for r, aciertos in rows_data:
+        row: list = [str(r.fecha), r.nombre, r.celular, r.cc or "", r.numero]
+        for a in aciertos:
+            row += [a.tipo, a.resultado.loteria, a.resultado.resultado]
+        # Pad rows that have fewer aciertos than the maximum
+        row += ["", "", ""] * (max_aciertos - len(aciertos))
+        ws.append(row)
 
     output = io.BytesIO()
     wb.save(output)

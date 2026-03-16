@@ -1,0 +1,133 @@
+from calendar import monthrange
+from collections import Counter
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.core.admin_security import get_current_platform_user
+from app.database import get_db
+from app.models.cliente import Cliente
+from app.models.loteria_resultado import LoteriaResultado
+from app.models.numero_acierto import NumeroAcierto
+from app.models.numbers_historic import NumberHistoric
+
+router = APIRouter(prefix="/admin/dashboard", tags=["Admin Dashboard"])
+
+
+class TopLoteria(BaseModel):
+    loteria: str
+    aciertos: int
+
+
+class DashboardStats(BaseModel):
+    mes: str                      # "YYYY-MM"
+    numeros_entregados: int
+    total_aciertos: int
+    efectividad_pct: float        # 0–100 redondeado a 1 decimal
+    exactos: int
+    tres_orden: int
+    tres_desorden: int
+    clientes_con_aciertos: int
+    numero_mas_frecuente: Optional[str]
+    top_loterias: list[TopLoteria]
+
+
+@router.get("", response_model=DashboardStats)
+def get_dashboard(
+    mes: Optional[str] = Query(None, description="Mes en formato YYYY-MM, por defecto mes actual"),
+    db: Session = Depends(get_db),
+    _user=Depends(get_current_platform_user),
+):
+    # ── Resolve month range ──────────────────────────────────────────────────
+    today = date.today()
+    if mes:
+        year, month = int(mes[:4]), int(mes[5:7])
+    else:
+        year, month = today.year, today.month
+
+    mes_str = f"{year:04d}-{month:02d}"
+    first_day = date(year, month, 1)
+    last_day = date(year, month, monthrange(year, month)[1])
+
+    # ── Numbers delivered in month ───────────────────────────────────────────
+    historics = (
+        db.query(NumberHistoric)
+        .filter(NumberHistoric.date >= first_day, NumberHistoric.date <= last_day)
+        .all()
+    )
+    numeros_entregados = len(historics)
+    historic_ids = [h.id for h in historics]
+
+    # ── Aciertos in month ────────────────────────────────────────────────────
+    if historic_ids:
+        aciertos = (
+            db.query(NumeroAcierto)
+            .filter(NumeroAcierto.historic_id.in_(historic_ids))
+            .all()
+        )
+    else:
+        aciertos = []
+
+    total_aciertos = len(aciertos)
+    efectividad = round(total_aciertos / numeros_entregados * 100, 1) if numeros_entregados else 0.0
+
+    exactos = sum(1 for a in aciertos if a.tipo == "exacto")
+    tres_orden = sum(1 for a in aciertos if a.tipo == "tres_orden")
+    tres_desorden = sum(1 for a in aciertos if a.tipo == "tres_desorden")
+
+    # ── Distinct clients with aciertos ───────────────────────────────────────
+    historic_ids_with_aciertos = {a.historic_id for a in aciertos}
+    if historic_ids_with_aciertos:
+        clientes_ids = (
+            db.query(NumberHistoric.id_user)
+            .filter(NumberHistoric.id.in_(historic_ids_with_aciertos))
+            .distinct()
+            .all()
+        )
+        clientes_con_aciertos = len(clientes_ids)
+    else:
+        clientes_con_aciertos = 0
+
+    # ── Most frequent winning number ─────────────────────────────────────────
+    numero_mas_frecuente: Optional[str] = None
+    if historic_ids_with_aciertos:
+        numeros = (
+            db.query(NumberHistoric.number)
+            .filter(NumberHistoric.id.in_(historic_ids_with_aciertos))
+            .all()
+        )
+        counter = Counter(n.number for n in numeros)
+        numero_mas_frecuente = counter.most_common(1)[0][0] if counter else None
+
+    # ── Top 5 loterias ───────────────────────────────────────────────────────
+    resultado_ids = [a.resultado_id for a in aciertos]
+    top_loterias: list[TopLoteria] = []
+    if resultado_ids:
+        loteria_counter: Counter = Counter(a.resultado_id for a in aciertos)
+        # Fetch names for top 5
+        top5_ids = [rid for rid, _ in loteria_counter.most_common(5)]
+        resultados = {
+            r.id: r.loteria
+            for r in db.query(LoteriaResultado).filter(LoteriaResultado.id.in_(top5_ids)).all()
+        }
+        top_loterias = [
+            TopLoteria(loteria=resultados.get(rid, "—"), aciertos=cnt)
+            for rid, cnt in loteria_counter.most_common(5)
+            if rid in resultados
+        ]
+
+    return DashboardStats(
+        mes=mes_str,
+        numeros_entregados=numeros_entregados,
+        total_aciertos=total_aciertos,
+        efectividad_pct=efectividad,
+        exactos=exactos,
+        tres_orden=tres_orden,
+        tres_desorden=tres_desorden,
+        clientes_con_aciertos=clientes_con_aciertos,
+        numero_mas_frecuente=numero_mas_frecuente,
+        top_loterias=top_loterias,
+    )
