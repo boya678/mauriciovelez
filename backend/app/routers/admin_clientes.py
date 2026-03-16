@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
+from app.models.cuenta_vip import acumular_cuenta_vip
 
 router = APIRouter(prefix="/admin/clientes", tags=["Admin Clientes"])
 
@@ -157,6 +158,7 @@ def update_cliente(
             fin=now + relativedelta(months=1),
             activa=True,
         ))
+        acumular_cuenta_vip(db)
 
     # Si se desactiva VIP, desactivar todas sus suscripciones activas
     if vip_antes and not obj.vip:

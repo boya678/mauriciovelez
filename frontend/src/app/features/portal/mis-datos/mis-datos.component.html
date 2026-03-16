@@ -1,0 +1,86 @@
+<div class="md-page">
+  <div class="md-card">
+    <div class="md-header">
+      <span class="md-header-icon material-icons-round">manage_accounts</span>
+      <div>
+        <h1 class="md-title">Mis Datos</h1>
+        <p class="md-subtitle">Actualiza tu información personal</p>
+      </div>
+    </div>
+
+    <form #form="ngForm" (ngSubmit)="submit(form)" novalidate>
+
+      <div class="field">
+        <label for="nombre">Nombre <span class="req">*</span></label>
+        <input
+          id="nombre"
+          type="text"
+          name="nombre"
+          [(ngModel)]="nombre"
+          required
+          minlength="1"
+          maxlength="150"
+          placeholder="Tu nombre completo"
+          #nombreCtrl="ngModel"
+        />
+        @if (nombreCtrl.invalid && nombreCtrl.touched) {
+          <span class="field-error">El nombre es obligatorio</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="celular">Celular <span class="req">*</span></label>
+        <input
+          id="celular"
+          type="tel"
+          name="celular"
+          [(ngModel)]="celular"
+          required
+          minlength="1"
+          maxlength="30"
+          placeholder="Número de celular"
+          #celularCtrl="ngModel"
+        />
+        @if (celularCtrl.invalid && celularCtrl.touched) {
+          <span class="field-error">El celular es obligatorio</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="correo">Correo electrónico</label>
+        <input
+          id="correo"
+          type="email"
+          name="correo"
+          [(ngModel)]="correo"
+          maxlength="200"
+          placeholder="ejemplo@correo.com"
+        />
+      </div>
+
+      <div class="field">
+        <label for="cc">Cédula (CC)</label>
+        <input
+          id="cc"
+          type="text"
+          name="cc"
+          [(ngModel)]="cc"
+          maxlength="30"
+          placeholder="Número de documento"
+        />
+      </div>
+
+      @if (success) {
+        <div class="alert alert-ok">✔ Datos actualizados correctamente</div>
+      }
+      @if (errorMsg) {
+        <div class="alert alert-err">{{ errorMsg }}</div>
+      }
+
+      <button type="submit" class="btn-save" [disabled]="saving || form.invalid">
+        {{ saving ? 'Guardando…' : 'Guardar cambios' }}
+      </button>
+
+    </form>
+  </div>
+</div>

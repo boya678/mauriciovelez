@@ -34,3 +34,10 @@ class LoginResponse(BaseModel):
 class VipVerifyRequest(BaseModel):
     cliente_id: uuid.UUID
     codigo: str = Field(..., min_length=1, max_length=100)
+
+
+class UpdateMisDatosRequest(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=150)
+    celular: str = Field(..., min_length=1, max_length=30)
+    correo: str | None = Field(default=None, max_length=200)
+    cc: str | None = Field(default=None, max_length=30)

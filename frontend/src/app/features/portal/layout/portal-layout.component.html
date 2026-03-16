@@ -53,6 +53,21 @@
             </a>
           </li>
         }
+        @for (item of vipMenuItems; track item.route) {
+          <li>
+            <a
+              class="nav-item nav-item--vip"
+              [routerLink]="item.route"
+              routerLinkActive="nav-item--active"
+              [title]="item.label"
+            >
+              <span class="material-icons-round nav-icon">{{ item.icon }}</span>
+              @if (!collapsed()) {
+                <span class="nav-label">{{ item.label }}</span>
+              }
+            </a>
+          </li>
+        }
       </ul>
     </nav>
 

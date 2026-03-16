@@ -24,6 +24,13 @@ export const routes: Routes = [
             m => m.NumerologiaComponent
           ),
       },
+      {
+        path: 'mis-datos',
+        loadComponent: () =>
+          import('./features/portal/mis-datos/mis-datos.component').then(
+            m => m.MisDatosComponent
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

@@ -14,6 +14,7 @@ from app.core.admin_security import get_current_platform_user, require_admin
 from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.suscripcion import Suscripcion
+from app.models.cuenta_vip import acumular_cuenta_vip
 from app.models.cliente import Cliente
 from app.core import scheduler as _scheduler_module
 
@@ -106,6 +107,8 @@ def renovar(
     cliente = db.get(Cliente, sus.cliente_id)
     if cliente and not cliente.vip:
         cliente.vip = True
+
+    acumular_cuenta_vip(db)
 
     db.add(AuditLog(
         platform_user_id=user.id,

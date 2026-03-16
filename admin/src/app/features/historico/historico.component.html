@@ -15,7 +15,7 @@
   </div>
   <button class="btn-primary btn-sm" (click)="filtrar()">Filtrar</button>
   @if (auth.isAdmin()) {
-    <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+    <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">download</span> Exportar</button>
   }
 </div>
 
@@ -35,7 +35,7 @@
             <th>Celular</th>
             <th>CC</th>
             <th class="center">Número</th>
-            <th class="center">🏆</th>
+            <th class="center"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">emoji_events</span></th>
           </tr>
         </thead>
         <tbody>
@@ -49,7 +49,7 @@
               <td class="center">
                 @if (r.aciertos > 0) {
                   <button class="btn-aciertos" (click)="openAciertos(r)" title="Ver aciertos">
-                    🏆 {{ r.aciertos }}
+                    <span class="material-icons-round" style="font-size:0.95rem;vertical-align:middle">emoji_events</span> {{ r.aciertos }}
                   </button>
                 } @else {
                   <span class="no-acierto">—</span>
@@ -76,7 +76,7 @@
     <div class="modal-box" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h3>{{ modalTitle() }}</h3>
-        <button class="modal-close" (click)="closeModal()">✕</button>
+        <button class="modal-close" (click)="closeModal()"><span class="material-icons-round">close</span></button>
       </div>
       <div class="modal-body">
         @if (modalLoading()) {

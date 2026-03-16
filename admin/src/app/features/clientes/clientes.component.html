@@ -8,7 +8,7 @@
     <input type="search" [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Buscar por nombre, celular o cc…" />
   </div>
   @if (auth.isAdmin()) {
-    <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel">⬇ Exportar</button>
+    <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">download</span> Exportar</button>
   }
 </div>
 
@@ -46,10 +46,10 @@
               <td class="center mono code-vip">{{ c.codigo_vip || '—' }}</td>
               <td class="center actions">
                 @if (auth.canEdit()) {
-                  <button class="btn-ghost btn-sm" (click)="openEdit(c)">✏️</button>
+                  <button class="btn-ghost btn-sm" (click)="openEdit(c)"><span class="material-icons-round">edit</span></button>
                 }
                 @if (auth.isAdmin()) {
-                  <button class="btn-danger btn-sm" (click)="openDelete(c)">🗑</button>
+                  <button class="btn-danger btn-sm" (click)="openDelete(c)"><span class="material-icons-round">delete</span></button>
                 }
               </td>
             </tr>

@@ -19,10 +19,12 @@
     </label>
     @if (auth.isAdmin()) {
       <button class="btn-export" (click)="runVipCheck()" [disabled]="runningCheck()" title="Desactiva suscripciones vencidas ahora">
-        {{ runningCheck() ? '…' : '⚙ Sincronizar suscripciones' }}
+        <span class="material-icons-round" style="font-size:1rem;vertical-align:middle">sync</span>
+        {{ runningCheck() ? 'Sincronizando…' : 'Sincronizar suscripciones' }}
       </button>
       <button class="btn-export" (click)="downloadExcel()">
-        ⬇ Exportar
+        <span class="material-icons-round" style="font-size:1rem;vertical-align:middle">download</span>
+        Exportar
       </button>
     }
   </div>

@@ -60,6 +60,17 @@ export class AuthService {
     );
   }
 
+  updateMisDatos(data: { nombre: string; celular: string; correo?: string | null; cc?: string | null }): Observable<LoginResponse> {
+    return this.http
+      .put<LoginResponse>(`${environment.apiUrl}/auth/mis-datos`, data, { headers: this.authHeaders() })
+      .pipe(
+        tap(res => {
+          localStorage.setItem(this.TOKEN_KEY, res.access_token);
+          localStorage.setItem(this.CLIENTE_KEY, JSON.stringify(res.cliente));
+        })
+      );
+  }
+
   private authHeaders(): HttpHeaders {
     const token = this.getToken();
     return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});

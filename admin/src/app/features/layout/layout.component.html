@@ -2,7 +2,7 @@
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <span class="brand-icon">⚡</span>
+      <span class="brand-icon material-icons-round">bolt</span>
       @if (sidebarOpen()) {
         <span class="brand-name">Admin Panel</span>
       }
@@ -10,28 +10,28 @@
 
     <nav class="sidebar-nav">
       <a routerLink="/admin/dashboard" routerLinkActive="active" class="nav-item">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon material-icons-round">dashboard</span>
         @if (sidebarOpen()) { <span>Dashboard</span> }
       </a>
       <a routerLink="/admin/clientes" routerLinkActive="active" class="nav-item">
-        <span class="nav-icon">👥</span>
+        <span class="nav-icon material-icons-round">group</span>
         @if (sidebarOpen()) { <span>Clientes</span> }
       </a>
       <a routerLink="/admin/historico" routerLinkActive="active" class="nav-item">
-        <span class="nav-icon">🔢</span>
+        <span class="nav-icon material-icons-round">history</span>
         @if (sidebarOpen()) { <span>Histórico</span> }
       </a>
       <a routerLink="/admin/suscripciones" routerLinkActive="active" class="nav-item">
-        <span class="nav-icon">💎</span>
+        <span class="nav-icon material-icons-round">card_membership</span>
         @if (sidebarOpen()) { <span>Suscripciones</span> }
       </a>
       @if (auth.isAdmin()) {
         <a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">🔐</span>
+          <span class="nav-icon material-icons-round">admin_panel_settings</span>
           @if (sidebarOpen()) { <span>Usuarios</span> }
         </a>
         <a routerLink="/admin/audit" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">📋</span>
+          <span class="nav-icon material-icons-round">fact_check</span>
           @if (sidebarOpen()) { <span>Auditoría</span> }
         </a>
       }

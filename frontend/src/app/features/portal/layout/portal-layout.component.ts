@@ -29,6 +29,11 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
     { label: 'Numerología', icon: 'auto_awesome', route: '/portal/numerologia' },
   ];
 
+  get vipMenuItems(): MenuItem[] {
+    if (!this.cliente?.vip) return [];
+    return [{ label: 'Mis Datos', icon: 'manage_accounts', route: '/portal/mis-datos' }];
+  }
+
   constructor(
     private authService: AuthService,
     private router: Router,
