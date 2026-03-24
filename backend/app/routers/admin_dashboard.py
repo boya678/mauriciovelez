@@ -24,10 +24,13 @@ class TopLoteria(BaseModel):
 
 class DashboardStats(BaseModel):
     mes: str                      # "YYYY-MM"
+    total_clientes: int
+    clientes_vip: int
     numeros_entregados: int
     total_aciertos: int
     efectividad_pct: float        # 0–100 redondeado a 1 decimal
     exactos: int
+    directo_devuelto: int
     tres_orden: int
     tres_desorden: int
     clientes_con_aciertos: int
@@ -52,6 +55,10 @@ def get_dashboard(
     first_day = date(year, month, 1)
     last_day = date(year, month, monthrange(year, month)[1])
 
+    # ── Total & VIP clients ──────────────────────────────────────────────────
+    total_clientes = db.query(Cliente).count()
+    clientes_vip = db.query(Cliente).filter(Cliente.vip.is_(True)).count()
+
     # ── Numbers delivered in month ───────────────────────────────────────────
     historics = (
         db.query(NumberHistoric)
@@ -75,6 +82,7 @@ def get_dashboard(
     efectividad = round(total_aciertos / numeros_entregados * 100, 1) if numeros_entregados else 0.0
 
     exactos = sum(1 for a in aciertos if a.tipo == "exacto")
+    directo_devuelto = sum(1 for a in aciertos if a.tipo == "directo_devuelto")
     tres_orden = sum(1 for a in aciertos if a.tipo == "tres_orden")
     tres_desorden = sum(1 for a in aciertos if a.tipo == "tres_desorden")
 
@@ -121,10 +129,13 @@ def get_dashboard(
 
     return DashboardStats(
         mes=mes_str,
+        total_clientes=total_clientes,
+        clientes_vip=clientes_vip,
         numeros_entregados=numeros_entregados,
         total_aciertos=total_aciertos,
         efectividad_pct=efectividad,
         exactos=exactos,
+        directo_devuelto=directo_devuelto,
         tres_orden=tres_orden,
         tres_desorden=tres_desorden,
         clientes_con_aciertos=clientes_con_aciertos,

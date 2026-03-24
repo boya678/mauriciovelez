@@ -27,6 +27,7 @@ class HistoricoRow(BaseModel):
     cc: Optional[str]
     numero: str
     aciertos: int = 0
+    vip: bool = False
 
 
 class PaginatedHistorico(BaseModel):
@@ -38,8 +39,8 @@ class PaginatedHistorico(BaseModel):
 
 # ── Helper query (join historic + clientes) ───────────────────────────────────────
 
-def _build_query(db: Session, desde: date, hasta: date):
-    return (
+def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = False, solo_vip: bool = False):
+    q = (
         db.query(
             NumberHistoric.id,
             NumberHistoric.date.label("fecha"),
@@ -47,11 +48,21 @@ def _build_query(db: Session, desde: date, hasta: date):
             Cliente.celular,
             Cliente.cc,
             NumberHistoric.number.label("numero"),
+            Cliente.vip,
         )
         .join(Cliente, NumberHistoric.id_user == Cliente.id)
         .filter(NumberHistoric.date >= desde, NumberHistoric.date <= hasta)
         .order_by(NumberHistoric.date.desc(), Cliente.nombre)
     )
+    if solo_ganadores:
+        q = q.filter(
+            db.query(NumeroAcierto)
+            .filter(NumeroAcierto.historic_id == NumberHistoric.id)
+            .exists()
+        )
+    if solo_vip:
+        q = q.filter(Cliente.vip == True)
+    return q
 
 
 def _defaults(desde, hasta):
@@ -67,11 +78,13 @@ def list_historico(
     hasta: Optional[date] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    solo_ganadores: bool = Query(False),
+    solo_vip: bool = Query(False),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
     _desde, _hasta = _defaults(desde, hasta)
-    q = _build_query(db, _desde, _hasta)
+    q = _build_query(db, _desde, _hasta, solo_ganadores, solo_vip)
     total = q.count()
     rows = q.offset((page - 1) * size).limit(size).all()
     items = [
@@ -79,6 +92,7 @@ def list_historico(
             id=r.id, fecha=r.fecha, nombre=r.nombre,
             celular=r.celular, cc=r.cc, numero=r.numero,
             aciertos=db.query(NumeroAcierto).filter(NumeroAcierto.historic_id == r.id).count(),
+            vip=r.vip,
         )
         for r in rows
     ]
@@ -89,11 +103,12 @@ def list_historico(
 def export_historico(
     desde: Optional[date] = Query(None),
     hasta: Optional[date] = Query(None),
+    solo_ganadores: bool = Query(False),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
     _desde, _hasta = _defaults(desde, hasta)
-    rows = _build_query(db, _desde, _hasta).all()
+    rows = _build_query(db, _desde, _hasta, solo_ganadores).all()
 
     # First pass: collect aciertos per row and determine max count for dynamic columns
     rows_data: list[tuple] = []

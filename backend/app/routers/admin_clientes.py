@@ -8,6 +8,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.admin_security import get_current_platform_user, require_admin, require_edit
@@ -44,6 +45,16 @@ class ClienteUpdate(BaseModel):
     codigo_vip: Optional[str] = None
 
 
+class ClienteCreate(BaseModel):
+    nombre: str
+    celular: str
+    correo: Optional[str] = None
+    cc: Optional[str] = None
+    saldo: float = 0
+    vip: bool = False
+    codigo_vip: Optional[str] = None
+
+
 class PaginatedClientes(BaseModel):
     total: int
     page: int
@@ -65,6 +76,47 @@ def _audit(db: Session, user, action: str, entity_id: str, detail: dict):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────────
+
+@router.post("", response_model=ClienteOut, status_code=201)
+def create_cliente(
+    payload: ClienteCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    nuevo = Cliente(
+        id=uuid.uuid4(),
+        nombre=payload.nombre,
+        celular=payload.celular,
+        correo=payload.correo or None,
+        cc=payload.cc or None,
+        saldo=payload.saldo,
+        vip=payload.vip,
+        codigo_vip=payload.codigo_vip or None,
+    )
+    db.add(nuevo)
+    if payload.vip:
+        now = datetime.now(timezone.utc)
+        db.add(Suscripcion(
+            cliente_id=nuevo.id,
+            inicio=now,
+            fin=now + relativedelta(months=1),
+            activa=True,
+        ))
+        acumular_cuenta_vip(db)
+    _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular})
+    try:
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        orig = str(e.orig)
+        if "celular" in orig:
+            raise HTTPException(status_code=409, detail="Ya existe un cliente con ese número de celular")
+        if "codigo_vip" in orig:
+            raise HTTPException(status_code=409, detail="El código VIP ya está en uso por otro cliente")
+        raise HTTPException(status_code=409, detail="Conflicto de datos: valor duplicado")
+    db.refresh(nuevo)
+    return nuevo
+
 
 @router.get("", response_model=PaginatedClientes)
 def list_clientes(
@@ -168,7 +220,13 @@ def update_cliente(
         ).update({"activa": False}, synchronize_session=False)
 
     _audit(db, user, "UPDATE", str(cliente_id), changes)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        if "codigo_vip" in str(e.orig):
+            raise HTTPException(status_code=409, detail="El código VIP ya está en uso por otro cliente")
+        raise HTTPException(status_code=409, detail="Conflicto de datos: valor duplicado")
     db.refresh(obj)
     return obj
 

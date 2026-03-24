@@ -9,10 +9,13 @@ export interface TopLoteria {
 
 export interface DashboardStats {
   mes: string;
+  total_clientes: number;
+  clientes_vip: number;
   numeros_entregados: number;
   total_aciertos: number;
   efectividad_pct: number;
   exactos: number;
+  directo_devuelto: number;
   tres_orden: number;
   tres_desorden: number;
   clientes_con_aciertos: number;

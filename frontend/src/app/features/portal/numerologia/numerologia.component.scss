@@ -134,6 +134,11 @@
     color: #10b981;
     border: 1px solid rgba(16, 185, 129, 0.3);
   }
+  &.tipo-directo_devuelto {
+    background: rgba(20, 184, 166, 0.18);
+    color: #2dd4bf;
+    border: 1px solid rgba(20, 184, 166, 0.3);
+  }
   &.tipo-tres_orden {
     background: rgba(59, 130, 246, 0.18);
     color: #93c5fd;

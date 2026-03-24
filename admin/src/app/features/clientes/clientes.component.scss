@@ -58,3 +58,29 @@
   margin-bottom: 4px;
   strong { color: var(--text); }
 }
+
+.form-error {
+  color: #ef4444;
+  font-size: 13px;
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: 6px;
+  border-left: 3px solid #ef4444;
+}
+
+.btn-new {
+  white-space: nowrap;
+  padding: 0 18px;
+  height: 38px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.required {
+  color: #ef4444;
+  font-size: 12px;
+}

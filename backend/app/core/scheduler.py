@@ -12,6 +12,7 @@ from app.models.cliente import Cliente
 from app.models.loteria_resultado import LoteriaResultado
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
+from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
@@ -24,24 +25,27 @@ _scheduler = BackgroundScheduler(timezone="UTC")
 
 def _clasificar(numero: str, resultado: str) -> list[str]:
     """
-    Devuelve una lista con los tipos de acierto que aplican entre `numero` y `resultado`.
-    - exacto: los 4 dígitos coinciden
-    - tres_orden: los últimos 3 dígitos coinciden en orden
-    - tres_desorden: los últimos 3 dígitos son los mismos sin importar el orden
+    Devuelve los tipos de acierto (máximo uno, el de mayor jerarquía):
+    - exacto:           los 4 dígitos coinciden exactamente
+    - directo_devuelto: primer dígito igual + últimos 3 en orden inverso (3267 vs 3762)
+    - tres_orden:       últimos 3 dígitos iguales en orden (sin importar el primero)
+    - tres_desorden:    últimos 3 dígitos en orden inverso (sin importar el primero)
     """
-    tipos: list[str] = []
     n4 = numero.zfill(4)[-4:]
     r4 = resultado.zfill(4)[-4:]
-    if n4 == r4:
-        tipos.append("exacto")
-        return tipos  # exacto ya incluye los otros
     n3 = n4[-3:]
     r3 = r4[-3:]
+    r3_rev = r3[::-1]
+
+    if n4 == r4:
+        return ["exacto"]
+    if n4[0] == r4[0] and n3 == r3_rev:
+        return ["directo_devuelto"]
     if n3 == r3:
-        tipos.append("tres_orden")
-    elif sorted(n3) == sorted(r3):
-        tipos.append("tres_desorden")
-    return tipos
+        return ["tres_orden"]
+    if n3 == r3_rev:
+        return ["tres_desorden"]
+    return []
 
 
 def _procesar_loterias(fecha: date | None = None) -> None:
@@ -71,15 +75,24 @@ def _procesar_loterias(fecha: date | None = None) -> None:
 
         # ── 2. Upsert resultados ──────────────────────────────────────────────
         resultados_map: dict[str, LoteriaResultado] = {}
+        seen_slugs: set[str] = set()
         for item in data:
             slug = item.get("slug", "")
+            if "5ta-" in slug:
+                continue
+            if slug in seen_slugs:
+                continue
+            seen_slugs.add(slug)
+            raw_result = item.get("result", "")
+            # Si el resultado trae 5 dígitos el último es la serie — lo descartamos
+            resultado_limpio = raw_result[:-1] if len(raw_result) == 5 and raw_result.isdigit() else raw_result
             existing = (
                 db.query(LoteriaResultado)
                 .filter(LoteriaResultado.fecha == hoy_col, LoteriaResultado.slug == slug)
                 .first()
             )
             if existing:
-                existing.resultado = item.get("result", "")
+                existing.resultado = resultado_limpio
                 existing.fetched_at = datetime.now(timezone.utc)
                 resultados_map[slug] = existing
             else:
@@ -88,7 +101,7 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                     fecha=hoy_col,
                     loteria=item.get("lottery", slug),
                     slug=slug,
-                    resultado=item.get("result", ""),
+                    resultado=resultado_limpio,
                     serie=item.get("series", ""),
                     fetched_at=datetime.now(timezone.utc),
                 )
@@ -98,9 +111,20 @@ def _procesar_loterias(fecha: date | None = None) -> None:
         db.flush()
 
         # ── 3. Cruce con numbers_historic ─────────────────────────────────────
+        # Se evalúan todos los números cuya vigencia (valid_until) cubra hoy,
+        # no sólo los asignados hoy.
         historicos = (
             db.query(NumberHistoric)
-            .filter(NumberHistoric.date == hoy_col)
+            .join(
+                NumberUser,
+                (NumberUser.id_user == NumberHistoric.id_user)
+                & (NumberUser.number == NumberHistoric.number)
+                & (NumberUser.date_assigned == NumberHistoric.date),
+            )
+            .filter(
+                NumberUser.date_assigned <= hoy_col,
+                NumberUser.valid_until >= hoy_col,
+            )
             .all()
         )
 

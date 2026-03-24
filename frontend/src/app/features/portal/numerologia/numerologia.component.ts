@@ -73,8 +73,9 @@ export class NumerologiaComponent implements OnInit {
   tipoLabel(tipo: string): string {
     const map: Record<string, string> = {
       exacto: 'Exacto',
+      directo_devuelto: 'Directo devuelto',
       tres_orden: '3 en orden',
-      tres_desorden: '3 desorden',
+      tres_desorden: '3 devuelto',
     };
     return map[tipo] ?? tipo;
   }

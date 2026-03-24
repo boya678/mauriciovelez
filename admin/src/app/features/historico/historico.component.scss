@@ -29,6 +29,29 @@
   }
 }
 
+.filter-check {
+  justify-content: flex-end;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+    height: 38px;
+  }
+
+  input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary, #6366f1);
+    cursor: pointer;
+  }
+}
+
 .btn-export {
   white-space: nowrap;
   padding: 0 18px;
@@ -77,6 +100,18 @@
 }
 
 .no-acierto { color: var(--text-muted); font-size: 13px; }
+
+.vip-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #f5c518 0%, #e0a800 100%);
+  color: #5a3e00;
+  text-transform: uppercase;
+}
 
 // Modal
 .modal-overlay {

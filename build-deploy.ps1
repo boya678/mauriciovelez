@@ -37,11 +37,6 @@ function Write-OK([string]$msg) {
     Write-Host "✔  $msg" -ForegroundColor Green
 }
 
-# ── 1. Login al ACR ───────────────────────────────────────────
-Write-Step "Login en Azure Container Registry: $REGISTRY"
-az acr login --name ($REGISTRY -split '\.')[0]
-Write-OK "Login OK"
-
 # ── 2. Preparar builder multi-arch ────────────────────────────
 Write-Step "Configurando builder multi-arch: $BUILDER_NAME"
 $existsBuilder = docker buildx inspect $BUILDER_NAME 2>$null

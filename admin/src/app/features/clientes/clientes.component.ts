@@ -22,7 +22,12 @@ export class ClientesComponent implements OnInit {
 
   editTarget: Cliente | null = null;
   editForm: Partial<Cliente> = {};
+  editError = signal<string | null>(null);
   deleteTarget: Cliente | null = null;
+
+  showCreate = false;
+  createForm: Partial<Cliente & { celular: string }> = {};
+  createError = signal<string | null>(null);
 
   private search$ = new Subject<string>();
 
@@ -60,13 +65,35 @@ export class ClientesComponent implements OnInit {
   openEdit(c: Cliente) {
     this.editTarget = c;
     this.editForm = { nombre: c.nombre, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '' };
+    this.editError.set(null);
+  }
+
+  openCreate() {
+    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '' };
+    this.createError.set(null);
+    this.showCreate = true;
+  }
+
+  saveCreate() {
+    this.createError.set(null);
+    this.svc.create(this.createForm).subscribe({
+      next: () => { this.showCreate = false; this.load(); },
+      error: (err) => {
+        const msg = err?.error?.detail;
+        this.createError.set(msg ?? 'Error al crear el cliente');
+      },
+    });
   }
 
   saveEdit() {
     if (!this.editTarget) return;
-    this.svc.update(this.editTarget.id, this.editForm).subscribe(() => {
-      this.editTarget = null;
-      this.load();
+    this.editError.set(null);
+    this.svc.update(this.editTarget.id, this.editForm).subscribe({
+      next: () => { this.editTarget = null; this.load(); },
+      error: (err) => {
+        const msg = err?.error?.detail;
+        this.editError.set(msg ?? 'Error al guardar los cambios');
+      },
     });
   }
 

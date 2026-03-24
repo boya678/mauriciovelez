@@ -26,6 +26,8 @@ export class HistoricoComponent implements OnInit {
 
   desde = yesterday();
   hasta = yesterday();
+  soloGanadores = false;
+  soloVip = false;
 
   // Modal aciertos
   showModal = signal(false);
@@ -39,7 +41,7 @@ export class HistoricoComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.svc.list(this.desde, this.hasta, this.page(), this.size).subscribe(res => {
+    this.svc.list(this.desde, this.hasta, this.page(), this.size, this.soloGanadores, this.soloVip).subscribe(res => {
       this.items.set(res.items);
       this.total.set(res.total);
       this.loading.set(false);
@@ -79,8 +81,9 @@ export class HistoricoComponent implements OnInit {
   tipoLabel(tipo: string): string {
     const map: Record<string, string> = {
       exacto: 'Exacto (4)',
+      directo_devuelto: 'Directo devuelto',
       tres_orden: 'Últimas 3 (orden)',
-      tres_desorden: 'Últimas 3 (desorden)',
+      tres_desorden: 'Últimas 3 (devuelto)',
     };
     return map[tipo] ?? tipo;
   }

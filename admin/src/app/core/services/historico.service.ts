@@ -10,6 +10,7 @@ export interface HistoricoRow {
   cc: string | null;
   numero: string;
   aciertos: number;
+  vip: boolean;
 }
 
 export interface AciertoDetalle {
@@ -35,12 +36,14 @@ export class HistoricoService {
 
   constructor(private http: HttpClient) {}
 
-  list(desde: string, hasta: string, page = 1, size = 20) {
-    const params = new HttpParams()
+  list(desde: string, hasta: string, page = 1, size = 20, soloGanadores = false, soloVip = false) {
+    let params = new HttpParams()
       .set('desde', desde)
       .set('hasta', hasta)
       .set('page', page)
       .set('size', size);
+    if (soloGanadores) params = params.set('solo_ganadores', 'true');
+    if (soloVip) params = params.set('solo_vip', 'true');
     return this.http.get<PaginatedHistorico>(this.base, { params });
   }
 

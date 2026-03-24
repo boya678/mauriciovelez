@@ -21,6 +21,18 @@
     <div class="kpi-grid">
 
       <div class="kpi-card">
+        <div class="kpi-icon"><span class="material-icons-round">group</span></div>
+        <div class="kpi-value">{{ stats!.total_clientes }}</div>
+        <div class="kpi-label">Total clientes</div>
+      </div>
+
+      <div class="kpi-card accent-gold">
+        <div class="kpi-icon"><span class="material-icons-round">workspace_premium</span></div>
+        <div class="kpi-value">{{ stats!.clientes_vip }}</div>
+        <div class="kpi-label">Clientes VIP</div>
+      </div>
+
+      <div class="kpi-card">
         <div class="kpi-icon"><span class="material-icons-round">inventory_2</span></div>
         <div class="kpi-value">{{ stats!.numeros_entregados }}</div>
         <div class="kpi-label">Números entregados</div>
@@ -62,13 +74,17 @@
           <span class="tipo-count">{{ stats!.exactos }}</span>
           <span class="tipo-label">Exacto</span>
         </div>
+        <div class="tipo-card directo-devuelto">
+          <span class="tipo-count">{{ stats!.directo_devuelto }}</span>
+          <span class="tipo-label">Directo devuelto</span>
+        </div>
         <div class="tipo-card tres-orden">
           <span class="tipo-count">{{ stats!.tres_orden }}</span>
           <span class="tipo-label">3 en orden</span>
         </div>
         <div class="tipo-card tres-desorden">
           <span class="tipo-count">{{ stats!.tres_desorden }}</span>
-          <span class="tipo-label">3 desorden</span>
+          <span class="tipo-label">3 devuelto</span>
         </div>
       </div>
     </div>

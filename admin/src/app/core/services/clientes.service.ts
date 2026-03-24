@@ -32,6 +32,10 @@ export class ClientesService {
     return this.http.get<PaginatedClientes>(this.base, { params });
   }
 
+  create(data: Partial<Cliente>) {
+    return this.http.post<Cliente>(this.base, data);
+  }
+
   update(id: string, data: Partial<Cliente>) {
     return this.http.put<Cliente>(`${this.base}/${id}`, data);
   }

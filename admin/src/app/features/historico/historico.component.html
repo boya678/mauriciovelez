@@ -13,6 +13,18 @@
     <label>Hasta</label>
     <input type="date" [(ngModel)]="hasta" />
   </div>
+  <div class="filter-group filter-check">
+    <label>
+      <input type="checkbox" [(ngModel)]="soloGanadores" />
+      Solo ganadores
+    </label>
+  </div>
+  <div class="filter-group filter-check">
+    <label>
+      <input type="checkbox" [(ngModel)]="soloVip" />
+      Solo VIP
+    </label>
+  </div>
   <button class="btn-primary btn-sm" (click)="filtrar()">Filtrar</button>
   @if (auth.isAdmin()) {
     <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">download</span> Exportar</button>
@@ -35,6 +47,7 @@
             <th>Celular</th>
             <th>CC</th>
             <th class="center">Número</th>
+            <th class="center">VIP</th>
             <th class="center"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">emoji_events</span></th>
           </tr>
         </thead>
@@ -46,6 +59,13 @@
               <td>{{ r.celular }}</td>
               <td>{{ r.cc || '—' }}</td>
               <td class="center numero-cell">{{ r.numero }}</td>
+              <td class="center">
+                @if (r.vip) {
+                  <span class="vip-badge">VIP</span>
+                } @else {
+                  <span class="no-acierto">—</span>
+                }
+              </td>
               <td class="center">
                 @if (r.aciertos > 0) {
                   <button class="btn-aciertos" (click)="openAciertos(r)" title="Ver aciertos">

@@ -121,9 +121,10 @@
   gap: 0.3rem;
   min-width: 130px;
 
-  &.exacto       { background: #14532d; border: 1px solid #22c55e; }
-  &.tres-orden   { background: #1e3a5f; border: 1px solid #6366f1; }
-  &.tres-desorden{ background: #3b1f5e; border: 1px solid #a855f7; }
+  &.exacto          { background: #14532d; border: 1px solid #22c55e; }
+  &.directo-devuelto{ background: #1a3a2a; border: 1px solid #10b981; }
+  &.tres-orden      { background: #1e3a5f; border: 1px solid #6366f1; }
+  &.tres-desorden   { background: #3b1f5e; border: 1px solid #a855f7; }
 }
 
 .tipo-count {
