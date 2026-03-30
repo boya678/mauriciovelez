@@ -19,11 +19,13 @@
       Solo ganadores
     </label>
   </div>
-  <div class="filter-group filter-check">
-    <label>
-      <input type="checkbox" [(ngModel)]="soloVip" />
-      Solo VIP
-    </label>
+  <div class="filter-group">
+    <label>VIP</label>
+    <select [(ngModel)]="filtroVip">
+      <option value="todos">Todos</option>
+      <option value="vip">Solo VIP</option>
+      <option value="no_vip">Solo no VIP</option>
+    </select>
   </div>
   <button class="btn-primary btn-sm" (click)="filtrar()">Filtrar</button>
   @if (auth.isAdmin()) {

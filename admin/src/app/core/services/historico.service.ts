@@ -36,14 +36,14 @@ export class HistoricoService {
 
   constructor(private http: HttpClient) {}
 
-  list(desde: string, hasta: string, page = 1, size = 20, soloGanadores = false, soloVip = false) {
+  list(desde: string, hasta: string, page = 1, size = 20, soloGanadores = false, filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos') {
     let params = new HttpParams()
       .set('desde', desde)
       .set('hasta', hasta)
       .set('page', page)
       .set('size', size);
     if (soloGanadores) params = params.set('solo_ganadores', 'true');
-    if (soloVip) params = params.set('solo_vip', 'true');
+    if (filtroVip !== 'todos') params = params.set('filtro_vip', filtroVip);
     return this.http.get<PaginatedHistorico>(this.base, { params });
   }
 

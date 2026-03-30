@@ -27,7 +27,7 @@ export class HistoricoComponent implements OnInit {
   desde = yesterday();
   hasta = yesterday();
   soloGanadores = false;
-  soloVip = false;
+  filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos';
 
   // Modal aciertos
   showModal = signal(false);
@@ -41,7 +41,7 @@ export class HistoricoComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.svc.list(this.desde, this.hasta, this.page(), this.size, this.soloGanadores, this.soloVip).subscribe(res => {
+    this.svc.list(this.desde, this.hasta, this.page(), this.size, this.soloGanadores, this.filtroVip).subscribe(res => {
       this.items.set(res.items);
       this.total.set(res.total);
       this.loading.set(false);

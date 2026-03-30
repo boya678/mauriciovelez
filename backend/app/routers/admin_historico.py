@@ -39,7 +39,7 @@ class PaginatedHistorico(BaseModel):
 
 # ── Helper query (join historic + clientes) ───────────────────────────────────────
 
-def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = False, solo_vip: bool = False):
+def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = False, filtro_vip: Optional[str] = None):
     q = (
         db.query(
             NumberHistoric.id,
@@ -60,8 +60,10 @@ def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = F
             .filter(NumeroAcierto.historic_id == NumberHistoric.id)
             .exists()
         )
-    if solo_vip:
+    if filtro_vip == "vip":
         q = q.filter(Cliente.vip == True)
+    elif filtro_vip == "no_vip":
+        q = q.filter(Cliente.vip == False)
     return q
 
 
@@ -79,12 +81,12 @@ def list_historico(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     solo_ganadores: bool = Query(False),
-    solo_vip: bool = Query(False),
+    filtro_vip: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
     _desde, _hasta = _defaults(desde, hasta)
-    q = _build_query(db, _desde, _hasta, solo_ganadores, solo_vip)
+    q = _build_query(db, _desde, _hasta, solo_ganadores, filtro_vip)
     total = q.count()
     rows = q.offset((page - 1) * size).limit(size).all()
     items = [
