@@ -30,6 +30,7 @@
             <th class="right">Saldo</th>
             <th class="center">VIP</th>
             <th class="center">Cód. VIP</th>
+            <th class="center">Habilitado</th>
             <th class="center">Acciones</th>
           </tr>
         </thead>
@@ -45,6 +46,13 @@
                 @if (c.vip) { <span class="badge vip">VIP</span> } @else { <span class="text-muted">—</span> }
               </td>
               <td class="center mono code-vip">{{ c.codigo_vip || '—' }}</td>
+              <td class="center">
+                @if (c.enabled) {
+                  <span class="badge active">Activo</span>
+                } @else {
+                  <span class="badge disabled">Inactivo</span>
+                }
+              </td>
               <td class="center actions">
                 @if (auth.canEdit()) {
                   <button class="btn-ghost btn-sm" (click)="openEdit(c)"><span class="material-icons-round">edit</span></button>
@@ -98,6 +106,11 @@
           <input type="checkbox" [(ngModel)]="createForm.vip" /> VIP
         </label>
       </div>
+      <div class="form-group check-group">
+        <label>
+          <input type="checkbox" [(ngModel)]="createForm.enabled" /> Habilitado
+        </label>
+      </div>
       <div class="form-group">
         <label>Código VIP</label>
         <input type="text" [(ngModel)]="createForm.codigo_vip" placeholder="Sin código" />
@@ -137,6 +150,11 @@
       <div class="form-group check-group">
         <label>
           <input type="checkbox" [(ngModel)]="editForm.vip" /> VIP
+        </label>
+      </div>
+      <div class="form-group check-group">
+        <label>
+          <input type="checkbox" [(ngModel)]="editForm.enabled" /> Habilitado
         </label>
       </div>
       <div class="form-group">

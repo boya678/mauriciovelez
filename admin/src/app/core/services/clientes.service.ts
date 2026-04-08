@@ -11,6 +11,7 @@ export interface Cliente {
   saldo: number;
   vip: boolean;
   codigo_vip: string | null;
+  enabled: boolean;
 }
 
 export interface PaginatedClientes {

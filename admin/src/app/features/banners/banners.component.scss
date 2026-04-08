@@ -1,0 +1,193 @@
+// ── Badges de estado ─────────────────────────────────────────────
+.badge-vigente {
+  color: #4caf50;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-activo {
+  color: #90a4ae;
+  font-size: 12px;
+}
+
+.badge-inactivo {
+  color: var(--text-muted, #666);
+  font-size: 12px;
+}
+
+.tipo-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+
+  &.tipo-texto  { background: rgba(100, 181, 246, 0.15); color: #64b5f6; }
+  &.tipo-imagen { background: rgba(255, 183, 77, 0.15);  color: #ffb74d; }
+}
+
+.audiencia-badge {
+  font-size: 12px;
+  color: var(--text-muted, #aaa);
+}
+
+.contenido-cell {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.text-muted { color: var(--text-muted, #888); font-style: italic; font-size: 13px; }
+
+.actions-cell {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.btn-danger { color: #ef5350 !important; }
+.btn-xs { padding: 2px 4px !important; }
+
+// ── Modal ────────────────────────────────────────────────────────
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: var(--bg-card, #1a1a2e);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.modal-lg { max-width: 640px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+
+  h3 { margin: 0; font-size: 1rem; }
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+  &:hover { opacity: 1; }
+}
+
+.modal-body {
+  padding: 1.25rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0.75rem 1.25rem 1rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+// ── Formulario ───────────────────────────────────────────────────
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted, #aaa);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  input[type="text"],
+  input[type="datetime-local"],
+  select,
+  textarea {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    color: inherit;
+    padding: 6px 10px;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
+
+    &:focus { outline: none; border-color: rgba(255,255,255,0.3); }
+  }
+
+  textarea { resize: vertical; }
+
+  input[type="file"] {
+    font-size: 13px;
+    color: inherit;
+  }
+
+  &.form-row--full {
+    grid-column: 1 / -1;
+  }
+}
+
+.radio-group {
+  display: flex;
+  gap: 1rem;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: normal !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: inherit !important;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.field-error {
+  font-size: 12px;
+  color: #ef5350;
+}
+
+.img-preview {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+}

@@ -13,6 +13,8 @@ from app.routers import admin_historico
 from app.routers import admin_suscripciones
 from app.routers import admin_loterias
 from app.routers import admin_dashboard
+from app.routers import admin_banners
+from app.routers import banners
 from app.core import scheduler
 
 
@@ -43,6 +45,8 @@ app.include_router(admin_historico.router)
 app.include_router(admin_suscripciones.router)
 app.include_router(admin_loterias.router)
 app.include_router(admin_dashboard.router)
+app.include_router(admin_banners.router)
+app.include_router(banners.router)
 
 
 @app.get("/health")

@@ -1,0 +1,89 @@
+@keyframes banner-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.banner-bar {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+
+  /* estilo texto: gradiente animado llamativo */
+  &:has(.banner-text-wrap) {
+    background: linear-gradient(135deg, #1a0533, #3b0764, #6d28d9, #7c3aed, #4f46e5, #1a0533);
+    background-size: 300% 300%;
+    animation: banner-shimmer 6s ease infinite;
+    border-bottom: 1px solid rgba(167, 139, 250, 0.4);
+    box-shadow: 0 2px 20px rgba(109, 40, 217, 0.5);
+    padding: 1.5rem 3.5rem 1.5rem 1.5rem;
+  }
+
+  /* estilo imagen */
+  &:has(.banner-img) {
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+.banner-img {
+  display: block;
+  width: 100%;
+  height: auto;       /* preserva proporciones originales, sin recortar */
+  max-height: 300px;  /* limita altura en pantallas grandes */
+  object-fit: contain;
+}
+
+.banner-text-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex: 1;
+}
+
+.banner-text-icon {
+  font-size: 1.4rem;
+  color: #fbbf24;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.7));
+  animation: banner-shimmer 3s ease infinite;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  margin: 0;
+  font-size: clamp(2rem, 3.5vw, 3.5rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 0 24px rgba(167, 139, 250, 0.9), 0 2px 6px rgba(0,0,0,0.7);
+  word-break: break-word;
+
+  @media (max-width: 600px) {
+    font-size: clamp(1.6rem, 5.6vw, 2.8rem);
+  }
+}
+
+.banner-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.5;
+  line-height: 1;
+  padding: 2px;
+
+  &:hover { opacity: 1; }
+
+  .material-icons-round { font-size: 1rem; }
+}

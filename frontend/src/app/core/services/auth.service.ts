@@ -11,6 +11,7 @@ export interface Cliente {
   cc: string | null;
   saldo: number;
   vip: boolean;
+  enabled: boolean;
   created_at: string;
 }
 

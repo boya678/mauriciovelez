@@ -25,6 +25,9 @@ export class LoginComponent implements OnInit {
   loading = signal(false);
   errorMsg = signal('');
   particles: Particle[] = [];
+  recordar = false;
+
+  private readonly STORAGE_KEY = 'mv_recordar';
 
   // Estado modal VIP
   showVipModal = signal(false);
@@ -32,6 +35,10 @@ export class LoginComponent implements OnInit {
   vipError = signal('');
   vipLoading = signal(false);
   private pendingClienteId = '';
+
+  // Estado modal cuenta deshabilitada
+  showDisabledModal = signal(false);
+  disabledMsg = signal('');
 
   private readonly symbols = ['♦', '★', '$', '✦', '♠', '♣', '♥', '7', '♞', '⬡'];
 
@@ -46,9 +53,11 @@ export class LoginComponent implements OnInit {
       this.router.navigate(['/portal']);
       return;
     }
+    const saved = this.loadSaved();
+    this.recordar = !!saved;
     this.form = this.fb.group({
-      nombre: ['', [Validators.required, Validators.minLength(2)]],
-      celular: ['', [Validators.required, Validators.pattern(/^\d{7,15}$/)]],
+      nombre: [saved?.nombre ?? '', [Validators.required, Validators.minLength(2)]],
+      celular: [saved?.celular ?? '', [Validators.required, Validators.pattern(/^\d{7,15}$/)]],
     });
     this.buildParticles();
   }
@@ -64,10 +73,22 @@ export class LoginComponent implements OnInit {
     }));
   }
 
+  private loadSaved(): { nombre: string; celular: string } | null {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
+    }
+    if (this.recordar) {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.form.value));
+    } else {
+      localStorage.removeItem(this.STORAGE_KEY);
     }
     this.loading.set(true);
     this.errorMsg.set('');
@@ -85,9 +106,15 @@ export class LoginComponent implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.errorMsg.set(
-          err?.error?.detail ?? 'No se pudo conectar con el servidor. Intenta de nuevo.'
-        );
+        const detail = err?.error?.detail;
+        if (detail?.code === 'CLIENTE_DISABLED') {
+          this.disabledMsg.set(detail.message);
+          this.showDisabledModal.set(true);
+        } else {
+          this.errorMsg.set(
+            typeof detail === 'string' ? detail : 'No se pudo conectar con el servidor. Intenta de nuevo.'
+          );
+        }
       },
     });
   }

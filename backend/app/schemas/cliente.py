@@ -19,6 +19,7 @@ class ClienteResponse(BaseModel):
     cc: str | None
     saldo: float
     vip: bool
+    enabled: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

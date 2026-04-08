@@ -1,0 +1,15 @@
+@if (visible() && banner()) {
+  <div class="banner-bar">
+    @if (banner()!.tipo === 'imagen' && banner()!.imagen_src) {
+      <img [src]="banner()!.imagen_src" class="banner-img" alt="Banner" />
+    } @else {
+      <div class="banner-text-wrap">
+        <span class="banner-text-icon material-icons-round">campaign</span>
+        <p class="banner-text">{{ banner()!.texto }}</p>
+      </div>
+    }
+    <button class="banner-close" (click)="cerrar()" title="Cerrar">
+      <span class="material-icons-round">close</span>
+    </button>
+  </div>
+}

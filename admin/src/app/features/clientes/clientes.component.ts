@@ -64,12 +64,12 @@ export class ClientesComponent implements OnInit {
 
   openEdit(c: Cliente) {
     this.editTarget = c;
-    this.editForm = { nombre: c.nombre, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '' };
+    this.editForm = { nombre: c.nombre, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled };
     this.editError.set(null);
   }
 
   openCreate() {
-    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '' };
+    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true };
     this.createError.set(null);
     this.showCreate = true;
   }

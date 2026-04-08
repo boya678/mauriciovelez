@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 180
+    CLIENTE_DISABLED_MSG: str = "Tu cuenta no está habilitada. Comunícate con el equipo de Mauricio Vélez para más información."
 
     model_config = SettingsConfigDict(
         env_file=".env",

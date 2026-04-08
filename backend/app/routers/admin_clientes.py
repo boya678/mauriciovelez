@@ -32,6 +32,7 @@ class ClienteOut(BaseModel):
     saldo: float
     vip: bool
     codigo_vip: Optional[str]
+    enabled: bool
 
     model_config = {"from_attributes": True}
 
@@ -43,6 +44,7 @@ class ClienteUpdate(BaseModel):
     saldo: Optional[float] = None
     vip: Optional[bool] = None
     codigo_vip: Optional[str] = None
+    enabled: Optional[bool] = None
 
 
 class ClienteCreate(BaseModel):
@@ -53,6 +55,7 @@ class ClienteCreate(BaseModel):
     saldo: float = 0
     vip: bool = False
     codigo_vip: Optional[str] = None
+    enabled: bool = True
 
 
 class PaginatedClientes(BaseModel):
@@ -92,6 +95,7 @@ def create_cliente(
         saldo=payload.saldo,
         vip=payload.vip,
         codigo_vip=payload.codigo_vip or None,
+        enabled=payload.enabled,
     )
     db.add(nuevo)
     if payload.vip:

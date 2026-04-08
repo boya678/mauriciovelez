@@ -1,0 +1,157 @@
+<div class="page-header">
+  <h2>Banners</h2>
+  <button class="btn-primary btn-sm" (click)="openNew()">
+    <span class="material-icons-round" style="font-size:1rem;vertical-align:middle">add</span> Nuevo banner
+  </button>
+</div>
+
+<div class="card table-card">
+  @if (loading()) {
+    <div class="empty-state">Cargando…</div>
+  } @else if (items().length === 0) {
+    <div class="empty-state">No hay banners creados.</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th>Tipo</th>
+            <th>Contenido</th>
+            <th>Audiencia</th>
+            <th>Inicio</th>
+            <th>Fin</th>
+            <th class="center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of items(); track b.id) {
+            <tr>
+              <td>
+                @if (isVigente(b)) {
+                  <span class="badge-vigente">● Vigente</span>
+                } @else if (b.activo) {
+                  <span class="badge-activo">○ Activo</span>
+                } @else {
+                  <span class="badge-inactivo">○ Inactivo</span>
+                }
+              </td>
+              <td>
+                <span class="tipo-badge tipo-{{ b.tipo }}">{{ b.tipo }}</span>
+              </td>
+              <td class="contenido-cell">
+                @if (b.tipo === 'texto') {
+                  {{ b.texto | slice:0:60 }}{{ (b.texto?.length ?? 0) > 60 ? '…' : '' }}
+                } @else {
+                  <span class="text-muted">imagen adjunta</span>
+                }
+              </td>
+              <td><span class="audiencia-badge">{{ audienciaLabel(b.audiencia) }}</span></td>
+              <td class="mono">{{ b.inicio | date:'dd/MM/yy HH:mm' }}</td>
+              <td class="mono">{{ b.fin | date:'dd/MM/yy HH:mm' }}</td>
+              <td class="center actions-cell">
+                <button class="btn-ghost btn-xs" (click)="toggle(b)" [title]="b.activo ? 'Desactivar' : 'Activar'">
+                  <span class="material-icons-round" style="font-size:1rem">{{ b.activo ? 'toggle_on' : 'toggle_off' }}</span>
+                </button>
+                <button class="btn-ghost btn-xs" (click)="openEdit(b)" title="Editar">
+                  <span class="material-icons-round" style="font-size:1rem">edit</span>
+                </button>
+                <button class="btn-ghost btn-xs btn-danger" (click)="delete(b)" title="Eliminar">
+                  <span class="material-icons-round" style="font-size:1rem">delete</span>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+<!-- Modal crear / editar -->
+@if (showModal()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-box modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editId ? 'Editar banner' : 'Nuevo banner' }}</h3>
+        <button class="modal-close" (click)="closeModal()">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body form-grid">
+
+        <!-- Tipo -->
+        <div class="form-row">
+          <label>Tipo</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" [(ngModel)]="fTipo" value="texto" /> Texto
+            </label>
+            <label class="radio-label">
+              <input type="radio" [(ngModel)]="fTipo" value="imagen" /> Imagen
+            </label>
+          </div>
+        </div>
+
+        <!-- Audiencia -->
+        <div class="form-row">
+          <label>Audiencia</label>
+          <select [(ngModel)]="fAudiencia">
+            <option value="todos">Todos</option>
+            <option value="vip">Solo VIP</option>
+          </select>
+        </div>
+
+        <!-- Inicio / Fin -->
+        <div class="form-row">
+          <label>Inicio</label>
+          <input type="datetime-local" [(ngModel)]="fInicio" />
+        </div>
+        <div class="form-row">
+          <label>Fin</label>
+          <input type="datetime-local" [(ngModel)]="fFin" />
+        </div>
+
+        <!-- Contenido según tipo -->
+        @if (fTipo === 'texto') {
+          <div class="form-row form-row--full">
+            <label>Texto del banner</label>
+            <textarea [(ngModel)]="fTexto" rows="4" placeholder="Escribe el mensaje del banner…"></textarea>
+          </div>
+        } @else {
+          <div class="form-row form-row--full">
+            <label>
+              Imagen
+              <span class="hint">Ancho mín. 800 px · proporción horizontal 2:1 a 8:1 · JPEG/PNG/WebP · máx. 2 MB<br><small>Ej: 1200×300, 1920×400, 800×200</small></span>
+            </label>
+            <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onFileChange($event)" />
+            @if (fFileError) {
+              <span class="field-error">{{ fFileError }}</span>
+            }
+            @if (fPreview) {
+              <img [src]="fPreview" class="img-preview" alt="Preview" />
+            }
+            @if (editId && !fFile) {
+              <span class="hint">Deja vacío para mantener la imagen actual.</span>
+            }
+          </div>
+        }
+
+        @if (errorMsg()) {
+          <div class="form-row form-row--full">
+            <span class="field-error">{{ errorMsg() }}</span>
+          </div>
+        }
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-ghost btn-sm" (click)="closeModal()">Cancelar</button>
+        <button class="btn-primary btn-sm" (click)="save()" [disabled]="saving()">
+          {{ saving() ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear banner') }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

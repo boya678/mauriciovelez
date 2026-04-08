@@ -4,6 +4,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } fro
 import { CommonModule } from '@angular/common';
 import { Subscription, filter } from 'rxjs';
 import { AuthService, Cliente } from '../../../core/services/auth.service';
+import { BannerComponent } from '../../../shared/banner/banner.component';
 
 export interface MenuItem {
   label: string;
@@ -14,7 +15,7 @@ export interface MenuItem {
 @Component({
   selector: 'app-portal-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule, BannerComponent],
   templateUrl: './portal-layout.component.html',
   styleUrl: './portal-layout.component.scss',
 })

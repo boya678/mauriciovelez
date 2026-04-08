@@ -37,6 +37,10 @@ export const routes: Routes = [
         path: 'suscripciones',
         loadComponent: () => import('./features/suscripciones/suscripciones.component').then(m => m.SuscripcionesComponent),
       },
+      {
+        path: 'banners',
+        loadComponent: () => import('./features/banners/banners.component').then(m => m.BannersComponent),
+      },
     ],
   },
   { path: '**', redirectTo: '/login' },

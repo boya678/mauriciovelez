@@ -112,6 +112,7 @@
     </header>
 
     <!-- Contenido enrutado -->
+    <app-banner [esVip]="!!cliente?.vip" />
     <main class="content">
       <router-outlet />
     </main>

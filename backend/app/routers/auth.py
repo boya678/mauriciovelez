@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import create_access_token, get_current_user
 from app.database import get_db
 from app.models.cliente import Cliente
@@ -26,6 +27,12 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         db.add(cliente)
         db.commit()
         db.refresh(cliente)
+
+    if not cliente.enabled:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "CLIENTE_DISABLED", "message": settings.CLIENTE_DISABLED_MSG},
+        )
 
     token = create_access_token(subject=str(cliente.id))
 

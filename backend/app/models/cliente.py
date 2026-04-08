@@ -21,6 +21,7 @@ class Cliente(Base):
     saldo: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
     vip: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     codigo_vip: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, default=None)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

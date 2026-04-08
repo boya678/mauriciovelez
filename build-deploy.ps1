@@ -87,41 +87,21 @@ if ($LASTEXITCODE -ne 0) {
     Write-OK "Namespace $NAMESPACE ya existe"
 }
 
-# ── 7. Secrets (solo si no existen) ───────────────────────────
-Write-Step "Verificando secret backend-secrets..."
-$existsSecret = kubectl get secret backend-secrets -n $NAMESPACE 2>$null
-if ($LASTEXITCODE -ne 0) {
-    # Leer valores desde backend/.env
-    $envFile = "$ROOT\backend\.env"
-    if (-not (Test-Path $envFile)) {
-        Write-Host "`n   ERROR: No se encontró $envFile" -ForegroundColor Red
-        Write-Host "   Crea el archivo con las claves DATABASE_URL y JWT_SECRET_KEY" -ForegroundColor Gray
-        exit 1
-    }
-
-    $dotenv = @{}
-    Get-Content $envFile | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
-        $parts = $_ -split '=', 2
-        $dotenv[$parts[0].Trim()] = $parts[1].Trim().Trim('"').Trim("'")
-    }
-
-    $dbUrl  = $dotenv['DATABASE_URL']
-    $jwtKey = $dotenv['JWT_SECRET_KEY']
-
-    if (-not $dbUrl -or -not $jwtKey) {
-        Write-Host "`n   ERROR: $envFile debe contener DATABASE_URL y JWT_SECRET_KEY" -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "   Creando secret desde $envFile ..." -ForegroundColor Yellow
-    kubectl create secret generic backend-secrets `
-        --namespace $NAMESPACE `
-        --from-literal=DATABASE_URL=$dbUrl `
-        --from-literal=JWT_SECRET_KEY=$jwtKey
-    Write-OK "Secret backend-secrets creado"
-} else {
-    Write-OK "Secret backend-secrets ya existe"
+# ── 7. Actualizar secret completo desde .env ──────────────────
+Write-Step "Aplicando secret backend-secrets desde .env..."
+$envFile = "$ROOT\backend\.env"
+if (-not (Test-Path $envFile)) {
+    Write-Host "`n   ERROR: No se encontró $envFile" -ForegroundColor Red
+    Write-Host "   Crea el archivo con las variables requeridas." -ForegroundColor Gray
+    exit 1
 }
+
+kubectl create secret generic backend-secrets `
+    --namespace $NAMESPACE `
+    --from-env-file="$envFile" `
+    --dry-run=client -o yaml | kubectl apply -f -
+
+Write-OK "Secret backend-secrets actualizado"
 
 # ── 8. Aplicar manifests ──────────────────────────────────────
 if ($Target -in "backend", "all") {
