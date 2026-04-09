@@ -57,7 +57,7 @@ export class LoginComponent implements OnInit {
     this.recordar = !!saved;
     this.form = this.fb.group({
       nombre: [saved?.nombre ?? '', [Validators.required, Validators.minLength(2)]],
-      celular: [saved?.celular ?? '', [Validators.required, Validators.pattern(/^\d{7,15}$/)]],
+      celular: [saved?.celular ?? '', [Validators.required, Validators.pattern(/^\d{10}$/)]],
     });
     this.buildParticles();
   }

@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
+from app.models.numbers_users import NumberUser
 
 router = APIRouter(prefix="/admin/historico", tags=["Admin Histórico"])
 
@@ -106,11 +107,46 @@ def export_historico(
     desde: Optional[date] = Query(None),
     hasta: Optional[date] = Query(None),
     solo_ganadores: bool = Query(False),
+    filtro_vip: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
     _desde, _hasta = _defaults(desde, hasta)
-    rows = _build_query(db, _desde, _hasta, solo_ganadores).all()
+
+    # Query extendida: incluye VIP del cliente y tipo del número asignado
+    base_q = (
+        db.query(
+            NumberHistoric.id,
+            NumberHistoric.date.label("fecha"),
+            Cliente.nombre,
+            Cliente.celular,
+            Cliente.cc,
+            NumberHistoric.number.label("numero"),
+            Cliente.vip,
+            NumberUser.type.label("tipo_numero"),
+        )
+        .join(Cliente, NumberHistoric.id_user == Cliente.id)
+        .outerjoin(
+            NumberUser,
+            (NumberUser.id_user == NumberHistoric.id_user)
+            & (NumberUser.number == NumberHistoric.number)
+            & (NumberUser.date_assigned <= NumberHistoric.date)
+            & (NumberUser.valid_until >= NumberHistoric.date),
+        )
+        .filter(NumberHistoric.date >= _desde, NumberHistoric.date <= _hasta)
+        .order_by(NumberHistoric.date.desc(), Cliente.nombre)
+    )
+    if solo_ganadores:
+        base_q = base_q.filter(
+            db.query(NumeroAcierto)
+            .filter(NumeroAcierto.historic_id == NumberHistoric.id)
+            .exists()
+        )
+    if filtro_vip == 'vip':
+        base_q = base_q.filter(Cliente.vip == True)
+    elif filtro_vip == 'no_vip':
+        base_q = base_q.filter(Cliente.vip == False)
+    rows = base_q.all()
 
     # First pass: collect aciertos per row and determine max count for dynamic columns
     rows_data: list[tuple] = []
@@ -129,18 +165,24 @@ def export_historico(
     ws = wb.active
     ws.title = "Histórico"
 
-    # Dynamic header: base columns + (Tipo N | Lotería N | Resultado N) × max_aciertos
-    header = ["Fecha", "Nombre", "Celular", "CC", "Número"]
+    # Header: columnas base + VIP cliente + tipo número + aciertos dinámicos
+    header = ["Fecha", "Nombre", "Celular", "CC", "Número", "VIP Cliente", "Tipo Número"]
     for i in range(1, max_aciertos + 1):
         header += [f"Tipo {i}", f"Lotería {i}", f"Resultado {i}"]
     ws.append(header)
 
-    # Second pass: write rows, padding shorter rows with empty cells
     for r, aciertos in rows_data:
-        row: list = [str(r.fecha), r.nombre, r.celular, r.cc or "", r.numero]
+        row: list = [
+            str(r.fecha),
+            r.nombre,
+            r.celular,
+            r.cc or "",
+            r.numero,
+            "Sí" if r.vip else "No",
+            r.tipo_numero or "—",
+        ]
         for a in aciertos:
             row += [a.tipo, a.resultado.loteria, a.resultado.resultado]
-        # Pad rows that have fewer aciertos than the maximum
         row += ["", "", ""] * (max_aciertos - len(aciertos))
         ws.append(row)
 

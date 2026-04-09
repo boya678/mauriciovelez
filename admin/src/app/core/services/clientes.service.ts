@@ -27,9 +27,10 @@ export class ClientesService {
 
   constructor(private http: HttpClient) {}
 
-  list(page = 1, size = 20, q = '') {
+  list(page = 1, size = 20, q = '', filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos') {
     let params = new HttpParams().set('page', page).set('size', size);
     if (q) params = params.set('q', q);
+    if (filtroVip !== 'todos') params = params.set('filtro_vip', filtroVip);
     return this.http.get<PaginatedClientes>(this.base, { params });
   }
 

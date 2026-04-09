@@ -47,8 +47,10 @@ export class HistoricoService {
     return this.http.get<PaginatedHistorico>(this.base, { params });
   }
 
-  export(desde: string, hasta: string) {
-    const params = new HttpParams().set('desde', desde).set('hasta', hasta);
+  export(desde: string, hasta: string, soloGanadores = false, filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos') {
+    let params = new HttpParams().set('desde', desde).set('hasta', hasta);
+    if (soloGanadores) params = params.set('solo_ganadores', 'true');
+    if (filtroVip !== 'todos') params = params.set('filtro_vip', filtroVip);
     return this.http.get(`${this.base}/export`, { params, responseType: 'blob' });
   }
 

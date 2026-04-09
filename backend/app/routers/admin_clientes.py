@@ -7,7 +7,7 @@ import openpyxl
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -45,6 +45,11 @@ class ClienteUpdate(BaseModel):
     vip: Optional[bool] = None
     codigo_vip: Optional[str] = None
     enabled: Optional[bool] = None
+
+    @field_validator('correo', 'cc', 'codigo_vip', mode='before')
+    @classmethod
+    def empty_to_none(cls, v):
+        return None if v == '' else v
 
 
 class ClienteCreate(BaseModel):
@@ -125,6 +130,7 @@ def create_cliente(
 @router.get("", response_model=PaginatedClientes)
 def list_clientes(
     q: Optional[str] = Query(None, description="Buscar por nombre, celular o cc"),
+    filtro_vip: Optional[str] = Query(None, description="vip | no_vip"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -138,6 +144,10 @@ def list_clientes(
             | Cliente.celular.ilike(like)
             | Cliente.cc.ilike(like)
         )
+    if filtro_vip == 'vip':
+        query = query.filter(Cliente.vip == True)
+    elif filtro_vip == 'no_vip':
+        query = query.filter(Cliente.vip == False)
     total = query.count()
     items = query.order_by(Cliente.nombre).offset((page - 1) * size).limit(size).all()
     return PaginatedClientes(total=total, page=page, size=size, items=items)

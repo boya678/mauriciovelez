@@ -55,7 +55,7 @@ export class HistoricoComponent implements OnInit {
   next() { if (this.page() < this.totalPages) { this.page.update(p => p + 1); this.load(); } }
 
   downloadExcel() {
-    this.svc.export(this.desde, this.hasta).subscribe(blob => {
+    this.svc.export(this.desde, this.hasta, this.soloGanadores, this.filtroVip).subscribe(blob => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

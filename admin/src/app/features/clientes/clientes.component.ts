@@ -18,6 +18,7 @@ export class ClientesComponent implements OnInit {
   page = signal(1);
   size = 20;
   search = '';
+  filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos';
   loading = signal(false);
 
   editTarget: Cliente | null = null;
@@ -38,7 +39,7 @@ export class ClientesComponent implements OnInit {
     this.search$.pipe(
       debounceTime(350),
       distinctUntilChanged(),
-      switchMap(q => { this.loading.set(true); return this.svc.list(1, this.size, q); }),
+      switchMap(q => { this.loading.set(true); return this.svc.list(1, this.size, q, this.filtroVip); }),
     ).subscribe(res => {
       this.items.set(res.items);
       this.total.set(res.total);
@@ -49,7 +50,7 @@ export class ClientesComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.svc.list(this.page(), this.size, this.search).subscribe(res => {
+    this.svc.list(this.page(), this.size, this.search, this.filtroVip).subscribe(res => {
       this.items.set(res.items);
       this.total.set(res.total);
       this.loading.set(false);
@@ -57,6 +58,8 @@ export class ClientesComponent implements OnInit {
   }
 
   onSearch() { this.search$.next(this.search); }
+
+  filtrar() { this.page.set(1); this.load(); }
 
   get totalPages() { return Math.ceil(this.total() / this.size); }
   prev() { if (this.page() > 1) { this.page.update(p => p - 1); this.load(); } }

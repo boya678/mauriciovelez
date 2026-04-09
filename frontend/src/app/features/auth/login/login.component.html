@@ -54,10 +54,11 @@
             type="tel"
             class="field-input"
             placeholder="Ej: 3001234567"
+            maxlength="10"
           />
         </div>
         @if (isInvalid('celular')) {
-          <span class="field-error">Ingresa un número válido (7–15 dígitos)</span>
+          <span class="field-error">Ingresa un número de celular colombiano (10 dígitos)</span>
         }
       </div>
 

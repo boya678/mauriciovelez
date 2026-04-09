@@ -7,6 +7,14 @@
   <div class="search-bar">
     <input type="search" [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Buscar por nombre, celular o cc…" />
   </div>
+  <div class="filter-group">
+    <label>VIP</label>
+    <select [(ngModel)]="filtroVip" (ngModelChange)="filtrar()">
+      <option value="todos">Todos</option>
+      <option value="vip">Solo VIP</option>
+      <option value="no_vip">No VIP</option>
+    </select>
+  </div>
   @if (auth.isAdmin()) {
     <button class="btn-export" (click)="downloadExcel()" title="Descargar Excel"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">download</span> Exportar</button>
     <button class="btn-primary btn-new" (click)="openCreate()"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">person_add</span> Nuevo cliente</button>
