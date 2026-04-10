@@ -1,3 +1,8 @@
+import random
+import string
+from datetime import datetime, timedelta, timezone
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -6,18 +11,87 @@ from app.core.security import create_access_token, get_current_user
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
-from app.schemas.cliente import LoginRequest, LoginResponse, VipVerifyRequest, UpdateMisDatosRequest
+from app.schemas.cliente import LoginRequest, LoginResponse, OtpRequest, VipVerifyRequest, UpdateMisDatosRequest
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+# ── OTP store en memoria: {celular: (codigo, expira_en)} ──────
+_otp_store: dict[str, tuple[str, datetime]] = {}
+OTP_TTL_MINUTES = 5
+
+
+def _generar_otp() -> str:
+    return ''.join(random.choices(string.digits, k=6))
+
+
+def _enviar_whatsapp_otp(celular: str, codigo: str) -> None:
+    """Envía el OTP via WhatsApp Business API (template 'otp')."""
+    # El número debe incluir código de país sin '+'
+    numero = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero,
+        'type': 'template',
+        'template': {
+            'name': 'otp',
+            'language': {'code': 'es_MX'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [{'type': 'text', 'text': codigo}],
+                },
+                {
+                    'type': 'button',
+                    'sub_type': 'url',
+                    'index': '0',
+                    'parameters': [{'type': 'text', 'text': codigo}],
+                },
+            ],
+        },
+    }
+    resp = httpx.post(url, json=body, headers=headers, timeout=10)
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail='No se pudo enviar el código de verificación. Intenta de nuevo.',
+        )
+
+
+@router.post('/send-otp', status_code=200)
+def send_otp(payload: OtpRequest):
+    """Genera y envía un OTP de 6 dígitos por WhatsApp."""
+    codigo = _generar_otp()
+    expira = datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)
+    _otp_store[payload.celular] = (codigo, expira)
+    _enviar_whatsapp_otp(payload.celular, codigo)
+    return {'ok': True, 'expira_en': OTP_TTL_MINUTES}
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    # ── Buscar cliente ─────────────────────────────────────────
     cliente = db.query(Cliente).filter(Cliente.celular == payload.celular).first()
-    es_nuevo = False
 
     if cliente is None:
-        es_nuevo = True
+        # Cliente nuevo: requiere OTP verificado
+        if not payload.otp_code:
+            raise HTTPException(status_code=403, detail='otp_required')
+
+        entry = _otp_store.get(payload.celular)
+        if not entry:
+            raise HTTPException(status_code=400, detail='Código de verificación no encontrado. Solicita uno nuevo.')
+        codigo_guardado, expira = entry
+        if datetime.now(timezone.utc) > expira:
+            _otp_store.pop(payload.celular, None)
+            raise HTTPException(status_code=400, detail='El código de verificación expiró. Solicita uno nuevo.')
+        if payload.otp_code != codigo_guardado:
+            raise HTTPException(status_code=400, detail='Código de verificación incorrecto.')
+        _otp_store.pop(payload.celular, None)  # invalidar tras uso
+
         cliente = Cliente(
             nombre=payload.nombre,
             celular=payload.celular,
@@ -27,6 +101,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         db.add(cliente)
         db.commit()
         db.refresh(cliente)
+        es_nuevo = True
+    else:
+        # Cliente existente: acceso directo sin OTP
+        es_nuevo = False
 
     if not cliente.enabled:
         raise HTTPException(

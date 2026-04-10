@@ -373,3 +373,27 @@ form {
   margin-bottom: 1.2rem;
   white-space: pre-line;
 }
+
+// Modal OTP WhatsApp
+.otp-modal {
+  border-top: 3px solid #25d366;
+}
+
+.otp-icon {
+  font-family: 'Material Icons Round';
+  font-size: 3rem;
+  color: #25d366;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.otp-field {
+  margin-bottom: 0.8rem;
+}
+
+.otp-input {
+  font-size: 1.6rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-weight: 700;
+}

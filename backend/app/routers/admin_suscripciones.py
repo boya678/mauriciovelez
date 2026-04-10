@@ -96,15 +96,24 @@ def renovar(
     if sus is None:
         raise HTTPException(status_code=404, detail="Suscripción no encontrada")
 
-    fin_anterior = sus.fin
-    now = datetime.now(timezone.utc)
-    # Si el fin ya pasó, renovar desde hoy; si no, sumar 1 mes al fin actual
-    base = sus.fin if sus.fin >= now else now
-    sus.fin = base + relativedelta(months=1)
-    sus.activa = True
-
-    # Asegurar que el cliente quede marcado como VIP
     cliente = db.get(Cliente, sus.cliente_id)
+    now = datetime.now(timezone.utc)
+
+    # 1. Inactivar TODAS las suscripciones existentes del cliente
+    db.query(Suscripcion).filter(
+        Suscripcion.cliente_id == sus.cliente_id
+    ).update({"activa": False}, synchronize_session="fetch")
+
+    # 2. Crear nueva suscripción desde ahora + 1 mes
+    nueva = Suscripcion(
+        cliente_id=sus.cliente_id,
+        inicio=now,
+        fin=now + relativedelta(months=1),
+        activa=True,
+    )
+    db.add(nueva)
+
+    # 3. Asegurar que el cliente quede marcado como VIP
     if cliente and not cliente.vip:
         cliente.vip = True
 
@@ -119,23 +128,23 @@ def renovar(
         detail={
             "cliente_id": str(sus.cliente_id),
             "nombre": cliente.nombre if cliente else "",
-            "fin_anterior": fin_anterior.isoformat(),
-            "fin_nuevo": sus.fin.isoformat(),
+            "nueva_inicio": now.isoformat(),
+            "nueva_fin": (now + relativedelta(months=1)).isoformat(),
         },
     ))
 
     db.commit()
-    db.refresh(sus)
+    db.refresh(nueva)
 
     return SuscripcionOut(
-        id=sus.id,
-        cliente_id=sus.cliente_id,
+        id=nueva.id,
+        cliente_id=nueva.cliente_id,
         nombre=cliente.nombre if cliente else "",
         celular=cliente.celular if cliente else "",
-        inicio=sus.inicio,
-        fin=sus.fin,
-        activa=sus.activa,
-        created_at=sus.created_at,
+        inicio=nueva.inicio,
+        fin=nueva.fin,
+        activa=nueva.activa,
+        created_at=nueva.created_at,
     )
 
 

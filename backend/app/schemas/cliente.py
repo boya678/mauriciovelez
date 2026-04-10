@@ -4,9 +4,14 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 
+class OtpRequest(BaseModel):
+    celular: str = Field(..., min_length=10, max_length=15)
+
+
 class LoginRequest(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=150)
     celular: str = Field(..., min_length=1, max_length=30)
+    otp_code: str | None = Field(default=None, min_length=6, max_length=6)
     correo: str | None = Field(default=None, max_length=200)
     cc: str | None = Field(default=None, max_length=30)
 

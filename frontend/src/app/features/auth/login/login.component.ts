@@ -40,6 +40,13 @@ export class LoginComponent implements OnInit {
   showDisabledModal = signal(false);
   disabledMsg = signal('');
 
+  // Estado modal OTP
+  showOtpModal = signal(false);
+  otpCode = '';
+  otpError = signal('');
+  otpLoading = signal(false);
+  otpExpiraEn = 5;
+
   private readonly symbols = ['♦', '★', '$', '✦', '♠', '♣', '♥', '7', '♞', '⬡'];
 
   constructor(
@@ -92,31 +99,87 @@ export class LoginComponent implements OnInit {
     }
     this.loading.set(true);
     this.errorMsg.set('');
-    this.authService.login(this.form.value).subscribe({
+    // Intentar login directo (sin OTP — clientes existentes pasan aquí)
+    this.authService.login({ ...this.form.value }).subscribe({
       next: res => {
         this.loading.set(false);
-        if (res.cliente.vip) {
-          this.pendingClienteId = res.cliente.id;
-          this.vipCode = '';
-          this.vipError.set('');
-          this.showVipModal.set(true);
-        } else {
-          this.router.navigate(['/portal']);
-        }
+        this.handleLoginSuccess(res);
       },
       error: err => {
-        this.loading.set(false);
         const detail = err?.error?.detail;
-        if (detail?.code === 'CLIENTE_DISABLED') {
+        if (err.status === 403 && detail === 'otp_required') {
+          // Cliente nuevo: enviar OTP por WhatsApp y mostrar modal
+          this.authService.sendOtp(this.form.value.celular).subscribe({
+            next: res2 => {
+              this.loading.set(false);
+              this.otpExpiraEn = res2.expira_en;
+              this.otpCode = '';
+              this.otpError.set('');
+              this.showOtpModal.set(true);
+            },
+            error: otpErr => {
+              this.loading.set(false);
+              this.errorMsg.set(otpErr?.error?.detail ?? 'No se pudo enviar el código. Intenta de nuevo.');
+            },
+          });
+        } else if (detail?.code === 'CLIENTE_DISABLED') {
+          this.loading.set(false);
           this.disabledMsg.set(detail.message);
           this.showDisabledModal.set(true);
         } else {
-          this.errorMsg.set(
-            typeof detail === 'string' ? detail : 'No se pudo conectar con el servidor. Intenta de nuevo.'
+          this.loading.set(false);
+          this.errorMsg.set(typeof detail === 'string' ? detail : 'Error al ingresar');
+        }
+      },
+    });
+  }
+
+  private handleLoginSuccess(res: any): void {
+    if (res.cliente.vip) {
+      this.pendingClienteId = res.cliente.id;
+      this.vipCode = '';
+      this.vipError.set('');
+      this.showVipModal.set(true);
+    } else {
+      this.router.navigate(['/portal']);
+    }
+  }
+
+  confirmOtp(): void {
+    if (!this.otpCode.trim() || this.otpCode.length !== 6) {
+      this.otpError.set('Ingresa el código de 6 dígitos');
+      return;
+    }
+    this.otpLoading.set(true);
+    this.otpError.set('');
+    // Paso 2: login con OTP incluido (cliente nuevo)
+    const payload = { ...this.form.value, otp_code: this.otpCode.trim() };
+    this.authService.login(payload).subscribe({
+      next: res => {
+        this.otpLoading.set(false);
+        this.showOtpModal.set(false);
+        this.handleLoginSuccess(res);
+      },
+      error: err => {
+        this.otpLoading.set(false);
+        const detail = err?.error?.detail;
+        if (detail?.code === 'CLIENTE_DISABLED') {
+          this.showOtpModal.set(false);
+          this.disabledMsg.set(detail.message);
+          this.showDisabledModal.set(true);
+        } else {
+          this.otpError.set(
+            typeof detail === 'string' ? detail : 'Código incorrecto o expirado.'
           );
         }
       },
     });
+  }
+
+  cancelOtpModal(): void {
+    this.showOtpModal.set(false);
+    this.otpCode = '';
+    this.otpError.set('');
   }
 
   submitVipCode(): void {
