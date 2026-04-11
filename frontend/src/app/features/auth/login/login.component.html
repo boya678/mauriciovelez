@@ -181,16 +181,3 @@
   </div>
 }
 
-<!-- Modal cuenta deshabilitada -->
-@if (showDisabledModal()) {
-  <div class="vip-overlay" (click)="$event.target === $event.currentTarget && showDisabledModal.set(false)">
-    <div class="vip-modal disabled-modal" role="dialog" aria-modal="true" aria-labelledby="disabled-title">
-      <span class="material-icons-round disabled-icon">block</span>
-      <h2 id="disabled-title" class="vip-modal-title">Cuenta deshabilitada</h2>
-      <p class="vip-modal-sub disabled-msg">{{ disabledMsg() }}</p>
-      <button class="btn-cancel" type="button" (click)="showDisabledModal.set(false)">
-        Cerrar
-      </button>
-    </div>
-  </div>
-}

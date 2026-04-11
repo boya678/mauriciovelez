@@ -24,6 +24,8 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
   isMobile = signal(false);
   cliente: Cliente | null = null;
   vipFin: string | null = null;
+  disabledMsg: string | null = null;
+  showDisabledModal = signal(false);
   private subs = new Subscription();
 
   menuItems: MenuItem[] = [
@@ -43,6 +45,12 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.cliente = this.authService.getCliente();
+
+    // Mostrar modal si la cuenta está deshabilitada
+    this.disabledMsg = this.authService.getDisabledMsg();
+    if (this.disabledMsg) {
+      this.showDisabledModal.set(true);
+    }
 
     // Cargar fecha de vencimiento VIP si aplica
     if (this.cliente?.vip) {
@@ -84,5 +92,10 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  closeDisabledModal(): void {
+    this.showDisabledModal.set(false);
+    this.authService.clearDisabledMsg();
   }
 }

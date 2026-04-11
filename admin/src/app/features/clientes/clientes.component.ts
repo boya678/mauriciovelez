@@ -67,7 +67,7 @@ export class ClientesComponent implements OnInit {
 
   openEdit(c: Cliente) {
     this.editTarget = c;
-    this.editForm = { nombre: c.nombre, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled };
+    this.editForm = { nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled };
     this.editError.set(null);
   }
 

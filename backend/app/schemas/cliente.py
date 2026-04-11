@@ -35,6 +35,7 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     cliente: ClienteResponse
     es_nuevo: bool
+    disabled_msg: str | None = None
 
 
 class VipVerifyRequest(BaseModel):

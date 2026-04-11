@@ -17,6 +17,7 @@ from app.models.audit_log import AuditLog
 from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
 from app.models.cuenta_vip import acumular_cuenta_vip
+from app.services.numbers import assign_number, VIGENCIA_VIP
 
 router = APIRouter(prefix="/admin/clientes", tags=["Admin Clientes"])
 
@@ -39,6 +40,7 @@ class ClienteOut(BaseModel):
 
 class ClienteUpdate(BaseModel):
     nombre: Optional[str] = None
+    celular: Optional[str] = None
     correo: Optional[str] = None
     cc: Optional[str] = None
     saldo: Optional[float] = None
@@ -103,6 +105,7 @@ def create_cliente(
         enabled=payload.enabled,
     )
     db.add(nuevo)
+    db.flush()  # asegurar que nuevo.id está disponible para FKs
     if payload.vip:
         now = datetime.now(timezone.utc)
         db.add(Suscripcion(
@@ -112,6 +115,7 @@ def create_cliente(
             activa=True,
         ))
         acumular_cuenta_vip(db)
+        assign_number(db, nuevo.id, "vip", VIGENCIA_VIP)
     _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular})
     try:
         db.commit()
@@ -215,7 +219,7 @@ def update_cliente(
     for key, val in changes.items():
         setattr(obj, key, val)
 
-    # Si se activa VIP y antes no lo era, crear suscripción de 1 mes
+    # Si se activa VIP y antes no lo era, crear suscripción de 1 mes y asignar número VIP
     if not vip_antes and obj.vip:
         now = datetime.now(timezone.utc)
         db.add(Suscripcion(
@@ -225,6 +229,7 @@ def update_cliente(
             activa=True,
         ))
         acumular_cuenta_vip(db)
+        assign_number(db, obj.id, "vip", VIGENCIA_VIP)
 
     # Si se desactiva VIP, desactivar todas sus suscripciones activas
     if vip_antes and not obj.vip:
@@ -238,7 +243,10 @@ def update_cliente(
         db.commit()
     except IntegrityError as e:
         db.rollback()
-        if "codigo_vip" in str(e.orig):
+        orig = str(e.orig)
+        if "celular" in orig:
+            raise HTTPException(status_code=409, detail="Ya existe un cliente con ese número de celular")
+        if "codigo_vip" in orig:
             raise HTTPException(status_code=409, detail="El código VIP ya está en uso por otro cliente")
         raise HTTPException(status_code=409, detail="Conflicto de datos: valor duplicado")
     db.refresh(obj)

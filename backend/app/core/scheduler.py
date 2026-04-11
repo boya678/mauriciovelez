@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from zoneinfo import ZoneInfo
 
+from app.core.config import settings
 from app.database import SessionLocal
 from app.models.cliente import Cliente
 from app.models.loteria_resultado import LoteriaResultado
@@ -14,6 +15,7 @@ from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
+from app.services.numbers import assign_number, VIGENCIA_FREE, VIGENCIA_VIP
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
 LOTERIAS_API = "https://api-resultadosloterias.com/api/results"
@@ -46,6 +48,108 @@ def _clasificar(numero: str, resultado: str) -> list[str]:
     if n3 == r3_rev:
         return ["tres_desorden"]
     return []
+
+
+def _notificar_nuevo_numero_vip(celular: str, numero: str, valid_until: date) -> None:
+    """Envía WhatsApp al cliente VIP cuando se le asigna un número nuevo."""
+    numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero_dest,
+        'type': 'template',
+        'template': {
+            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP,
+            'language': {'code': 'es_CO'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {'type': 'text', 'text': numero},
+                        {'type': 'text', 'text': valid_until.strftime('%d/%m/%Y')},
+                    ],
+                },
+            ],
+        },
+    }
+    try:
+        resp = httpx.post(url, json=body, headers=headers, timeout=10)
+        if resp.status_code >= 400:
+            logger.warning("WhatsApp nuevo_numero_vip falló (%s): %s", resp.status_code, resp.text)
+    except Exception:
+        logger.exception("Error al enviar WhatsApp nuevo_numero_vip a %s", celular)
+
+
+def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_num: str, tipo: str) -> None:
+    """Envía WhatsApp al cliente free ganador usando la template configurada."""
+    numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero_dest,
+        'type': 'template',
+        'template': {
+            'name': settings.WHATSAPP_TEMPLATE_GANADOR_FREE,
+            'language': {'code': 'es_CO'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {'type': 'text', 'text': numero},
+                        {'type': 'text', 'text': f'{loteria} {resultado_num} {tipo}'},
+                    ],
+                },
+            ],
+        },
+    }
+    try:
+        resp = httpx.post(url, json=body, headers=headers, timeout=10)
+        if resp.status_code >= 400:
+            logger.warning("WhatsApp ganador_free falló (%s): %s", resp.status_code, resp.text)
+    except Exception:
+        logger.exception("Error al enviar WhatsApp ganador_free a %s", celular)
+
+
+def _notificar_ganador_vip(celular: str, numero: str, loteria: str, resultado_num: str, tipo: str) -> None:
+    """Envía WhatsApp al cliente VIP ganador (sin deshabilitar la cuenta)."""
+    numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero_dest,
+        'type': 'template',
+        'template': {
+            'name': settings.WHATSAPP_TEMPLATE_GANADOR_VIP,
+            'language': {'code': 'es_CO'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {'type': 'text', 'text': numero},
+                        {'type': 'text', 'text': f'{loteria} {resultado_num} {tipo}'},
+                    ],
+                },
+            ],
+        },
+    }
+    try:
+        resp = httpx.post(url, json=body, headers=headers, timeout=10)
+        if resp.status_code >= 400:
+            logger.warning("WhatsApp ganador_vip falló (%s): %s", resp.status_code, resp.text)
+    except Exception:
+        logger.exception("Error al enviar WhatsApp ganador_vip a %s", celular)
 
 
 def _procesar_loterias(fecha: date | None = None) -> None:
@@ -129,6 +233,7 @@ def _procesar_loterias(fecha: date | None = None) -> None:
         )
 
         nuevos_aciertos = 0
+        _notificados_esta_corrida: set = set()
         for h in historicos:
             for resultado in resultados_map.values():
                 for tipo in _clasificar(h.number, resultado.resultado):
@@ -149,6 +254,48 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                             tipo=tipo,
                         ))
                         nuevos_aciertos += 1
+
+                        # ── Notificar ganador ────────────────────────────────
+                        cliente_h = db.query(Cliente).filter(Cliente.id == h.id_user).first()
+                        if (
+                            cliente_h
+                            and cliente_h.enabled
+                            and cliente_h.id not in _notificados_esta_corrida
+                        ):
+                            _notificados_esta_corrida.add(cliente_h.id)
+                            tipo_legible = {
+                                "exacto": "Exacto",
+                                "directo_devuelto": "Directo Devuelto",
+                                "tres_orden": "Tres en Orden",
+                                "tres_desorden": "Tres en Desorden",
+                            }.get(tipo, tipo)
+                            if cliente_h.vip:
+                                _notificar_ganador_vip(
+                                    celular=cliente_h.celular,
+                                    numero=h.number,
+                                    loteria=resultado.loteria,
+                                    resultado_num=resultado.resultado,
+                                    tipo=tipo_legible,
+                                )
+                                logger.info(
+                                    "Ganador VIP notificado: %s (%s) — %s %s %s",
+                                    cliente_h.nombre, cliente_h.celular,
+                                    resultado.loteria, resultado.resultado, tipo,
+                                )
+                            else:
+                                _notificar_ganador_free(
+                                    celular=cliente_h.celular,
+                                    numero=h.number,
+                                    loteria=resultado.loteria,
+                                    resultado_num=resultado.resultado,
+                                    tipo=tipo_legible,
+                                )
+                                cliente_h.enabled = False
+                                logger.info(
+                                    "Ganador free deshabilitado: %s (%s) — %s %s %s",
+                                    cliente_h.nombre, cliente_h.celular,
+                                    resultado.loteria, resultado.resultado, tipo,
+                                )
 
         db.commit()
         logger.info(
@@ -209,12 +356,74 @@ def _desactivar_vip_vencidos() -> None:
         db.close()
 
 
+def _reasignar_numeros_vencidos() -> None:
+    """
+    Recorre todos los clientes habilitados y reasigna números vencidos:
+    - Número free: a todos (si no tiene o venció).
+    - Número vip: solo a clientes vip (si no tiene o venció).
+    """
+    from sqlalchemy import select as _select
+
+    db = SessionLocal()
+    try:
+        today = date.today()
+        clientes = db.query(Cliente).filter(Cliente.enabled == True).all()
+        asignados = 0
+        print(f"   Procesando {len(clientes)} cliente(s)...")
+
+        for c in clientes:
+            # ── Número free ───────────────────────────────────────
+            free_row = db.execute(
+                _select(NumberUser).where(
+                    NumberUser.id_user == c.id,
+                    NumberUser.type == "free",
+                )
+            ).scalar_one_or_none()
+
+            if free_row is None or free_row.valid_until < today:
+                assign_number(db, c.id, "free", VIGENCIA_FREE)
+                asignados += 1
+
+            # ── Número vip (solo si el cliente es VIP) ────────────
+            if c.vip:
+                vip_row = db.execute(
+                    _select(NumberUser).where(
+                        NumberUser.id_user == c.id,
+                        NumberUser.type == "vip",
+                    )
+                ).scalar_one_or_none()
+
+                if vip_row is None or vip_row.valid_until < today:
+                    nueva = assign_number(db, c.id, "vip", VIGENCIA_VIP)
+                    asignados += 1
+                    if c.celular:
+                        _notificar_nuevo_numero_vip(c.celular, nueva.number, nueva.valid_until)
+
+        db.commit()
+        print(f"   Asignaciones realizadas: {asignados}")
+        logger.info("Cron reasignacion numeros: %d asignaciones realizadas sobre %d clientes", asignados, len(clientes))
+    except Exception:
+        db.rollback()
+        logger.exception("Error en cron _reasignar_numeros_vencidos")
+    finally:
+        db.close()
+
+
 def start() -> None:
     """Registra los jobs y arranca el scheduler."""
     _scheduler.add_job(
         _desactivar_vip_vencidos,
         trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
         id="vip_check",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    # Reasignación de números vencidos — cron UTC completo desde settings
+    minuto, hora, dom, mes, dow = settings.CRON_NUMEROS.split()
+    _scheduler.add_job(
+        _reasignar_numeros_vencidos,
+        trigger=CronTrigger(minute=minuto, hour=hora, day=dom, month=mes, day_of_week=dow, timezone="UTC"),
+        id="reasignar_numeros",
         replace_existing=True,
         misfire_grace_time=3600,
     )
@@ -234,7 +443,10 @@ def start() -> None:
             misfire_grace_time=3600,
         )
     _scheduler.start()
-    logger.info("Scheduler iniciado — vip_check 03:00 UTC + loterias 4x/día")
+    logger.info(
+        "Scheduler iniciado — vip_check 03:00 UTC + reasignar_numeros '%s' UTC + loterias 4x/día",
+        settings.CRON_NUMEROS,
+    )
 
 
 def stop() -> None:

@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
 from app.schemas.cliente import LoginRequest, LoginResponse, OtpRequest, VipVerifyRequest, UpdateMisDatosRequest
+from app.services.numbers import assign_number, VIGENCIA_FREE
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -99,6 +100,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             cc=payload.cc,
         )
         db.add(cliente)
+        db.flush()  # obtener el ID antes del commit
+        assign_number(db, cliente.id, "free", VIGENCIA_FREE)
         db.commit()
         db.refresh(cliente)
         es_nuevo = True
@@ -106,18 +109,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         # Cliente existente: acceso directo sin OTP
         es_nuevo = False
 
-    if not cliente.enabled:
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "CLIENTE_DISABLED", "message": settings.CLIENTE_DISABLED_MSG},
-        )
-
     token = create_access_token(subject=str(cliente.id))
 
     return LoginResponse(
         access_token=token,
         cliente=cliente,
         es_nuevo=es_nuevo,
+        disabled_msg=settings.CLIENTE_DISABLED_MSG if not cliente.enabled else None,
     )
 
 

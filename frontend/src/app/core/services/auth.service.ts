@@ -20,6 +20,7 @@ export interface LoginResponse {
   token_type: string;
   cliente: Cliente;
   es_nuevo: boolean;
+  disabled_msg: string | null;
 }
 
 export interface LoginRequest {
@@ -34,6 +35,7 @@ export interface LoginRequest {
 export class AuthService {
   private readonly TOKEN_KEY = 'mv_token';
   private readonly CLIENTE_KEY = 'mv_cliente';
+  private readonly DISABLED_MSG_KEY = 'mv_disabled_msg';
 
   constructor(private http: HttpClient) {}
 
@@ -51,6 +53,11 @@ export class AuthService {
         tap(res => {
           localStorage.setItem(this.TOKEN_KEY, res.access_token);
           localStorage.setItem(this.CLIENTE_KEY, JSON.stringify(res.cliente));
+          if (res.disabled_msg) {
+            localStorage.setItem(this.DISABLED_MSG_KEY, res.disabled_msg);
+          } else {
+            localStorage.removeItem(this.DISABLED_MSG_KEY);
+          }
         })
       );
   }
@@ -88,6 +95,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.CLIENTE_KEY);
+    localStorage.removeItem(this.DISABLED_MSG_KEY);
   }
 
   isAuthenticated(): boolean {
@@ -101,5 +109,13 @@ export class AuthService {
   getCliente(): Cliente | null {
     const raw = localStorage.getItem(this.CLIENTE_KEY);
     return raw ? (JSON.parse(raw) as Cliente) : null;
+  }
+
+  getDisabledMsg(): string | null {
+    return localStorage.getItem(this.DISABLED_MSG_KEY);
+  }
+
+  clearDisabledMsg(): void {
+    localStorage.removeItem(this.DISABLED_MSG_KEY);
   }
 }

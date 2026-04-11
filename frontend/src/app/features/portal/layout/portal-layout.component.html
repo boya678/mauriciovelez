@@ -119,4 +119,17 @@
 
   </div>
 
+  <!-- ── MODAL: CUENTA DESHABILITADA ───────────────────── -->
+  @if (showDisabledModal()) {
+    <div class="disabled-overlay" (click)="closeDisabledModal()"></div>
+    <div class="disabled-modal" role="dialog" aria-modal="true" aria-labelledby="disabled-modal-title">
+      <div class="disabled-modal__icon">
+        <span class="material-icons-round">warning_amber</span>
+      </div>
+      <h3 id="disabled-modal-title" class="disabled-modal__title">Cuenta deshabilitada</h3>
+      <p class="disabled-modal__body">{{ disabledMsg }}</p>
+      <button class="disabled-modal__btn" (click)="closeDisabledModal()">Entendido</button>
+    </div>
+  }
+
 </div>

@@ -36,10 +36,6 @@ export class LoginComponent implements OnInit {
   vipLoading = signal(false);
   private pendingClienteId = '';
 
-  // Estado modal cuenta deshabilitada
-  showDisabledModal = signal(false);
-  disabledMsg = signal('');
-
   // Estado modal OTP
   showOtpModal = signal(false);
   otpCode = '';
@@ -122,10 +118,6 @@ export class LoginComponent implements OnInit {
               this.errorMsg.set(otpErr?.error?.detail ?? 'No se pudo enviar el código. Intenta de nuevo.');
             },
           });
-        } else if (detail?.code === 'CLIENTE_DISABLED') {
-          this.loading.set(false);
-          this.disabledMsg.set(detail.message);
-          this.showDisabledModal.set(true);
         } else {
           this.loading.set(false);
           this.errorMsg.set(typeof detail === 'string' ? detail : 'Error al ingresar');
@@ -163,15 +155,9 @@ export class LoginComponent implements OnInit {
       error: err => {
         this.otpLoading.set(false);
         const detail = err?.error?.detail;
-        if (detail?.code === 'CLIENTE_DISABLED') {
-          this.showOtpModal.set(false);
-          this.disabledMsg.set(detail.message);
-          this.showDisabledModal.set(true);
-        } else {
-          this.otpError.set(
-            typeof detail === 'string' ? detail : 'Código incorrecto o expirado.'
-          );
-        }
+        this.otpError.set(
+          typeof detail === 'string' ? detail : 'Código incorrecto o expirado.'
+        );
       },
     });
   }

@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     CLIENTE_DISABLED_MSG: str = "Tu cuenta no está habilitada. Comunícate con el equipo de Mauricio Vélez para más información."
     WHATSAPP_TOKEN: str = ""
     WHATSAPP_PHONE_ID: str = ""
+    WHATSAPP_TEMPLATE_GANADOR_FREE: str = "ganador_free"
+    WHATSAPP_TEMPLATE_GANADOR_VIP: str = "vip_ganador"
+    WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP: str = "vip_nuevo_numero"
+    CRON_NUMEROS: str = "0 7 * * *"  # cron UTC completo para reasignación de números (default 07:00 UTC = 02:00 COL)
 
     model_config = SettingsConfigDict(
         env_file=".env",
