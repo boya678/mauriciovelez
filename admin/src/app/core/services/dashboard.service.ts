@@ -28,6 +28,7 @@ export interface DashboardStats {
   ganadores_free: number;
   pct_ganadores_vip: number;
   pct_ganadores_free: number;
+  suscripciones_iniciadas: number;
 }
 
 @Injectable({ providedIn: 'root' })

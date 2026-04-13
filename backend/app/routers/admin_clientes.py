@@ -1,6 +1,6 @@
 import io
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import openpyxl
@@ -36,6 +36,7 @@ class ClienteOut(BaseModel):
     vip: bool
     codigo_vip: Optional[str]
     enabled: bool
+    fecha_nacimiento: Optional[date] = None
 
     model_config = {"from_attributes": True}
 
@@ -49,6 +50,7 @@ class ClienteUpdate(BaseModel):
     vip: Optional[bool] = None
     codigo_vip: Optional[str] = None
     enabled: Optional[bool] = None
+    fecha_nacimiento: Optional[date] = None
 
     @field_validator('correo', 'cc', 'codigo_vip', mode='before')
     @classmethod
@@ -65,6 +67,7 @@ class ClienteCreate(BaseModel):
     vip: bool = False
     codigo_vip: Optional[str] = None
     enabled: bool = True
+    fecha_nacimiento: Optional[date] = None
 
     @field_validator('nombre', 'celular')
     @classmethod
@@ -112,9 +115,13 @@ def create_cliente(
         vip=payload.vip,
         codigo_vip=payload.codigo_vip or None,
         enabled=payload.enabled,
+        fecha_nacimiento=payload.fecha_nacimiento,
     )
     db.add(nuevo)
     db.flush()  # asegurar que nuevo.id está disponible para FKs
+
+    # Capturar celular antes de cualquier commit (evita expiración SQLAlchemy)
+    celular_cliente = nuevo.celular
 
     # Siempre asignar número free
     nueva_free = assign_number(db, nuevo.id, "free", VIGENCIA_FREE)
@@ -134,14 +141,14 @@ def create_cliente(
         valid_until_vip = nueva_vip.valid_until
         number_vip = nueva_vip.number
         db.flush()
-        if nuevo.celular:
-            notificar_nuevo_numero_vip(nuevo.celular, number_vip, valid_until_vip)
+        if celular_cliente:
+            notificar_nuevo_numero_vip(celular_cliente, number_vip, valid_until_vip)
 
     _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular})
     try:
         db.commit()
-        if nuevo.celular:
-            notificar_nuevo_numero_free(nuevo.celular, free_number, free_valid_until)
+        if celular_cliente:
+            notificar_nuevo_numero_free(celular_cliente, free_number, free_valid_until)
     except IntegrityError as e:
         db.rollback()
         orig = str(e.orig)
@@ -253,6 +260,8 @@ def update_cliente(
         ).scalar_one_or_none()
 
         if vip_row is None:
+            # Capturar celular antes de flush (evita expiración SQLAlchemy)
+            celular_cliente = obj.celular
             # Solo crear suscripción si es una activación nueva
             if not vip_antes:
                 now = datetime.now(timezone.utc)
@@ -267,8 +276,8 @@ def update_cliente(
             valid_until = nueva.valid_until
             number = nueva.number
             db.flush()
-            if obj.celular:
-                notificar_nuevo_numero_vip(obj.celular, number, valid_until)
+            if celular_cliente:
+                notificar_nuevo_numero_vip(celular_cliente, number, valid_until)
 
     # Si se desactiva VIP, desactivar todas sus suscripciones activas
     if vip_antes and not obj.vip:

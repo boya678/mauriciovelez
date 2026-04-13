@@ -21,6 +21,8 @@ export class SuscripcionesComponent implements OnInit {
   loading = signal(false);
   renovandoId: string | null = null;
   runningCheck = signal(false);
+  toast = signal<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(public auth: AuthService, private svc: SuscripcionesService) {}
 
@@ -44,12 +46,22 @@ export class SuscripcionesComponent implements OnInit {
   renovar(s: Suscripcion) {
     this.renovandoId = s.id;
     this.svc.renovar(s.id).subscribe({
-      next: updated => {
-        this.items.update(list => list.map(x => x.id === updated.id ? updated : x));
+      next: () => {
         this.renovandoId = null;
+        this.showToast('Suscripción renovada correctamente', 'ok');
+        this.load();
       },
-      error: () => { this.renovandoId = null; },
+      error: () => {
+        this.renovandoId = null;
+        this.showToast('Error al renovar — intenta de nuevo', 'err');
+      },
     });
+  }
+
+  private showToast(msg: string, type: 'ok' | 'err') {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toast.set({ msg, type });
+    this.toastTimer = setTimeout(() => this.toast.set(null), 3500);
   }
 
   estadoBadge(s: Suscripcion): 'activa' | 'vencida' {

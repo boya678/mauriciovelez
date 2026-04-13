@@ -85,6 +85,32 @@
   font-size: 12px;
 }
 
+.date-split {
+  display: flex;
+  gap: 8px;
+
+  select {
+    flex: 1;
+    min-width: 0;
+    background: var(--surface, #1e1e2e);
+    border: 1px solid var(--border, rgba(255,255,255,0.12));
+    border-radius: 6px;
+    color: var(--text, #e2e8f0);
+    font-size: 13px;
+    padding: 6px 4px;
+    cursor: pointer;
+    appearance: auto;
+    transition: border-color 0.15s;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    option { background: var(--surface, #1e1e2e); }
+  }
+}
+
 .badge {
   display: inline-block;
   padding: 2px 8px;

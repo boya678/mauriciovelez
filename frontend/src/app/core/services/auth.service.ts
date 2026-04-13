@@ -12,6 +12,7 @@ export interface Cliente {
   saldo: number;
   vip: boolean;
   enabled: boolean;
+  fecha_nacimiento: string | null;
   created_at: string;
 }
 
@@ -84,7 +85,7 @@ export class AuthService {
     );
   }
 
-  updateMisDatos(data: { nombre: string; celular: string; correo?: string | null; cc?: string | null }): Observable<LoginResponse> {
+  updateMisDatos(data: { nombre: string; celular: string; correo?: string | null; cc?: string | null; fecha_nacimiento?: string | null }): Observable<LoginResponse> {
     return this.http
       .put<LoginResponse>(`${environment.apiUrl}/auth/mis-datos`, data, { headers: this.authHeaders() })
       .pipe(

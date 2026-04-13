@@ -1,0 +1,33 @@
+{
+  "messaging_product": "whatsapp",
+  "to": "573215332978",
+  "type": "template",
+  "template": {
+    "name": "relampagobogota",
+    "language": {
+      "code": "es"
+    },
+    "components": [
+      {
+        "type": "header",
+        "parameters": [
+          {
+            "type": "video",
+            "video": {
+              "link": "https://res.cloudinary.com/dfpy0exz1/video/upload/v1776118687/video_iyswbt.mp4" 
+            }
+          }
+        ]
+      },
+      {
+        "type": "body",
+        "parameters": [
+          {
+            "type": "text",
+            "text": "victorioso" 
+          }
+        ]
+      }
+    ]
+  }
+}

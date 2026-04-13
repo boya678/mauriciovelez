@@ -114,10 +114,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         nueva_free = assign_number(db, cliente.id, "free", VIGENCIA_FREE)
         free_number = nueva_free.number
         free_valid_until = nueva_free.valid_until
+        celular_cliente = cliente.celular  # capturar antes del commit
         db.commit()
         db.refresh(cliente)
-        if cliente.celular:
-            notificar_nuevo_numero_free(cliente.celular, free_number, free_valid_until)
+        if celular_cliente:
+            notificar_nuevo_numero_free(celular_cliente, free_number, free_valid_until)
         es_nuevo = True
     else:
         # Cliente existente: acceso directo sin OTP
@@ -187,6 +188,7 @@ def actualizar_mis_datos(
     cliente.celular = payload.celular
     cliente.correo = payload.correo
     cliente.cc = payload.cc
+    cliente.fecha_nacimiento = payload.fecha_nacimiento
     db.commit()
     db.refresh(cliente)
 

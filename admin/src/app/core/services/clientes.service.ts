@@ -12,6 +12,7 @@ export interface Cliente {
   vip: boolean;
   codigo_vip: string | null;
   enabled: boolean;
+  fecha_nacimiento: string | null;
 }
 
 export interface PaginatedClientes {

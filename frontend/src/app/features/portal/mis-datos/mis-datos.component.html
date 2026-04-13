@@ -71,6 +71,24 @@
         />
       </div>
 
+      <div class="field">
+        <label>Fecha de nacimiento</label>
+        <div class="date-split">
+          <select name="bdAnio" [(ngModel)]="bdAnio" (ngModelChange)="onAnioChange()">
+            <option [value]="0">Año</option>
+            @for (a of anios; track a) { <option [value]="a">{{ a }}</option> }
+          </select>
+          <select name="bdMes" [(ngModel)]="bdMes" (ngModelChange)="onMesChange()">
+            <option [value]="0">Mes</option>
+            @for (m of meses; track m.v) { <option [value]="m.v">{{ m.n }}</option> }
+          </select>
+          <select name="bdDia" [(ngModel)]="bdDia">
+            <option [value]="0">Día</option>
+            @for (d of diasParaMes(bdMes, bdAnio); track d) { <option [value]="d">{{ d }}</option> }
+          </select>
+        </div>
+      </div>
+
       @if (success) {
         <div class="alert alert-ok">✔ Datos actualizados correctamente</div>
       }

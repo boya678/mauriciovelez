@@ -1,5 +1,12 @@
 <div class="page">
 
+  @if (toast()) {
+    <div class="toast toast-{{ toast()!.type }}">
+      <span class="material-icons-round">{{ toast()!.type === 'ok' ? 'check_circle' : 'error' }}</span>
+      {{ toast()!.msg }}
+    </div>
+  }
+
   <div class="page-header">
     <h2>Suscripciones VIP</h2>
   </div>

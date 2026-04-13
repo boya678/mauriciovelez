@@ -84,6 +84,32 @@
   }
 }
 
+.date-split {
+  display: flex;
+  gap: 0.5rem;
+
+  select {
+    flex: 1;
+    background: rgba(10, 0, 25, 0.65);
+    border: 1px solid rgba(255, 215, 0, 0.18);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    padding: 0.65rem 0.5rem;
+    cursor: pointer;
+    appearance: auto;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: var(--gold-bright);
+      box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+    }
+
+    option { background: #0a0019; }
+  }
+}
+
 .field-error {
   font-size: 0.78rem;
   color: var(--accent-red, #f87171);

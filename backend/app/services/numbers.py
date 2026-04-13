@@ -95,6 +95,7 @@ def notificar_nuevo_numero_free(celular: str, numero: str, valid_until: date) ->
             logger.warning("WhatsApp nuevo_numero_free falló (%s): %s", resp.status_code, resp.text)
     except Exception:
         logger.exception("Error al enviar WhatsApp nuevo_numero_free a %s", celular)
+        logger.exception("Error al enviar WhatsApp nuevo_numero_free a %s", celular)
 
 
 def assign_number(db: Session, id_user: uuid.UUID, num_type: str, validity_days: int) -> NumberUser:

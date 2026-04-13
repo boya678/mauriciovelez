@@ -13,6 +13,7 @@ from app.models.cliente import Cliente
 from app.models.loteria_resultado import LoteriaResultado
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
+from app.models.suscripcion import Suscripcion
 
 router = APIRouter(prefix="/admin/dashboard", tags=["Admin Dashboard"])
 
@@ -43,6 +44,8 @@ class DashboardStats(BaseModel):
     ganadores_free: int
     pct_ganadores_vip: float          # % sobre clientes_con_aciertos
     pct_ganadores_free: float
+    # ── Suscripciones iniciadas en el mes ─────────────────────────────────
+    suscripciones_iniciadas: int
 
 
 @router.get("", response_model=DashboardStats)
@@ -136,6 +139,16 @@ def get_dashboard(
     pct_ganadores_vip = round(ganadores_vip / base_pct * 100, 1)
     pct_ganadores_free = round(ganadores_free / base_pct * 100, 1)
 
+    # ── Suscripciones iniciadas en el mes ─────────────────────────────────
+    from datetime import datetime, timezone as _tz
+    first_dt = datetime(year, month, 1, tzinfo=_tz.utc)
+    last_dt = datetime(year, month, monthrange(year, month)[1], 23, 59, 59, tzinfo=_tz.utc)
+    suscripciones_iniciadas = (
+        db.query(Suscripcion)
+        .filter(Suscripcion.inicio >= first_dt, Suscripcion.inicio <= last_dt)
+        .count()
+    )
+
     # ── Most frequent winning number ─────────────────────────────────────────
     numero_mas_frecuente: Optional[str] = None
     if historic_ids_with_aciertos:
@@ -182,4 +195,5 @@ def get_dashboard(
         ganadores_free=ganadores_free,
         pct_ganadores_vip=pct_ganadores_vip,
         pct_ganadores_free=pct_ganadores_free,
+        suscripciones_iniciadas=suscripciones_iniciadas,
     )

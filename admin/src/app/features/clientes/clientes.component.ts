@@ -24,11 +24,25 @@ export class ClientesComponent implements OnInit {
   editTarget: Cliente | null = null;
   editForm: Partial<Cliente> = {};
   editError = signal<string | null>(null);
+  editBdDia = 0;
+  editBdMes = 0;
+  editBdAnio = 0;
   deleteTarget: Cliente | null = null;
 
   showCreate = false;
   createForm: Partial<Cliente & { celular: string }> = {};
   createError = signal<string | null>(null);
+  createBdDia = 0;
+  createBdMes = 0;
+  createBdAnio = 0;
+
+  meses = [
+    { v: 1, n: 'Enero' }, { v: 2, n: 'Febrero' }, { v: 3, n: 'Marzo' },
+    { v: 4, n: 'Abril' }, { v: 5, n: 'Mayo' }, { v: 6, n: 'Junio' },
+    { v: 7, n: 'Julio' }, { v: 8, n: 'Agosto' }, { v: 9, n: 'Septiembre' },
+    { v: 10, n: 'Octubre' }, { v: 11, n: 'Noviembre' }, { v: 12, n: 'Diciembre' },
+  ];
+  anios = Array.from({ length: 91 }, (_, i) => new Date().getFullYear() - 1 - i);
 
   private search$ = new Subject<string>();
 
@@ -68,18 +82,50 @@ export class ClientesComponent implements OnInit {
   openEdit(c: Cliente) {
     this.editTarget = c;
     this.editForm = { nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled };
+    if (c.fecha_nacimiento) {
+      const [ay, am, ad] = c.fecha_nacimiento.split('-').map(Number);
+      this.editBdAnio = ay; this.editBdMes = am; this.editBdDia = ad;
+    } else {
+      this.editBdDia = 0; this.editBdMes = 0; this.editBdAnio = 0;
+    }
     this.editError.set(null);
   }
 
   openCreate() {
     this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true };
+    this.createBdDia = 0; this.createBdMes = 0; this.createBdAnio = 0;
     this.createError.set(null);
     this.showCreate = true;
   }
 
+  diasParaMes(mes: number, anio: number): number[] {
+    const max = (mes && anio) ? new Date(anio, mes, 0).getDate() : 31;
+    return Array.from({ length: max }, (_, i) => i + 1);
+  }
+
+  onCreateMesChange() {
+    const max = (this.createBdMes && this.createBdAnio) ? new Date(this.createBdAnio, this.createBdMes, 0).getDate() : 31;
+    if (this.createBdDia > max) this.createBdDia = 0;
+  }
+
+  onCreateAnioChange() { this.onCreateMesChange(); }
+
+  onEditMesChange() {
+    const max = (this.editBdMes && this.editBdAnio) ? new Date(this.editBdAnio, this.editBdMes, 0).getDate() : 31;
+    if (this.editBdDia > max) this.editBdDia = 0;
+  }
+
+  onEditAnioChange() { this.onEditMesChange(); }
+
+  private composeFecha(dia: number, mes: number, anio: number): string | null {
+    if (!dia || !mes || !anio) return null;
+    return `${anio}-${mes.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
+  }
+
   saveCreate() {
     this.createError.set(null);
-    this.svc.create(this.createForm).subscribe({
+    const payload = { ...this.createForm, fecha_nacimiento: this.composeFecha(this.createBdDia, this.createBdMes, this.createBdAnio) };
+    this.svc.create(payload).subscribe({
       next: () => { this.showCreate = false; this.load(); },
       error: (err) => {
         const msg = err?.error?.detail;
@@ -91,7 +137,8 @@ export class ClientesComponent implements OnInit {
   saveEdit() {
     if (!this.editTarget) return;
     this.editError.set(null);
-    this.svc.update(this.editTarget.id, this.editForm).subscribe({
+    const payload = { ...this.editForm, fecha_nacimiento: this.composeFecha(this.editBdDia, this.editBdMes, this.editBdAnio) };
+    this.svc.update(this.editTarget.id, payload).subscribe({
       next: () => { this.editTarget = null; this.load(); },
       error: (err) => {
         const msg = err?.error?.detail;

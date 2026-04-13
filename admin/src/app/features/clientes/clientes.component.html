@@ -106,6 +106,23 @@
         <input type="text" [(ngModel)]="createForm.cc" />
       </div>
       <div class="form-group">
+        <label>Fecha de nacimiento</label>
+        <div class="date-split">
+          <select [(ngModel)]="createBdAnio" (ngModelChange)="onCreateAnioChange()">
+            <option [value]="0">Año</option>
+            @for (a of anios; track a) { <option [value]="a">{{ a }}</option> }
+          </select>
+          <select [(ngModel)]="createBdMes" (ngModelChange)="onCreateMesChange()">
+            <option [value]="0">Mes</option>
+            @for (m of meses; track m.v) { <option [value]="m.v">{{ m.n }}</option> }
+          </select>
+          <select [(ngModel)]="createBdDia">
+            <option [value]="0">Día</option>
+            @for (d of diasParaMes(createBdMes, createBdAnio); track d) { <option [value]="d">{{ d }}</option> }
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Saldo inicial</label>
         <input type="number" [(ngModel)]="createForm.saldo" step="0.01" />
       </div>
@@ -154,6 +171,23 @@
       <div class="form-group">
         <label>CC</label>
         <input type="text" [(ngModel)]="editForm.cc" />
+      </div>
+      <div class="form-group">
+        <label>Fecha de nacimiento</label>
+        <div class="date-split">
+          <select [(ngModel)]="editBdAnio" (ngModelChange)="onEditAnioChange()">
+            <option [value]="0">Año</option>
+            @for (a of anios; track a) { <option [value]="a">{{ a }}</option> }
+          </select>
+          <select [(ngModel)]="editBdMes" (ngModelChange)="onEditMesChange()">
+            <option [value]="0">Mes</option>
+            @for (m of meses; track m.v) { <option [value]="m.v">{{ m.n }}</option> }
+          </select>
+          <select [(ngModel)]="editBdDia">
+            <option [value]="0">Día</option>
+            @for (d of diasParaMes(editBdMes, editBdAnio); track d) { <option [value]="d">{{ d }}</option> }
+          </select>
+        </div>
       </div>
       <div class="form-group">
         <label>Saldo</label>

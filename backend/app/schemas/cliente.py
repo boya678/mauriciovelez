@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -25,6 +25,7 @@ class ClienteResponse(BaseModel):
     saldo: float
     vip: bool
     enabled: bool
+    fecha_nacimiento: date | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -48,3 +49,4 @@ class UpdateMisDatosRequest(BaseModel):
     celular: str = Field(..., min_length=1, max_length=30)
     correo: str | None = Field(default=None, max_length=200)
     cc: str | None = Field(default=None, max_length=30)
+    fecha_nacimiento: date | None = None
