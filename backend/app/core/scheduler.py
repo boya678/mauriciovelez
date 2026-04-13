@@ -10,12 +10,13 @@ from zoneinfo import ZoneInfo
 from app.core.config import settings
 from app.database import SessionLocal
 from app.models.cliente import Cliente
+from app.models.contacto import Contacto
 from app.models.loteria_resultado import LoteriaResultado
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
-from app.services.numbers import assign_number, VIGENCIA_FREE, VIGENCIA_VIP
+from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip, VIGENCIA_FREE, VIGENCIA_VIP
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
 LOTERIAS_API = "https://api-resultadosloterias.com/api/results"
@@ -48,40 +49,6 @@ def _clasificar(numero: str, resultado: str) -> list[str]:
     if n3 == r3_rev:
         return ["tres_desorden"]
     return []
-
-
-def _notificar_nuevo_numero_vip(celular: str, numero: str, valid_until: date) -> None:
-    """Envía WhatsApp al cliente VIP cuando se le asigna un número nuevo."""
-    numero_dest = celular if celular.startswith('57') else f'57{celular}'
-    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
-    headers = {
-        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
-        'Content-Type': 'application/json',
-    }
-    body = {
-        'messaging_product': 'whatsapp',
-        'to': numero_dest,
-        'type': 'template',
-        'template': {
-            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP,
-            'language': {'code': 'es_CO'},
-            'components': [
-                {
-                    'type': 'body',
-                    'parameters': [
-                        {'type': 'text', 'text': numero},
-                        {'type': 'text', 'text': valid_until.strftime('%d/%m/%Y')},
-                    ],
-                },
-            ],
-        },
-    }
-    try:
-        resp = httpx.post(url, json=body, headers=headers, timeout=10)
-        if resp.status_code >= 400:
-            logger.warning("WhatsApp nuevo_numero_vip falló (%s): %s", resp.status_code, resp.text)
-    except Exception:
-        logger.exception("Error al enviar WhatsApp nuevo_numero_vip a %s", celular)
 
 
 def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_num: str, tipo: str) -> None:
@@ -291,6 +258,13 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                                     tipo=tipo_legible,
                                 )
                                 cliente_h.enabled = False
+                                db.add(Contacto(
+                                    id=uuid.uuid4(),
+                                    cliente_id=cliente_h.id,
+                                    numero=h.number,
+                                    loteria=resultado.loteria,
+                                    tipo_acierto=tipo_legible,
+                                ))
                                 logger.info(
                                     "Ganador free deshabilitado: %s (%s) — %s %s %s",
                                     cliente_h.nombre, cliente_h.celular,
@@ -341,7 +315,8 @@ def _desactivar_vip_vencidos() -> None:
         )
         for c in expirados:
             c.vip = False
-            logger.info("VIP desactivado: %s (%s)", c.nombre, c.celular)
+            c.enabled = False
+            logger.info("VIP desactivado y cuenta inhabilitada: %s (%s)", c.nombre, c.celular)
 
         db.commit()
         logger.info(
@@ -381,8 +356,10 @@ def _reasignar_numeros_vencidos() -> None:
             ).scalar_one_or_none()
 
             if free_row is None or free_row.valid_until < today:
-                assign_number(db, c.id, "free", VIGENCIA_FREE)
+                nueva_free = assign_number(db, c.id, "free", VIGENCIA_FREE)
                 asignados += 1
+                if c.celular:
+                    notificar_nuevo_numero_free(c.celular, nueva_free.number, nueva_free.valid_until)
 
             # ── Número vip (solo si el cliente es VIP) ────────────
             if c.vip:
@@ -397,7 +374,7 @@ def _reasignar_numeros_vencidos() -> None:
                     nueva = assign_number(db, c.id, "vip", VIGENCIA_VIP)
                     asignados += 1
                     if c.celular:
-                        _notificar_nuevo_numero_vip(c.celular, nueva.number, nueva.valid_until)
+                        notificar_nuevo_numero_vip(c.celular, nueva.number, nueva.valid_until)
 
         db.commit()
         print(f"   Asignaciones realizadas: {asignados}")

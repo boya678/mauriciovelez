@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     WHATSAPP_TEMPLATE_GANADOR_FREE: str = "ganador_free"
     WHATSAPP_TEMPLATE_GANADOR_VIP: str = "vip_ganador"
     WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP: str = "vip_nuevo_numero"
+    WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE: str = "free_nuevo_numero"
+    WHATSAPP_TEMPLATE_OTP: str = "codigo_otp"
+    WHATSAPP_TEMPLATE_NOTIFICACION_REFERIDO: str = "free_referido"
     CRON_NUMEROS: str = "0 7 * * *"  # cron UTC completo para reasignación de números (default 07:00 UTC = 02:00 COL)
 
     model_config = SettingsConfigDict(

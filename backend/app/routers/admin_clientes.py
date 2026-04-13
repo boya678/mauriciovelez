@@ -8,6 +8,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,7 +18,8 @@ from app.models.audit_log import AuditLog
 from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
 from app.models.cuenta_vip import acumular_cuenta_vip
-from app.services.numbers import assign_number, VIGENCIA_VIP
+from app.models.numbers_users import NumberUser
+from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip, VIGENCIA_FREE, VIGENCIA_VIP
 
 router = APIRouter(prefix="/admin/clientes", tags=["Admin Clientes"])
 
@@ -64,6 +66,13 @@ class ClienteCreate(BaseModel):
     codigo_vip: Optional[str] = None
     enabled: bool = True
 
+    @field_validator('nombre', 'celular')
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('Este campo es obligatorio')
+        return v.strip()
+
 
 class PaginatedClientes(BaseModel):
     total: int
@@ -106,6 +115,12 @@ def create_cliente(
     )
     db.add(nuevo)
     db.flush()  # asegurar que nuevo.id está disponible para FKs
+
+    # Siempre asignar número free
+    nueva_free = assign_number(db, nuevo.id, "free", VIGENCIA_FREE)
+    free_number = nueva_free.number
+    free_valid_until = nueva_free.valid_until
+
     if payload.vip:
         now = datetime.now(timezone.utc)
         db.add(Suscripcion(
@@ -115,10 +130,18 @@ def create_cliente(
             activa=True,
         ))
         acumular_cuenta_vip(db)
-        assign_number(db, nuevo.id, "vip", VIGENCIA_VIP)
+        nueva_vip = assign_number(db, nuevo.id, "vip", VIGENCIA_VIP)
+        valid_until_vip = nueva_vip.valid_until
+        number_vip = nueva_vip.number
+        db.flush()
+        if nuevo.celular:
+            notificar_nuevo_numero_vip(nuevo.celular, number_vip, valid_until_vip)
+
     _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular})
     try:
         db.commit()
+        if nuevo.celular:
+            notificar_nuevo_numero_free(nuevo.celular, free_number, free_valid_until)
     except IntegrityError as e:
         db.rollback()
         orig = str(e.orig)
@@ -219,17 +242,33 @@ def update_cliente(
     for key, val in changes.items():
         setattr(obj, key, val)
 
-    # Si se activa VIP y antes no lo era, crear suscripción de 1 mes y asignar número VIP
-    if not vip_antes and obj.vip:
-        now = datetime.now(timezone.utc)
-        db.add(Suscripcion(
-            cliente_id=obj.id,
-            inicio=now,
-            fin=now + relativedelta(months=1),
-            activa=True,
-        ))
-        acumular_cuenta_vip(db)
-        assign_number(db, obj.id, "vip", VIGENCIA_VIP)
+    # Si el cliente es (o acaba de ser marcado como) VIP, asegurar que tenga número VIP.
+    # Esto cubre tanto la activación nueva como clientes que ya eran VIP sin número asignado.
+    if obj.vip:
+        vip_row = db.execute(
+            select(NumberUser).where(
+                NumberUser.id_user == obj.id,
+                NumberUser.type == "vip",
+            )
+        ).scalar_one_or_none()
+
+        if vip_row is None:
+            # Solo crear suscripción si es una activación nueva
+            if not vip_antes:
+                now = datetime.now(timezone.utc)
+                db.add(Suscripcion(
+                    cliente_id=obj.id,
+                    inicio=now,
+                    fin=now + relativedelta(months=1),
+                    activa=True,
+                ))
+                acumular_cuenta_vip(db)
+            nueva = assign_number(db, obj.id, "vip", VIGENCIA_VIP)
+            valid_until = nueva.valid_until
+            number = nueva.number
+            db.flush()
+            if obj.celular:
+                notificar_nuevo_numero_vip(obj.celular, number, valid_until)
 
     # Si se desactiva VIP, desactivar todas sus suscripciones activas
     if vip_antes and not obj.vip:

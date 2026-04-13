@@ -15,3 +15,5 @@ class NumberHistoric(Base):
     number: Mapped[str] = mapped_column(String, nullable=False)
     id_user: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
+    # "free" | "vip"
+    type: Mapped[str] = mapped_column(String(10), nullable=False, default="free")

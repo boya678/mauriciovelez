@@ -135,6 +135,52 @@
   </div>
 }
 
+<!-- Modal Referido -->
+@if (showReferidoModal()) {
+  <div class="vip-overlay">
+    <div class="vip-modal otp-modal" role="dialog" aria-modal="true" aria-labelledby="referido-title">
+      <span class="material-icons-round otp-icon">group_add</span>
+      <h2 id="referido-title" class="vip-modal-title">¿Vienes referido?</h2>
+      <p class="vip-modal-sub">Si alguien te recomendó, ingresa su código (opcional).</p>
+
+      <div class="field-wrapper otp-field" [class.field-invalid]="referidoError()">
+        <span class="field-icon material-icons-round">vpn_key</span>
+        <input
+          type="text"
+          class="field-input"
+          [(ngModel)]="referidoCode"
+          placeholder="Código de referido"
+          maxlength="50"
+          (keyup.enter)="confirmReferido()"
+          autocomplete="off"
+          autofocus
+        />
+      </div>
+
+      @if (referidoError()) {
+        <div class="alert-error vip-alert" role="alert">
+          <span class="material-icons-round">warning</span>
+          {{ referidoError() }}
+        </div>
+      }
+
+      <button class="btn-submit vip-btn" (click)="confirmReferido()" [disabled]="referidoLoading()">
+        @if (referidoLoading()) {
+          <span class="spinner"></span>
+          <span>Guardando…</span>
+        } @else {
+          <span class="material-icons-round">check_circle</span>
+          <span>Confirmar y entrar</span>
+        }
+      </button>
+
+      <button class="btn-cancel" type="button" (click)="skipReferido()">
+        Omitir
+      </button>
+    </div>
+  </div>
+}
+
 <!-- Modal VIP -->
 @if (showVipModal()) {
   <div class="vip-overlay" (click)="$event.target === $event.currentTarget && cancelVipModal()">

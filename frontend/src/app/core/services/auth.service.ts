@@ -69,6 +69,14 @@ export class AuthService {
     });
   }
 
+  saveReferido(codigo: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(
+      `${environment.apiUrl}/auth/referido`,
+      { codigo },
+      { headers: this.authHeaders() }
+    );
+  }
+
   getMiSuscripcion(): Observable<{ vip: boolean; fin: string | null }> {
     return this.http.get<{ vip: boolean; fin: string | null }>(
       `${environment.apiUrl}/auth/mi-suscripcion`,

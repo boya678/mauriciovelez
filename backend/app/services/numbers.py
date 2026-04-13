@@ -3,19 +3,98 @@ Servicio compartido de asignación de números.
 Usado por: auth.py (primer número free), admin_clientes.py (primer número vip),
            scheduler.py (cron nocturno de reasignación).
 """
+import logging
 import random
 import uuid
 from datetime import date, timedelta
 
+import httpx
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.numbers import Number
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 
 VIGENCIA_FREE = 10  # días
 VIGENCIA_VIP = 3    # días
+
+logger = logging.getLogger(__name__)
+
+
+def notificar_nuevo_numero_vip(celular: str, numero: str, valid_until: date) -> None:
+    """Envía WhatsApp al cliente VIP cuando se le asigna un número nuevo."""
+    metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
+    param_numero = f"{numero} y con el metodo {metodo}"
+
+    numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero_dest,
+        'type': 'template',
+        'template': {
+            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP,
+            'language': {'code': 'es_CO'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {'type': 'text', 'text': param_numero},
+                        {'type': 'text', 'text': valid_until.strftime('%d/%m/%Y')},
+                    ],
+                },
+            ],
+        },
+    }
+    try:
+        resp = httpx.post(url, json=body, headers=headers, timeout=10)
+        if resp.status_code >= 400:
+            logger.warning("WhatsApp nuevo_numero_vip falló (%s): %s", resp.status_code, resp.text)
+    except Exception:
+        logger.exception("Error al enviar WhatsApp nuevo_numero_vip a %s", celular)
+
+
+def notificar_nuevo_numero_free(celular: str, numero: str, valid_until: date) -> None:
+    """Envía WhatsApp al cliente cuando se le asigna un número free nuevo."""
+    metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
+    param_numero = f"{numero} y con el metodo {metodo}"
+
+    numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero_dest,
+        'type': 'template',
+        'template': {
+            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE,
+            'language': {'code': 'es_CO'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {'type': 'text', 'text': param_numero},
+                        {'type': 'text', 'text': valid_until.strftime('%d/%m/%Y')},
+                    ],
+                },
+            ],
+        },
+    }
+    try:
+        resp = httpx.post(url, json=body, headers=headers, timeout=10)
+        if resp.status_code >= 400:
+            logger.warning("WhatsApp nuevo_numero_free falló (%s): %s", resp.status_code, resp.text)
+    except Exception:
+        logger.exception("Error al enviar WhatsApp nuevo_numero_free a %s", celular)
 
 
 def assign_number(db: Session, id_user: uuid.UUID, num_type: str, validity_days: int) -> NumberUser:
@@ -68,7 +147,7 @@ def assign_number(db: Session, id_user: uuid.UUID, num_type: str, validity_days:
     db.add(assignment)
 
     # Histórico
-    db.add(NumberHistoric(number=final_number, id_user=id_user, date=today))
+    db.add(NumberHistoric(number=final_number, id_user=id_user, date=today, type=num_type))
 
     db.flush()
     return assignment

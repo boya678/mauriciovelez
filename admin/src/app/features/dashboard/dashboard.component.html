@@ -17,53 +17,86 @@
     <div class="error-state">{{ error() }}</div>
   } @else if (stats) {
 
-    <!-- KPI Cards row -->
-    <div class="kpi-grid">
+    <!-- ── Totalizados (no cambian con el mes) ────────────────────────── -->
+    <div class="section">
+      <h2 class="section-title">Totales generales</h2>
+      <div class="kpi-grid">
 
-      <div class="kpi-card">
-        <div class="kpi-icon"><span class="material-icons-round">group</span></div>
-        <div class="kpi-value">{{ stats!.total_clientes }}</div>
-        <div class="kpi-label">Total clientes</div>
-      </div>
-
-      <div class="kpi-card accent-gold">
-        <div class="kpi-icon"><span class="material-icons-round">workspace_premium</span></div>
-        <div class="kpi-value">{{ stats!.clientes_vip }}</div>
-        <div class="kpi-label">Clientes VIP</div>
-      </div>
-
-      <div class="kpi-card">
-        <div class="kpi-icon"><span class="material-icons-round">inventory_2</span></div>
-        <div class="kpi-value">{{ stats!.numeros_entregados }}</div>
-        <div class="kpi-label">Números entregados</div>
-      </div>
-
-      <div class="kpi-card accent-gold">
-        <div class="kpi-icon"><span class="material-icons-round">emoji_events</span></div>
-        <div class="kpi-value">{{ stats!.total_aciertos }}</div>
-        <div class="kpi-label">Total aciertos</div>
-      </div>
-
-      <div class="kpi-card accent-green">
-        <div class="kpi-icon"><span class="material-icons-round">trending_up</span></div>
-        <div class="kpi-value">{{ stats!.efectividad_pct }}%</div>
-        <div class="kpi-label">Efectividad</div>
-      </div>
-
-      <div class="kpi-card">
-        <div class="kpi-icon"><span class="material-icons-round">group</span></div>
-        <div class="kpi-value">{{ stats!.clientes_con_aciertos }}</div>
-        <div class="kpi-label">Clientes ganadores</div>
-      </div>
-
-      @if (stats!.numero_mas_frecuente) {
-        <div class="kpi-card accent-blue">
-          <div class="kpi-icon"><span class="material-icons-round">pin</span></div>
-          <div class="kpi-value num-hero">{{ stats!.numero_mas_frecuente }}</div>
-          <div class="kpi-label">Número más frecuente</div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><span class="material-icons-round">group</span></div>
+          <div class="kpi-value">{{ stats!.total_clientes }}</div>
+          <div class="kpi-label">Total clientes</div>
         </div>
-      }
 
+        <div class="kpi-card accent-gold">
+          <div class="kpi-icon"><span class="material-icons-round">workspace_premium</span></div>
+          <div class="kpi-value">{{ stats!.clientes_vip }}</div>
+          <div class="kpi-label">Clientes VIP</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Filtrados por mes ──────────────────────────────────────────── -->
+    <div class="section">
+      <h2 class="section-title">Estadísticas del mes</h2>
+      <div class="kpi-grid">
+
+        <div class="kpi-card">
+          <div class="kpi-icon"><span class="material-icons-round">inventory_2</span></div>
+          <div class="kpi-value">{{ stats!.numeros_entregados }}</div>
+          <div class="kpi-label">Números entregados</div>
+        </div>
+
+        <div class="kpi-card accent-gold">
+          <div class="kpi-icon"><span class="material-icons-round">emoji_events</span></div>
+          <div class="kpi-value">{{ stats!.total_aciertos }}</div>
+          <div class="kpi-label">Total aciertos</div>
+        </div>
+
+        <div class="kpi-card accent-green">
+          <div class="kpi-icon"><span class="material-icons-round">trending_up</span></div>
+          <div class="kpi-value">{{ stats!.efectividad_pct }}%</div>
+          <div class="kpi-label">Efectividad</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon"><span class="material-icons-round">group</span></div>
+          <div class="kpi-value">{{ stats!.clientes_con_aciertos }}</div>
+          <div class="kpi-label">Clientes ganadores</div>
+        </div>
+
+        @if (stats!.numero_mas_frecuente) {
+          <div class="kpi-card accent-blue">
+            <div class="kpi-icon"><span class="material-icons-round">pin</span></div>
+            <div class="kpi-value num-hero">{{ stats!.numero_mas_frecuente }}</div>
+            <div class="kpi-label">Número más frecuente</div>
+          </div>
+        }
+
+      </div>
+    </div>
+
+    <!-- ── Ganadores por tipo de número ──────────────────────────────── -->
+    <div class="section">
+      <h2 class="section-title">Ganadores por tipo de número</h2>
+      <div class="kpi-grid">
+
+        <div class="kpi-card accent-gold">
+          <div class="kpi-icon"><span class="material-icons-round">workspace_premium</span></div>
+          <div class="kpi-value">{{ stats!.ganadores_vip }}</div>
+          <div class="kpi-label">Ganadores con VIP</div>
+          <div class="kpi-pct">{{ stats!.pct_ganadores_vip }}% de ganadores</div>
+        </div>
+
+        <div class="kpi-card accent-green">
+          <div class="kpi-icon"><span class="material-icons-round">confirmation_number</span></div>
+          <div class="kpi-value">{{ stats!.ganadores_free }}</div>
+          <div class="kpi-label">Ganadores con Free</div>
+          <div class="kpi-pct">{{ stats!.pct_ganadores_free }}% de ganadores</div>
+        </div>
+
+      </div>
     </div>
 
     <!-- Tipo breakdown -->

@@ -1,0 +1,106 @@
+.total-badge {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.btn-export {
+  margin-left: auto;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(76, 175, 125, 0.4);
+  background: rgba(76, 175, 125, 0.12);
+  color: #4caf7d;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(76, 175, 125, 0.28); }
+}
+
+.table-card { padding: 0; overflow: hidden; }
+.table-wrap { overflow-x: auto; }
+
+.mono  { font-family: 'Courier New', monospace; }
+.small { font-size: 12px; }
+.bold  { font-weight: 700; }
+.center { text-align: center; }
+
+.tipo-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(240, 167, 50, 0.18);
+  color: #f0c060;
+  letter-spacing: 0.03em;
+}
+
+.vip-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.no-vip-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.05em;
+}
+
+.btn-contactado {
+  padding: 4px 14px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(76, 175, 125, 0.18);
+  color: #4caf7d;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(76, 175, 125, 0.35); }
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 200;
+}
+
+.modal-box {
+  position: fixed;
+  z-index: 201;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-card, #1a1030);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 1.75rem;
+  width: min(90vw, 400px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  h3 { margin: 0 0 0.75rem; font-size: 1.05rem; }
+  p  { font-size: 0.9rem; color: rgba(255, 255, 255, 0.75); margin: 0 0 1.25rem; }
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

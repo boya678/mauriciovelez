@@ -29,6 +29,10 @@
         <span class="nav-icon material-icons-round">campaign</span>
         @if (sidebarOpen()) { <span>Banners</span> }
       </a>
+      <a routerLink="/admin/contactos" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon material-icons-round">contact_phone</span>
+        @if (sidebarOpen()) { <span>Contactos</span> }
+      </a>
       @if (auth.isAdmin()) {
         <a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-item">
           <span class="nav-icon material-icons-round">admin_panel_settings</span>

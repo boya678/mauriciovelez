@@ -33,5 +33,10 @@ export const routes: Routes = [
       },
     ],
   },
+  {
+    path: 'raspa/:texto',
+    loadComponent: () =>
+      import('./features/raspa/raspa.component').then(m => m.RaspaComponent),
+  },
   { path: '**', redirectTo: 'login' },
 ];

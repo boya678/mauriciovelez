@@ -9,8 +9,10 @@ export interface TopLoteria {
 
 export interface DashboardStats {
   mes: string;
+  // Totalizados (independientes del mes)
   total_clientes: number;
   clientes_vip: number;
+  // Filtrados por mes
   numeros_entregados: number;
   total_aciertos: number;
   efectividad_pct: number;
@@ -21,6 +23,11 @@ export interface DashboardStats {
   clientes_con_aciertos: number;
   numero_mas_frecuente: string | null;
   top_loterias: TopLoteria[];
+  // Ganadores por tipo
+  ganadores_vip: number;
+  ganadores_free: number;
+  pct_ganadores_vip: number;
+  pct_ganadores_free: number;
 }
 
 @Injectable({ providedIn: 'root' })

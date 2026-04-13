@@ -1,0 +1,59 @@
+<div class="page-header">
+  <h2>Pendientes de contacto</h2>
+  <span class="total-badge">{{ items().length }} pendiente(s)</span>
+  <button class="btn-export" (click)="exportExcel()">⬇ Exportar Excel</button>
+</div>
+
+<div class="card table-card">
+  @if (loading()) {
+    <div class="empty-state">Cargando…</div>
+  } @else if (items().length === 0) {
+    <div class="empty-state">Sin clientes pendientes de contacto</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Nombre</th>
+            <th>Celular</th>
+            <th>Número</th>
+            <th>Lotería</th>
+            <th>Tipo</th>
+            <th>VIP</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of items(); track c.id) {
+            <tr>
+              <td class="small">{{ c.fecha | date:'dd/MM/yy HH:mm' }}</td>
+              <td>{{ c.nombre }} @if (c.vip) { <span class="vip-badge">VIP</span> }</td>
+              <td class="mono">{{ c.celular }}</td>
+              <td class="mono bold">{{ c.numero }}</td>
+              <td>{{ c.loteria }}</td>
+              <td><span class="tipo-badge">{{ c.tipo_acierto }}</span></td>
+              <td class="center">@if (c.vip) { <span class="vip-badge">⭐ VIP</span> } @else { <span class="no-vip-badge">No</span> }</td>
+              <td class="center">
+                <button class="btn-contactado" (click)="confirmDelete(c)">Contactado</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+<!-- Modal confirmación -->
+@if (deleteTarget) {
+  <div class="modal-overlay" (click)="cancelDelete()"></div>
+  <div class="modal-box">
+    <h3>¿Confirmar contacto?</h3>
+    <p>Marcar a <strong>{{ deleteTarget.nombre }}</strong> como contactado eliminará este registro.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" (click)="cancelDelete()">Cancelar</button>
+      <button class="btn-primary" (click)="doDelete()">Sí, contactado</button>
+    </div>
+  </div>
+}

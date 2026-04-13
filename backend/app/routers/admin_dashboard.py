@@ -23,12 +23,14 @@ class TopLoteria(BaseModel):
 
 
 class DashboardStats(BaseModel):
-    mes: str                      # "YYYY-MM"
+    mes: str                          # "YYYY-MM"
+    # ── Totalizados (independientes del mes) ────────────────────────────────
     total_clientes: int
     clientes_vip: int
+    # ── Filtrados por mes ───────────────────────────────────────────────────
     numeros_entregados: int
     total_aciertos: int
-    efectividad_pct: float        # 0–100 redondeado a 1 decimal
+    efectividad_pct: float            # 0–100 redondeado a 1 decimal
     exactos: int
     directo_devuelto: int
     tres_orden: int
@@ -36,6 +38,11 @@ class DashboardStats(BaseModel):
     clientes_con_aciertos: int
     numero_mas_frecuente: Optional[str]
     top_loterias: list[TopLoteria]
+    # ── Ganadores por tipo de número (filtrados por mes) ───────────────────
+    ganadores_vip: int
+    ganadores_free: int
+    pct_ganadores_vip: float          # % sobre clientes_con_aciertos
+    pct_ganadores_free: float
 
 
 @router.get("", response_model=DashboardStats)
@@ -99,6 +106,36 @@ def get_dashboard(
     else:
         clientes_con_aciertos = 0
 
+    # ── Ganadores por tipo de número (vip / free) ─────────────────────────
+    if historic_ids_with_aciertos:
+        ganadores_vip_ids = (
+            db.query(NumberHistoric.id_user)
+            .filter(
+                NumberHistoric.id.in_(historic_ids_with_aciertos),
+                NumberHistoric.type == "vip",
+            )
+            .distinct()
+            .all()
+        )
+        ganadores_free_ids = (
+            db.query(NumberHistoric.id_user)
+            .filter(
+                NumberHistoric.id.in_(historic_ids_with_aciertos),
+                NumberHistoric.type == "free",
+            )
+            .distinct()
+            .all()
+        )
+        ganadores_vip = len(ganadores_vip_ids)
+        ganadores_free = len(ganadores_free_ids)
+    else:
+        ganadores_vip = 0
+        ganadores_free = 0
+
+    base_pct = clientes_con_aciertos if clientes_con_aciertos else 1
+    pct_ganadores_vip = round(ganadores_vip / base_pct * 100, 1)
+    pct_ganadores_free = round(ganadores_free / base_pct * 100, 1)
+
     # ── Most frequent winning number ─────────────────────────────────────────
     numero_mas_frecuente: Optional[str] = None
     if historic_ids_with_aciertos:
@@ -141,4 +178,8 @@ def get_dashboard(
         clientes_con_aciertos=clientes_con_aciertos,
         numero_mas_frecuente=numero_mas_frecuente,
         top_loterias=top_loterias,
+        ganadores_vip=ganadores_vip,
+        ganadores_free=ganadores_free,
+        pct_ganadores_vip=pct_ganadores_vip,
+        pct_ganadores_free=pct_ganadores_free,
     )

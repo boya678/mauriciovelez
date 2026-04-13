@@ -41,6 +41,10 @@ export const routes: Routes = [
         path: 'banners',
         loadComponent: () => import('./features/banners/banners.component').then(m => m.BannersComponent),
       },
+      {
+        path: 'contactos',
+        loadComponent: () => import('./features/contactos/contactos.component').then(m => m.ContactosComponent),
+      },
     ],
   },
   { path: '**', redirectTo: '/login' },

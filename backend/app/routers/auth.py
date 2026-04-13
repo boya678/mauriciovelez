@@ -11,11 +11,21 @@ from app.core.security import create_access_token, get_current_user
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
-from app.schemas.cliente import LoginRequest, LoginResponse, OtpRequest, VipVerifyRequest, UpdateMisDatosRequest
-from app.services.numbers import assign_number, VIGENCIA_FREE
+from app.schemas.cliente import (
+    OtpRequest,
+    LoginRequest,
+    LoginResponse,
+    VipVerifyRequest,
+    UpdateMisDatosRequest,
+)
+from app.services.numbers import assign_number, notificar_nuevo_numero_free, VIGENCIA_FREE
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+
+class ReferidoRequest(BaseModel):
+    codigo: str = Field(..., min_length=1, max_length=50)
 # ── OTP store en memoria: {celular: (codigo, expira_en)} ──────
 _otp_store: dict[str, tuple[str, datetime]] = {}
 OTP_TTL_MINUTES = 5
@@ -39,8 +49,8 @@ def _enviar_whatsapp_otp(celular: str, codigo: str) -> None:
         'to': numero,
         'type': 'template',
         'template': {
-            'name': 'otp',
-            'language': {'code': 'es_MX'},
+            'name': settings.WHATSAPP_TEMPLATE_OTP,
+            'language': {'code': 'es_CO'},
             'components': [
                 {
                     'type': 'body',
@@ -101,9 +111,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         )
         db.add(cliente)
         db.flush()  # obtener el ID antes del commit
-        assign_number(db, cliente.id, "free", VIGENCIA_FREE)
+        nueva_free = assign_number(db, cliente.id, "free", VIGENCIA_FREE)
+        free_number = nueva_free.number
+        free_valid_until = nueva_free.valid_until
         db.commit()
         db.refresh(cliente)
+        if cliente.celular:
+            notificar_nuevo_numero_free(cliente.celular, free_number, free_valid_until)
         es_nuevo = True
     else:
         # Cliente existente: acceso directo sin OTP
@@ -179,3 +193,59 @@ def actualizar_mis_datos(
     from app.core.security import create_access_token
     token = create_access_token(subject=str(cliente.id))
     return LoginResponse(access_token=token, cliente=cliente, es_nuevo=False)
+
+
+def _enviar_whatsapp_referido(celular: str, param1: str, param2: str) -> None:
+    """Notifica al referente por WhatsApp cuando alguien usa su código."""
+    numero = celular if celular.startswith('57') else f'57{celular}'
+    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
+    headers = {
+        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    body = {
+        'messaging_product': 'whatsapp',
+        'to': numero,
+        'type': 'template',
+        'template': {
+            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_REFERIDO,
+            'language': {'code': 'es_CO'},
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {'type': 'text', 'text': param1},
+                        {'type': 'text', 'text': param2},
+                    ],
+                },
+            ],
+        },
+    }
+    try:
+        httpx.post(url, json=body, headers=headers, timeout=10)
+    except Exception:
+        pass  # notificación no bloqueante
+
+
+@router.post('/referido', status_code=200)
+def guardar_referido(
+    payload: ReferidoRequest,
+    current_user: Cliente = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guarda el código de referido del cliente nuevo (solo una vez, silencioso si no existe)."""
+    if current_user.referente:
+        return {'ok': True}  # ya registrado, no sobrescribir
+
+    referente = db.query(Cliente).filter(Cliente.codigo_vip == payload.codigo).first()
+    if not referente:
+        return {'ok': True}  # código no existe, falla silenciosa
+
+    current_user.referente = payload.codigo
+    db.commit()
+
+    # TODO: confirmar con el usuario los dos parámetros del template WHATSAPP_TEMPLATE_NOTIFICACION_REFERIDO
+    # Actualmente: param1 = nombre del nuevo usuario, param2 = celular del nuevo usuario
+    _enviar_whatsapp_referido(referente.celular, current_user.nombre, current_user.celular)
+
+    return {'ok': True}

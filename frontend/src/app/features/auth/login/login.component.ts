@@ -36,6 +36,13 @@ export class LoginComponent implements OnInit {
   vipLoading = signal(false);
   private pendingClienteId = '';
 
+  // Estado modal Referido
+  showReferidoModal = signal(false);
+  referidoCode = '';
+  referidoError = signal('');
+  referidoLoading = signal(false);
+  private pendingLoginRes: any = null;
+
   // Estado modal OTP
   showOtpModal = signal(false);
   otpCode = '';
@@ -150,7 +157,15 @@ export class LoginComponent implements OnInit {
       next: res => {
         this.otpLoading.set(false);
         this.showOtpModal.set(false);
-        this.handleLoginSuccess(res);
+        if (res.es_nuevo) {
+          // Mostrar modal de referido antes de entrar al portal
+          this.pendingLoginRes = res;
+          this.referidoCode = '';
+          this.referidoError.set('');
+          this.showReferidoModal.set(true);
+        } else {
+          this.handleLoginSuccess(res);
+        }
       },
       error: err => {
         this.otpLoading.set(false);
@@ -160,6 +175,32 @@ export class LoginComponent implements OnInit {
         );
       },
     });
+  }
+
+  confirmReferido(): void {
+    if (!this.referidoCode.trim()) {
+      this.skipReferido();
+      return;
+    }
+    this.referidoLoading.set(true);
+    this.referidoError.set('');
+    this.authService.saveReferido(this.referidoCode.trim()).subscribe({
+      next: () => {
+        this.referidoLoading.set(false);
+        this.showReferidoModal.set(false);
+        this.handleLoginSuccess(this.pendingLoginRes);
+      },
+      error: () => {
+        this.referidoLoading.set(false);
+        this.showReferidoModal.set(false);
+        this.handleLoginSuccess(this.pendingLoginRes);
+      },
+    });
+  }
+
+  skipReferido(): void {
+    this.showReferidoModal.set(false);
+    this.handleLoginSuccess(this.pendingLoginRes);
   }
 
   cancelOtpModal(): void {
