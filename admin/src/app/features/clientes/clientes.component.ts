@@ -124,6 +124,10 @@ export class ClientesComponent implements OnInit {
 
   saveCreate() {
     this.createError.set(null);
+    if (this.createForm.vip && !this.createForm.codigo_vip?.trim()) {
+      this.createError.set('El código VIP es obligatorio cuando el cliente es VIP');
+      return;
+    }
     const payload = { ...this.createForm, fecha_nacimiento: this.composeFecha(this.createBdDia, this.createBdMes, this.createBdAnio) };
     this.svc.create(payload).subscribe({
       next: () => { this.showCreate = false; this.load(); },
@@ -137,6 +141,10 @@ export class ClientesComponent implements OnInit {
   saveEdit() {
     if (!this.editTarget) return;
     this.editError.set(null);
+    if (this.editForm.vip && !this.editForm.codigo_vip?.trim()) {
+      this.editError.set('El código VIP es obligatorio cuando el cliente es VIP');
+      return;
+    }
     const payload = { ...this.editForm, fecha_nacimiento: this.composeFecha(this.editBdDia, this.editBdMes, this.editBdAnio) };
     this.svc.update(this.editTarget.id, payload).subscribe({
       next: () => { this.editTarget = null; this.load(); },

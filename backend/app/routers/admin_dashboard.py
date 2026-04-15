@@ -1,7 +1,8 @@
 from calendar import monthrange
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -23,6 +24,9 @@ class TopLoteria(BaseModel):
     aciertos: int
 
 
+COLOMBIA_TZ = ZoneInfo("America/Bogota")
+
+
 class DashboardStats(BaseModel):
     mes: str                          # "YYYY-MM"
     # ── Totalizados (independientes del mes) ────────────────────────────────
@@ -31,7 +35,9 @@ class DashboardStats(BaseModel):
     # ── Filtrados por mes ───────────────────────────────────────────────────
     numeros_entregados: int
     total_aciertos: int
-    efectividad_pct: float            # 0–100 redondeado a 1 decimal
+    efectividad_numerica_pct: float    # aciertos / numeros_entregados
+    efectividad_personal_pct: float    # clientes que ganaron / clientes con números
+    clientes_con_numeros: int
     exactos: int
     directo_devuelto: int
     tres_orden: int
@@ -46,6 +52,12 @@ class DashboardStats(BaseModel):
     pct_ganadores_free: float
     # ── Suscripciones iniciadas en el mes ─────────────────────────────────
     suscripciones_iniciadas: int
+    # ── Nuevos clientes registrados en el mes ───────────────────────────
+    nuevos_clientes: int
+    # ── % resultados con últimos 3 dígitos todos diferentes ────────────────
+    pct_3digitos_diferentes: float
+    total_resultados_mes: int
+    resultados_3dif: int
 
 
 @router.get("", response_model=DashboardStats)
@@ -55,7 +67,7 @@ def get_dashboard(
     _user=Depends(get_current_platform_user),
 ):
     # ── Resolve month range ──────────────────────────────────────────────────
-    today = date.today()
+    today = datetime.now(COLOMBIA_TZ).date()
     if mes:
         year, month = int(mes[:4]), int(mes[5:7])
     else:
@@ -89,7 +101,10 @@ def get_dashboard(
         aciertos = []
 
     total_aciertos = len(aciertos)
-    efectividad = round(total_aciertos / numeros_entregados * 100, 1) if numeros_entregados else 0.0
+    efectividad_numerica = round(total_aciertos / numeros_entregados * 100, 1) if numeros_entregados else 0.0
+
+    # ── Clientes distintos con números en el mes ─────────────────────────────
+    clientes_con_numeros = len(set(h.id_user for h in historics))
 
     exactos = sum(1 for a in aciertos if a.tipo == "exacto")
     directo_devuelto = sum(1 for a in aciertos if a.tipo == "directo_devuelto")
@@ -108,6 +123,8 @@ def get_dashboard(
         clientes_con_aciertos = len(clientes_ids)
     else:
         clientes_con_aciertos = 0
+
+    efectividad_personal = round(clientes_con_aciertos / clientes_con_numeros * 100, 1) if clientes_con_numeros else 0.0
 
     # ── Ganadores por tipo de número (vip / free) ─────────────────────────
     if historic_ids_with_aciertos:
@@ -140,14 +157,40 @@ def get_dashboard(
     pct_ganadores_free = round(ganadores_free / base_pct * 100, 1)
 
     # ── Suscripciones iniciadas en el mes ─────────────────────────────────
-    from datetime import datetime, timezone as _tz
-    first_dt = datetime(year, month, 1, tzinfo=_tz.utc)
-    last_dt = datetime(year, month, monthrange(year, month)[1], 23, 59, 59, tzinfo=_tz.utc)
+    first_dt = datetime(year, month, 1, tzinfo=COLOMBIA_TZ)
+    last_dt = datetime(year, month, monthrange(year, month)[1], 23, 59, 59, tzinfo=COLOMBIA_TZ)
     suscripciones_iniciadas = (
         db.query(Suscripcion)
         .filter(Suscripcion.inicio >= first_dt, Suscripcion.inicio <= last_dt)
         .count()
     )
+
+    # ── Nuevos clientes registrados en el mes ───────────────────────────
+    nuevos_clientes = (
+        db.query(Cliente)
+        .filter(Cliente.created_at >= first_dt, Cliente.created_at <= last_dt)
+        .count()
+    )
+
+    # ── % resultados del mes con últimos 3 dígitos todos diferentes ─────────
+    resultados_mes = (
+        db.query(LoteriaResultado.resultado)
+        .filter(LoteriaResultado.fecha >= first_day, LoteriaResultado.fecha <= last_day)
+        .all()
+    )
+    total_res = len(resultados_mes)
+    if total_res:
+        def _ultimos3(r: str) -> str:
+            digits = ''.join(c for c in r if c.isdigit())
+            return digits[-3:] if len(digits) >= 3 else ''
+        todos_diferentes = sum(
+            1 for (r,) in resultados_mes
+            if (u3 := _ultimos3(r)) and len(set(u3)) == 3
+        )
+        pct_3digitos_diferentes = round(todos_diferentes / total_res * 100, 1)
+    else:
+        todos_diferentes = 0
+        pct_3digitos_diferentes = 0.0
 
     # ── Most frequent winning number ─────────────────────────────────────────
     numero_mas_frecuente: Optional[str] = None
@@ -183,7 +226,9 @@ def get_dashboard(
         clientes_vip=clientes_vip,
         numeros_entregados=numeros_entregados,
         total_aciertos=total_aciertos,
-        efectividad_pct=efectividad,
+        efectividad_numerica_pct=efectividad_numerica,
+        efectividad_personal_pct=efectividad_personal,
+        clientes_con_numeros=clientes_con_numeros,
         exactos=exactos,
         directo_devuelto=directo_devuelto,
         tres_orden=tres_orden,
@@ -196,4 +241,8 @@ def get_dashboard(
         pct_ganadores_vip=pct_ganadores_vip,
         pct_ganadores_free=pct_ganadores_free,
         suscripciones_iniciadas=suscripciones_iniciadas,
+        nuevos_clientes=nuevos_clientes,
+        pct_3digitos_diferentes=pct_3digitos_diferentes,
+        total_resultados_mes=total_res,
+        resultados_3dif=todos_diferentes,
     )

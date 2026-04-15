@@ -43,12 +43,32 @@ export class LoginComponent implements OnInit {
   referidoLoading = signal(false);
   private pendingLoginRes: any = null;
 
+  // País
+  codigoPais = '57';
+  paises = [
+    { code: '57',  label: 'COL+57' },
+    { code: '58',  label: 'VEN+58' },
+    { code: '593', label: 'ECU+593' },
+    { code: '51',  label: 'PER+51' },
+    { code: '52',  label: 'MEX+52' },
+    { code: '1',   label: 'USA+1' },
+    { code: '34',  label: 'ESP+34' },
+    { code: '54',  label: 'ARG+54' },
+    { code: '56',  label: 'CHL+56' },
+  ];
+
   // Estado modal OTP
   showOtpModal = signal(false);
   otpCode = '';
   otpError = signal('');
   otpLoading = signal(false);
   otpExpiraEn = 5;
+
+  onPaisChange() {
+    const pattern = this.codigoPais === '57' ? /^\d{10}$/ : /^\d{7,15}$/;
+    this.form.get('celular')!.setValidators([Validators.required, Validators.pattern(pattern)]);
+    this.form.get('celular')!.updateValueAndValidity();
+  }
 
   private readonly symbols = ['♦', '★', '$', '✦', '♠', '♣', '♥', '7', '♞', '⬡'];
 
@@ -67,7 +87,7 @@ export class LoginComponent implements OnInit {
     this.recordar = !!saved;
     this.form = this.fb.group({
       nombre: [saved?.nombre ?? '', [Validators.required, Validators.minLength(2)]],
-      celular: [saved?.celular ?? '', [Validators.required, Validators.pattern(/^\d{10}$/)]],
+      celular: [saved?.celular ?? '', [Validators.required, Validators.pattern(/^\d{7,15}$/)]],
     });
     this.buildParticles();
   }
@@ -103,7 +123,7 @@ export class LoginComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
     // Intentar login directo (sin OTP — clientes existentes pasan aquí)
-    this.authService.login({ ...this.form.value }).subscribe({
+    this.authService.login({ ...this.form.value, celular: this.codigoPais + this.form.value.celular }).subscribe({
       next: res => {
         this.loading.set(false);
         this.handleLoginSuccess(res);
@@ -112,7 +132,8 @@ export class LoginComponent implements OnInit {
         const detail = err?.error?.detail;
         if (err.status === 403 && detail === 'otp_required') {
           // Cliente nuevo: enviar OTP por WhatsApp y mostrar modal
-          this.authService.sendOtp(this.form.value.celular).subscribe({
+          const celularCompleto = this.codigoPais + this.form.value.celular;
+          this.authService.sendOtp(celularCompleto).subscribe({
             next: res2 => {
               this.loading.set(false);
               this.otpExpiraEn = res2.expira_en;
@@ -152,7 +173,7 @@ export class LoginComponent implements OnInit {
     this.otpLoading.set(true);
     this.otpError.set('');
     // Paso 2: login con OTP incluido (cliente nuevo)
-    const payload = { ...this.form.value, otp_code: this.otpCode.trim() };
+    const payload = { ...this.form.value, celular: this.codigoPais + this.form.value.celular, otp_code: this.otpCode.trim() };
     this.authService.login(payload).subscribe({
       next: res => {
         this.otpLoading.set(false);

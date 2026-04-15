@@ -15,7 +15,9 @@ export interface DashboardStats {
   // Filtrados por mes
   numeros_entregados: number;
   total_aciertos: number;
-  efectividad_pct: number;
+  efectividad_numerica_pct: number;
+  efectividad_personal_pct: number;
+  clientes_con_numeros: number;
   exactos: number;
   directo_devuelto: number;
   tres_orden: number;
@@ -29,6 +31,10 @@ export interface DashboardStats {
   pct_ganadores_vip: number;
   pct_ganadores_free: number;
   suscripciones_iniciadas: number;
+  nuevos_clientes: number;
+  pct_3digitos_diferentes: number;
+  total_resultados_mes: number;
+  resultados_3dif: number;
 }
 
 @Injectable({ providedIn: 'root' })

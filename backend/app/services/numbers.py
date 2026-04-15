@@ -6,7 +6,8 @@ Usado por: auth.py (primer número free), admin_clientes.py (primer número vip)
 import logging
 import random
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy import delete, select, update
@@ -136,7 +137,7 @@ def assign_number(db: Session, id_user: uuid.UUID, num_type: str, validity_days:
     # Marcar el número del pool como ocupado
     selected.assigned = True
 
-    today = date.today()
+    today = datetime.now(ZoneInfo("America/Bogota")).date()
 
     assignment = NumberUser(
         number=final_number,

@@ -106,6 +106,19 @@ form {
   padding-left: 0.15rem;
 }
 
+.country-select {
+  background: transparent;
+  border: none;
+  color: var(--gold-dark);
+  font-size: 0.82rem;
+  padding: 0 0.4rem 0 0;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  max-width: 10rem;
+  option { background: #1a0a2e; color: #fff; }
+}
+
 .field-wrapper {
   display: flex;
   align-items: center;

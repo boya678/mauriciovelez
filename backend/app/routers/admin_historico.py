@@ -1,6 +1,7 @@
 import io
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import openpyxl
 from fastapi import APIRouter, Depends, Query
@@ -69,7 +70,7 @@ def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = F
 
 
 def _defaults(desde, hasta):
-    ayer = date.today() - timedelta(days=1)
+    ayer = datetime.now(ZoneInfo("America/Bogota")).date() - timedelta(days=1)
     return desde or ayer, hasta or ayer
 
 

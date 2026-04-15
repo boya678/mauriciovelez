@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE: str = "free_nuevo_numero"
     WHATSAPP_TEMPLATE_OTP: str = "codigo_otp"
     WHATSAPP_TEMPLATE_NOTIFICACION_REFERIDO: str = "free_referido"
-    CRON_NUMEROS: str = "0 7 * * *"  # cron UTC completo para reasignación de números (default 07:00 UTC = 02:00 COL)
+    # Cron hora Colombia (minuto hora dom mes dow)
+    CRON_NUMEROS: str = "0 7 * * *"        # reasignación de números 07:00 COL
+    CRON_VIP_CHECK: str = "0 22 * * *"     # desactivar VIP vencidos 22:00 COL
+    CRON_LOTERIAS: str = "0 10,14,18,23 * * *"  # procesar loterías (repetir a las horas indicadas COL)
 
     model_config = SettingsConfigDict(
         env_file=".env",

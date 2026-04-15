@@ -48,17 +48,24 @@
         <label class="field-label" for="celular">Número de celular</label>
         <div class="field-wrapper" [class.field-invalid]="isInvalid('celular')">
           <span class="field-icon material-icons-round">smartphone</span>
+          <select class="country-select" [(ngModel)]="codigoPais" [ngModelOptions]="{standalone: true}" (ngModelChange)="onPaisChange()">
+            @for (p of paises; track p.code) {
+              <option [value]="p.code">{{ p.label }}</option>
+            }
+          </select>
           <input
             id="celular"
             formControlName="celular"
             type="tel"
             class="field-input"
-            placeholder="Ej: 3001234567"
-            maxlength="10"
+            [placeholder]="codigoPais === '57' ? 'Ej: 3001234567' : 'Número sin código de país'"
+            [maxlength]="codigoPais === '57' ? 10 : 15"
           />
         </div>
         @if (isInvalid('celular')) {
-          <span class="field-error">Ingresa un número de celular colombiano (10 dígitos)</span>
+          <span class="field-error">
+            {{ codigoPais === '57' ? 'Ingresa un número colombiano (10 dígitos)' : 'Ingresa un número válido (7–15 dígitos)' }}
+          </span>
         }
       </div>
 

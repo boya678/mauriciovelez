@@ -54,6 +54,19 @@
           <div class="kpi-label">Suscripciones iniciadas</div>
         </div>
 
+        <div class="kpi-card accent-green">
+          <div class="kpi-icon"><span class="material-icons-round">person_add</span></div>
+          <div class="kpi-value">{{ stats!.nuevos_clientes }}</div>
+          <div class="kpi-label">Nuevos clientes</div>
+        </div>
+
+        <div class="kpi-card accent-blue">
+          <div class="kpi-icon"><span class="material-icons-round">casino</span></div>
+          <div class="kpi-value">{{ stats!.pct_3digitos_diferentes }}%</div>
+          <div class="kpi-label">Resultados con 3 dígitos diferentes</div>
+          <div class="kpi-pct">{{ stats!.resultados_3dif }} / {{ stats!.total_resultados_mes }} sorteos</div>
+        </div>
+
         <div class="kpi-card accent-gold">
           <div class="kpi-icon"><span class="material-icons-round">emoji_events</span></div>
           <div class="kpi-value">{{ stats!.total_aciertos }}</div>
@@ -62,8 +75,16 @@
 
         <div class="kpi-card accent-green">
           <div class="kpi-icon"><span class="material-icons-round">trending_up</span></div>
-          <div class="kpi-value">{{ stats!.efectividad_pct }}%</div>
-          <div class="kpi-label">Efectividad</div>
+          <div class="kpi-value">{{ stats!.efectividad_numerica_pct }}%</div>
+          <div class="kpi-label">Efectividad numérica</div>
+          <div class="kpi-pct">{{ stats!.total_aciertos }} / {{ stats!.numeros_entregados }} números</div>
+        </div>
+
+        <div class="kpi-card accent-blue">
+          <div class="kpi-icon"><span class="material-icons-round">people</span></div>
+          <div class="kpi-value">{{ stats!.efectividad_personal_pct }}%</div>
+          <div class="kpi-label">Efectividad personal</div>
+          <div class="kpi-pct">{{ stats!.clientes_con_aciertos }} / {{ stats!.clientes_con_numeros }} clientes</div>
         </div>
 
         <div class="kpi-card">

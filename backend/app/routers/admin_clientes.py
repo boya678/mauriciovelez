@@ -86,6 +86,17 @@ class PaginatedClientes(BaseModel):
 
 # ── Helper audit ─────────────────────────────────────────────────────────────────
 
+def _json_safe(obj):
+    """Recursively convert non-JSON-serializable values (date, datetime) to strings."""
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    return obj
+
+
 def _audit(db: Session, user, action: str, entity_id: str, detail: dict):
     db.add(AuditLog(
         platform_user_id=user.id,
@@ -93,7 +104,7 @@ def _audit(db: Session, user, action: str, entity_id: str, detail: dict):
         action=action,
         entity="clientes",
         entity_id=entity_id,
-        detail=detail,
+        detail=_json_safe(detail),
     ))
 
 
@@ -246,48 +257,50 @@ def update_cliente(
 
     vip_antes = obj.vip
     changes = payload.model_dump(exclude_none=True)
-    for key, val in changes.items():
-        setattr(obj, key, val)
-
-    # Si el cliente es (o acaba de ser marcado como) VIP, asegurar que tenga número VIP.
-    # Esto cubre tanto la activación nueva como clientes que ya eran VIP sin número asignado.
-    if obj.vip:
-        vip_row = db.execute(
-            select(NumberUser).where(
-                NumberUser.id_user == obj.id,
-                NumberUser.type == "vip",
-            )
-        ).scalar_one_or_none()
-
-        if vip_row is None:
-            # Capturar celular antes de flush (evita expiración SQLAlchemy)
-            celular_cliente = obj.celular
-            # Solo crear suscripción si es una activación nueva
-            if not vip_antes:
-                now = datetime.now(timezone.utc)
-                db.add(Suscripcion(
-                    cliente_id=obj.id,
-                    inicio=now,
-                    fin=now + relativedelta(months=1),
-                    activa=True,
-                ))
-                acumular_cuenta_vip(db)
-            nueva = assign_number(db, obj.id, "vip", VIGENCIA_VIP)
-            valid_until = nueva.valid_until
-            number = nueva.number
-            db.flush()
-            if celular_cliente:
-                notificar_nuevo_numero_vip(celular_cliente, number, valid_until)
-
-    # Si se desactiva VIP, desactivar todas sus suscripciones activas
-    if vip_antes and not obj.vip:
-        db.query(Suscripcion).filter(
-            Suscripcion.cliente_id == obj.id,
-            Suscripcion.activa == True,
-        ).update({"activa": False}, synchronize_session=False)
-
-    _audit(db, user, "UPDATE", str(cliente_id), changes)
     try:
+        for key, val in changes.items():
+            setattr(obj, key, val)
+
+        # Si el cliente es (o acaba de ser marcado como) VIP, asegurar que tenga número VIP.
+        # Esto cubre tanto la activación nueva como clientes que ya eran VIP sin número asignado.
+        if obj.vip:
+            # autoflush=False evita que la query dispare un flush prematuro
+            with db.no_autoflush:
+                vip_row = db.execute(
+                    select(NumberUser).where(
+                        NumberUser.id_user == obj.id,
+                        NumberUser.type == "vip",
+                    )
+                ).scalar_one_or_none()
+
+            if vip_row is None:
+                # Capturar celular antes de flush (evita expiración SQLAlchemy)
+                celular_cliente = obj.celular
+                # Solo crear suscripción si es una activación nueva
+                if not vip_antes:
+                    now = datetime.now(timezone.utc)
+                    db.add(Suscripcion(
+                        cliente_id=obj.id,
+                        inicio=now,
+                        fin=now + relativedelta(months=1),
+                        activa=True,
+                    ))
+                    acumular_cuenta_vip(db)
+                nueva = assign_number(db, obj.id, "vip", VIGENCIA_VIP)
+                valid_until = nueva.valid_until
+                number = nueva.number
+                db.flush()
+                if celular_cliente:
+                    notificar_nuevo_numero_vip(celular_cliente, number, valid_until)
+
+        # Si se desactiva VIP, desactivar todas sus suscripciones activas
+        if vip_antes and not obj.vip:
+            db.query(Suscripcion).filter(
+                Suscripcion.cliente_id == obj.id,
+                Suscripcion.activa == True,
+            ).update({"activa": False}, synchronize_session=False)
+
+        _audit(db, user, "UPDATE", str(cliente_id), changes)
         db.commit()
     except IntegrityError as e:
         db.rollback()

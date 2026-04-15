@@ -14,9 +14,9 @@ WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
 API_URL = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
 
 EXCEL_FILE = "Whaticket y Software.xlsx"
-BATCH_SIZE = 7000
-MAX_CONCURRENT = 20   # peticiones simultáneas — sube o baja según límite de Meta
-SAVE_EVERY = 50       # guarda Excel cada N resultados procesados
+BATCH_SIZE = 16610
+MAX_CONCURRENT = 60   # peticiones simultáneas — sube o baja según límite de Meta
+SAVE_EVERY = 1000       # guarda Excel cada N resultados procesados
 
 with open("body.json", "r", encoding="utf-8") as f:
     body_template = json.load(f)

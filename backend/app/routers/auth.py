@@ -37,8 +37,8 @@ def _generar_otp() -> str:
 
 def _enviar_whatsapp_otp(celular: str, codigo: str) -> None:
     """Envía el OTP via WhatsApp Business API (template 'otp')."""
-    # El número debe incluir código de país sin '+'
-    numero = celular if celular.startswith('57') else f'57{celular}'
+    # El número ya llega con código de país desde el frontend
+    numero = celular.lstrip('+')
     url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
     headers = {
         'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
@@ -86,6 +86,10 @@ def send_otp(payload: OtpRequest):
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     # ── Buscar cliente ─────────────────────────────────────────
     cliente = db.query(Cliente).filter(Cliente.celular == payload.celular).first()
+    # Fallback: clientes Colombia guardados sin código de país (10 dígitos)
+    if cliente is None and payload.celular.startswith('57') and len(payload.celular) == 12:
+        sin_prefijo = payload.celular[2:]
+        cliente = db.query(Cliente).filter(Cliente.celular == sin_prefijo).first()
 
     if cliente is None:
         # Cliente nuevo: requiere OTP verificado

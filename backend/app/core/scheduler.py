@@ -341,7 +341,7 @@ def _reasignar_numeros_vencidos() -> None:
 
     db = SessionLocal()
     try:
-        today = date.today()
+        today = datetime.now(COLOMBIA_TZ).date()
         clientes = db.query(Cliente).filter(Cliente.enabled == True).all()
         asignados = 0
         print(f"   Procesando {len(clientes)} cliente(s)...")
@@ -386,43 +386,39 @@ def _reasignar_numeros_vencidos() -> None:
         db.close()
 
 
+def _parse_cron(expr: str) -> CronTrigger:
+    """Parsea una expresión cron de 5 campos y retorna un CronTrigger en hora Colombia."""
+    minuto, hora, dom, mes, dow = expr.split()
+    return CronTrigger(minute=minuto, hour=hora, day=dom, month=mes, day_of_week=dow, timezone="America/Bogota")
+
+
 def start() -> None:
     """Registra los jobs y arranca el scheduler."""
     _scheduler.add_job(
         _desactivar_vip_vencidos,
-        trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
+        trigger=_parse_cron(settings.CRON_VIP_CHECK),
         id="vip_check",
         replace_existing=True,
         misfire_grace_time=3600,
     )
-    # Reasignación de números vencidos — cron UTC completo desde settings
-    minuto, hora, dom, mes, dow = settings.CRON_NUMEROS.split()
     _scheduler.add_job(
         _reasignar_numeros_vencidos,
-        trigger=CronTrigger(minute=minuto, hour=hora, day=dom, month=mes, day_of_week=dow, timezone="UTC"),
+        trigger=_parse_cron(settings.CRON_NUMEROS),
         id="reasignar_numeros",
         replace_existing=True,
         misfire_grace_time=3600,
     )
-    # Procesar loterias 4 veces al día en hora Colombia (UTC-5)
-    # 10:00 COT = 15:00 UTC | 14:00 COT = 19:00 UTC | 18:00 COT = 23:00 UTC | 23:30 COT = 04:30 UTC
-    for job_id, (h, m) in [
-        ("loterias_1000", (15, 0)),
-        ("loterias_1400", (19, 0)),
-        ("loterias_1800", (23, 0)),
-        ("loterias_2330", (4, 30)),
-    ]:
-        _scheduler.add_job(
-            _procesar_loterias,
-            trigger=CronTrigger(hour=h, minute=m, timezone="UTC"),
-            id=job_id,
-            replace_existing=True,
-            misfire_grace_time=3600,
-        )
+    _scheduler.add_job(
+        _procesar_loterias,
+        trigger=_parse_cron(settings.CRON_LOTERIAS),
+        id="loterias",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
     _scheduler.start()
     logger.info(
-        "Scheduler iniciado — vip_check 03:00 UTC + reasignar_numeros '%s' UTC + loterias 4x/día",
-        settings.CRON_NUMEROS,
+        "Scheduler iniciado (hora Colombia) — vip_check '%s' | numeros '%s' | loterias '%s'",
+        settings.CRON_VIP_CHECK, settings.CRON_NUMEROS, settings.CRON_LOTERIAS,
     )
 
 
