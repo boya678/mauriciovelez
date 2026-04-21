@@ -52,4 +52,8 @@ export class ClientesService {
     if (q) params = params.set('q', q);
     return this.http.get(`${this.base}/export`, { params, responseType: 'blob' });
   }
+
+  getStats() {
+    return this.http.get<{ activos: number; inactivos: number }>(`${this.base}/stats`);
+  }
 }

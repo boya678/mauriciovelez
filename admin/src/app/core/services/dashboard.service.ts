@@ -12,6 +12,8 @@ export interface DashboardStats {
   // Totalizados (independientes del mes)
   total_clientes: number;
   clientes_vip: number;
+  clientes_activos: number;
+  clientes_inactivos: number;
   // Filtrados por mes
   numeros_entregados: number;
   total_aciertos: number;

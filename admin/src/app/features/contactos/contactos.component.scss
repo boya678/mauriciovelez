@@ -18,6 +18,21 @@
   &:hover { background: rgba(76, 175, 125, 0.28); }
 }
 
+.btn-purge-vip {
+  margin-left: auto;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 83, 80, 0.4);
+  background: rgba(239, 83, 80, 0.12);
+  color: #ef5350;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(239, 83, 80, 0.28); }
+}
+
 .table-card { padding: 0; overflow: hidden; }
 .table-wrap { overflow-x: auto; }
 
@@ -103,4 +118,18 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.btn-danger {
+  padding: 7px 18px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(239, 83, 80, 0.85);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #ef5350; }
 }

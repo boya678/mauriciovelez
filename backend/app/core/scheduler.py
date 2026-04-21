@@ -16,7 +16,7 @@ from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
-from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip, VIGENCIA_FREE, VIGENCIA_VIP
+from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
 LOTERIAS_API = "https://api-resultadosloterias.com/api/results"
@@ -356,7 +356,7 @@ def _reasignar_numeros_vencidos() -> None:
             ).scalar_one_or_none()
 
             if free_row is None or free_row.valid_until < today:
-                nueva_free = assign_number(db, c.id, "free", VIGENCIA_FREE)
+                nueva_free = assign_number(db, c.id, "free")
                 asignados += 1
                 if c.celular:
                     notificar_nuevo_numero_free(c.celular, nueva_free.number, nueva_free.valid_until)
@@ -371,7 +371,7 @@ def _reasignar_numeros_vencidos() -> None:
                 ).scalar_one_or_none()
 
                 if vip_row is None or vip_row.valid_until < today:
-                    nueva = assign_number(db, c.id, "vip", VIGENCIA_VIP)
+                    nueva = assign_number(db, c.id, "vip")
                     asignados += 1
                     if c.celular:
                         notificar_nuevo_numero_vip(c.celular, nueva.number, nueva.valid_until)

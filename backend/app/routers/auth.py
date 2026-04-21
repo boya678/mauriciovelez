@@ -18,7 +18,7 @@ from app.schemas.cliente import (
     VipVerifyRequest,
     UpdateMisDatosRequest,
 )
-from app.services.numbers import assign_number, notificar_nuevo_numero_free, VIGENCIA_FREE
+from app.services.numbers import assign_number, notificar_nuevo_numero_free
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -78,51 +78,50 @@ def send_otp(payload: OtpRequest):
     """Genera y envía un OTP de 6 dígitos por WhatsApp."""
     codigo = _generar_otp()
     expira = datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)
-    _otp_store[payload.celular] = (codigo, expira)
-    _enviar_whatsapp_otp(payload.celular, codigo)
+    numero_completo = f"{payload.codigo_pais}{payload.celular}"
+    _otp_store[numero_completo] = (codigo, expira)
+    _enviar_whatsapp_otp(numero_completo, codigo)
     return {'ok': True, 'expira_en': OTP_TTL_MINUTES}
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    # ── Buscar cliente ─────────────────────────────────────────
+    # ── Buscar cliente (celular guardado sin código de país) ───
     cliente = db.query(Cliente).filter(Cliente.celular == payload.celular).first()
-    # Fallback: clientes Colombia guardados sin código de país (10 dígitos)
-    if cliente is None and payload.celular.startswith('57') and len(payload.celular) == 12:
-        sin_prefijo = payload.celular[2:]
-        cliente = db.query(Cliente).filter(Cliente.celular == sin_prefijo).first()
 
     if cliente is None:
         # Cliente nuevo: requiere OTP verificado
         if not payload.otp_code:
             raise HTTPException(status_code=403, detail='otp_required')
 
-        entry = _otp_store.get(payload.celular)
+        numero_completo = f"{payload.codigo_pais}{payload.celular}"
+        entry = _otp_store.get(numero_completo)
         if not entry:
             raise HTTPException(status_code=400, detail='Código de verificación no encontrado. Solicita uno nuevo.')
         codigo_guardado, expira = entry
         if datetime.now(timezone.utc) > expira:
-            _otp_store.pop(payload.celular, None)
+            _otp_store.pop(numero_completo, None)
             raise HTTPException(status_code=400, detail='El código de verificación expiró. Solicita uno nuevo.')
         if payload.otp_code != codigo_guardado:
             raise HTTPException(status_code=400, detail='Código de verificación incorrecto.')
-        _otp_store.pop(payload.celular, None)  # invalidar tras uso
+        _otp_store.pop(numero_completo, None)  # invalidar tras uso
 
         cliente = Cliente(
             nombre=payload.nombre,
             celular=payload.celular,
+            codigo_pais=payload.codigo_pais,
             correo=payload.correo,
             cc=payload.cc,
         )
         db.add(cliente)
         db.flush()  # obtener el ID antes del commit
-        nueva_free = assign_number(db, cliente.id, "free", VIGENCIA_FREE)
+        nueva_free = assign_number(db, cliente.id, "free")
         free_number = nueva_free.number
         free_valid_until = nueva_free.valid_until
-        celular_cliente = cliente.celular  # capturar antes del commit
+        # Para WhatsApp usar el número completo con código de país
+        celular_wp = f"{payload.codigo_pais}{cliente.celular}"
         db.commit()
         db.refresh(cliente)
-        if celular_cliente:
-            notificar_nuevo_numero_free(celular_cliente, free_number, free_valid_until)
+        notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
         es_nuevo = True
     else:
         # Cliente existente: acceso directo sin OTP

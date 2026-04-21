@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import openpyxl
 import io
@@ -8,15 +9,18 @@ from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import select as _select
 from sqlalchemy.orm import Session
 
 from app.core.admin_security import get_current_platform_user, require_admin
 from app.database import get_db
 from app.models.audit_log import AuditLog
+from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
 from app.models.cuenta_vip import acumular_cuenta_vip
 from app.models.cliente import Cliente
 from app.core import scheduler as _scheduler_module
+from app.services.numbers import assign_number, notificar_nuevo_numero_vip
 
 router = APIRouter(prefix="/admin/suscripciones", tags=["Admin Suscripciones"])
 
@@ -113,9 +117,35 @@ def renovar(
     )
     db.add(nueva)
 
-    # 3. Asegurar que el cliente quede marcado como VIP
-    if cliente and not cliente.vip:
-        cliente.vip = True
+    # 3. Asegurar que el cliente quede marcado como VIP y habilitado
+    if cliente:
+        if not cliente.vip:
+            cliente.vip = True
+        cliente.enabled = True
+
+    # 4. Asignar números si no tiene (o vencieron), sin esperar al cron
+    if cliente:
+        today = datetime.now(ZoneInfo("America/Bogota")).date()
+
+        free_row = db.execute(
+            _select(NumberUser).where(
+                NumberUser.id_user == cliente.id,
+                NumberUser.type == "free",
+            )
+        ).scalar_one_or_none()
+        if free_row is None or free_row.valid_until < today:
+            assign_number(db, cliente.id, "free")
+
+        vip_row = db.execute(
+            _select(NumberUser).where(
+                NumberUser.id_user == cliente.id,
+                NumberUser.type == "vip",
+            )
+        ).scalar_one_or_none()
+        if vip_row is None or vip_row.valid_until < today:
+            nueva_vip = assign_number(db, cliente.id, "vip")
+            if cliente.celular:
+                notificar_nuevo_numero_vip(cliente.celular, nueva_vip.number, nueva_vip.valid_until)
 
     acumular_cuenta_vip(db)
 

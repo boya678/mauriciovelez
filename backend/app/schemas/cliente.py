@@ -5,12 +5,14 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class OtpRequest(BaseModel):
-    celular: str = Field(..., min_length=10, max_length=15)
+    celular: str = Field(..., min_length=7, max_length=15)
+    codigo_pais: str = Field(default='57', max_length=10)
 
 
 class LoginRequest(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=150)
     celular: str = Field(..., min_length=1, max_length=30)
+    codigo_pais: str = Field(default='57', max_length=10)
     otp_code: str | None = Field(default=None, min_length=6, max_length=6)
     correo: str | None = Field(default=None, max_length=200)
     cc: str | None = Field(default=None, max_length=30)
@@ -20,6 +22,7 @@ class ClienteResponse(BaseModel):
     id: uuid.UUID
     nombre: str
     celular: str
+    codigo_pais: str | None
     correo: str | None
     cc: str | None
     saldo: float

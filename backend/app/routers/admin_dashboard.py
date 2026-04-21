@@ -32,6 +32,8 @@ class DashboardStats(BaseModel):
     # ── Totalizados (independientes del mes) ────────────────────────────────
     total_clientes: int
     clientes_vip: int
+    clientes_activos: int
+    clientes_inactivos: int
     # ── Filtrados por mes ───────────────────────────────────────────────────
     numeros_entregados: int
     total_aciertos: int
@@ -80,6 +82,8 @@ def get_dashboard(
     # ── Total & VIP clients ──────────────────────────────────────────────────
     total_clientes = db.query(Cliente).count()
     clientes_vip = db.query(Cliente).filter(Cliente.vip.is_(True)).count()
+    clientes_activos = db.query(Cliente).filter(Cliente.enabled.is_(True)).count()
+    clientes_inactivos = total_clientes - clientes_activos
 
     # ── Numbers delivered in month ───────────────────────────────────────────
     historics = (
@@ -224,6 +228,8 @@ def get_dashboard(
         mes=mes_str,
         total_clientes=total_clientes,
         clientes_vip=clientes_vip,
+        clientes_activos=clientes_activos,
+        clientes_inactivos=clientes_inactivos,
         numeros_entregados=numeros_entregados,
         total_aciertos=total_aciertos,
         efectividad_numerica_pct=efectividad_numerica,

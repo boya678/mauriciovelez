@@ -1,6 +1,7 @@
 <div class="page-header">
   <h2>Pendientes de contacto</h2>
   <span class="total-badge">{{ items().length }} pendiente(s)</span>
+  <button class="btn-purge-vip" (click)="confirmPurgeVip()">🗑 Eliminar VIPs</button>
   <button class="btn-export" (click)="exportExcel()">⬇ Exportar Excel</button>
 </div>
 
@@ -45,7 +46,7 @@
   }
 </div>
 
-<!-- Modal confirmación -->
+<!-- Modal confirmación contactado -->
 @if (deleteTarget) {
   <div class="modal-overlay" (click)="cancelDelete()"></div>
   <div class="modal-box">
@@ -54,6 +55,19 @@
     <div class="modal-actions">
       <button class="btn-ghost" (click)="cancelDelete()">Cancelar</button>
       <button class="btn-primary" (click)="doDelete()">Sí, contactado</button>
+    </div>
+  </div>
+}
+
+<!-- Modal confirmación eliminar VIPs -->
+@if (purgeVipConfirm) {
+  <div class="modal-overlay" (click)="cancelPurgeVip()"></div>
+  <div class="modal-box">
+    <h3>¿Eliminar contactos VIP?</h3>
+    <p>Se eliminarán <strong>todos los registros</strong> de contactos cuyo cliente ya sea VIP. Esta acción no se puede deshacer.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" (click)="cancelPurgeVip()">Cancelar</button>
+      <button class="btn-danger" (click)="doPurgeVip()">Sí, eliminar</button>
     </div>
   </div>
 }

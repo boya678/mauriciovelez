@@ -29,6 +29,10 @@ export class ContactosService {
     return this.http.delete(`${this.base}/${id}`);
   }
 
+  purgeVip() {
+    return this.http.delete<{ eliminados: number }>(`${this.base}/purge-vip`);
+  }
+
   export() {
     return this.http.get(`${this.base}/export`, { responseType: 'blob' }).pipe(
       tap(blob => {

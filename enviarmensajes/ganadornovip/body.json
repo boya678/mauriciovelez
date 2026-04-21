@@ -1,0 +1,11 @@
+{
+  "messaging_product": "whatsapp",
+  "to": "{{NUMERO}}",
+  "type": "template",
+  "template": {
+    "name": "ganadornovip2",
+    "language": {
+      "code": "es"
+    }
+  }
+}

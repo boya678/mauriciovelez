@@ -27,6 +27,7 @@ export interface LoginResponse {
 export interface LoginRequest {
   nombre: string;
   celular: string;
+  codigo_pais: string;
   otp_code: string;
   correo?: string;
   cc?: string;
@@ -40,10 +41,10 @@ export class AuthService {
 
   constructor(private http: HttpClient) {}
 
-  sendOtp(celular: string): Observable<{ ok: boolean; expira_en: number }> {
+  sendOtp(payload: { celular: string; codigo_pais: string }): Observable<{ ok: boolean; expira_en: number }> {
     return this.http.post<{ ok: boolean; expira_en: number }>(
       `${environment.apiUrl}/auth/send-otp`,
-      { celular }
+      payload
     );
   }
 

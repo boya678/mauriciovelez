@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, Session
 
 from app.database import Base
 
-ACUMULADO_POR_EVENTO = Decimal("500.00")
+ACUMULADO_POR_EVENTO = Decimal("1000.00")
 
 
 class CuentaVip(Base):
@@ -23,7 +23,7 @@ class CuentaVip(Base):
 
 
 def acumular_cuenta_vip(db: Session) -> None:
-    """Suma 500 al registro de cuentas_vip del mes/año actual. Crea la fila si no existe."""
+    """Suma 1000 al registro de cuentas_vip del mes/año actual. Crea la fila si no existe."""
     now = datetime.now(timezone.utc)
     fila = (
         db.query(CuentaVip)

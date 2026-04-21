@@ -3,6 +3,40 @@
   font-size: 13px;
 }
 
+.stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 24px;
+    border-radius: 10px;
+    min-width: 160px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e5e7eb);
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    &.stat-activos .stat-value { color: #16a34a; }
+    &.stat-inactivos .stat-value { color: #dc2626; }
+  }
+}
+
 .toolbar {
   display: flex;
   gap: 12px;

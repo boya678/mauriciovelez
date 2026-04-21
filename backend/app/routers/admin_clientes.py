@@ -19,7 +19,7 @@ from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
 from app.models.cuenta_vip import acumular_cuenta_vip
 from app.models.numbers_users import NumberUser
-from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip, VIGENCIA_FREE, VIGENCIA_VIP
+from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
 
 router = APIRouter(prefix="/admin/clientes", tags=["Admin Clientes"])
 
@@ -30,6 +30,7 @@ class ClienteOut(BaseModel):
     id: uuid.UUID
     nombre: str
     celular: str
+    codigo_pais: Optional[str]
     correo: Optional[str]
     cc: Optional[str]
     saldo: float
@@ -44,6 +45,7 @@ class ClienteOut(BaseModel):
 class ClienteUpdate(BaseModel):
     nombre: Optional[str] = None
     celular: Optional[str] = None
+    codigo_pais: Optional[str] = None
     correo: Optional[str] = None
     cc: Optional[str] = None
     saldo: Optional[float] = None
@@ -61,6 +63,7 @@ class ClienteUpdate(BaseModel):
 class ClienteCreate(BaseModel):
     nombre: str
     celular: str
+    codigo_pais: str = '57'
     correo: Optional[str] = None
     cc: Optional[str] = None
     saldo: float = 0
@@ -120,6 +123,7 @@ def create_cliente(
         id=uuid.uuid4(),
         nombre=payload.nombre,
         celular=payload.celular,
+        codigo_pais=payload.codigo_pais,
         correo=payload.correo or None,
         cc=payload.cc or None,
         saldo=payload.saldo,
@@ -131,11 +135,11 @@ def create_cliente(
     db.add(nuevo)
     db.flush()  # asegurar que nuevo.id está disponible para FKs
 
-    # Capturar celular antes de cualquier commit (evita expiración SQLAlchemy)
-    celular_cliente = nuevo.celular
+    # Número completo con código de país para WhatsApp
+    celular_wp = f"{nuevo.codigo_pais or '57'}{nuevo.celular}"
 
     # Siempre asignar número free
-    nueva_free = assign_number(db, nuevo.id, "free", VIGENCIA_FREE)
+    nueva_free = assign_number(db, nuevo.id, "free")
     free_number = nueva_free.number
     free_valid_until = nueva_free.valid_until
 
@@ -148,18 +152,16 @@ def create_cliente(
             activa=True,
         ))
         acumular_cuenta_vip(db)
-        nueva_vip = assign_number(db, nuevo.id, "vip", VIGENCIA_VIP)
+        nueva_vip = assign_number(db, nuevo.id, "vip")
         valid_until_vip = nueva_vip.valid_until
         number_vip = nueva_vip.number
         db.flush()
-        if celular_cliente:
-            notificar_nuevo_numero_vip(celular_cliente, number_vip, valid_until_vip)
+        notificar_nuevo_numero_vip(celular_wp, number_vip, valid_until_vip)
 
     _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular})
     try:
         db.commit()
-        if celular_cliente:
-            notificar_nuevo_numero_free(celular_cliente, free_number, free_valid_until)
+        notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
     except IntegrityError as e:
         db.rollback()
         orig = str(e.orig)
@@ -198,6 +200,16 @@ def list_clientes(
     return PaginatedClientes(total=total, page=page, size=size, items=items)
 
 
+@router.get("/stats")
+def stats_clientes(
+    db: Session = Depends(get_db),
+    _user=Depends(get_current_platform_user),
+):
+    activos = db.query(Cliente).filter(Cliente.enabled == True).count()
+    inactivos = db.query(Cliente).filter(Cliente.enabled == False).count()
+    return {"activos": activos, "inactivos": inactivos}
+
+
 @router.get("/export")
 def export_clientes(
     q: Optional[str] = Query(None),
@@ -217,9 +229,9 @@ def export_clientes(
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Clientes"
-    ws.append(["Nombre", "Celular", "CC", "Correo", "Saldo", "VIP", "Código VIP"])
+    ws.append(["Nombre", "Cód. País", "Celular", "CC", "Correo", "Saldo", "VIP", "Código VIP", "Habilitado"])
     for c in items:
-        ws.append([c.nombre, c.celular, c.cc or "", c.correo or "", float(c.saldo), "Sí" if c.vip else "No", c.codigo_vip or ""])
+        ws.append([c.nombre, c.codigo_pais or "57", c.celular, c.cc or "", c.correo or "", float(c.saldo), "Sí" if c.vip else "No", c.codigo_vip or "", "Sí" if c.enabled else "No"])
 
     output = io.BytesIO()
     wb.save(output)
@@ -275,7 +287,10 @@ def update_cliente(
 
             if vip_row is None:
                 # Capturar celular antes de flush (evita expiración SQLAlchemy)
-                celular_cliente = obj.celular
+                celular_wp = f"{obj.codigo_pais or '57'}{obj.celular}"
+                # Al activar como VIP, habilitar el cliente
+                if not vip_antes:
+                    obj.enabled = True
                 # Solo crear suscripción si es una activación nueva
                 if not vip_antes:
                     now = datetime.now(timezone.utc)
@@ -286,12 +301,11 @@ def update_cliente(
                         activa=True,
                     ))
                     acumular_cuenta_vip(db)
-                nueva = assign_number(db, obj.id, "vip", VIGENCIA_VIP)
+                nueva = assign_number(db, obj.id, "vip")
                 valid_until = nueva.valid_until
                 number = nueva.number
                 db.flush()
-                if celular_cliente:
-                    notificar_nuevo_numero_vip(celular_cliente, number, valid_until)
+                notificar_nuevo_numero_vip(celular_wp, number, valid_until)
 
         # Si se desactiva VIP, desactivar todas sus suscripciones activas
         if vip_antes and not obj.vip:

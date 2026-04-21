@@ -15,6 +15,8 @@ import { AuthService } from '../../core/services/auth.service';
 export class ClientesComponent implements OnInit {
   items = signal<Cliente[]>([]);
   total = signal(0);
+  totalActivos = signal(0);
+  totalInactivos = signal(0);
   page = signal(1);
   size = 20;
   search = '';
@@ -50,6 +52,7 @@ export class ClientesComponent implements OnInit {
 
   ngOnInit() {
     this.load();
+    this.loadStats();
     this.search$.pipe(
       debounceTime(350),
       distinctUntilChanged(),
@@ -68,6 +71,13 @@ export class ClientesComponent implements OnInit {
       this.items.set(res.items);
       this.total.set(res.total);
       this.loading.set(false);
+    });
+  }
+
+  loadStats() {
+    this.svc.getStats().subscribe(s => {
+      this.totalActivos.set(s.activos);
+      this.totalInactivos.set(s.inactivos);
     });
   }
 

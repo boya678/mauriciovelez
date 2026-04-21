@@ -16,6 +16,7 @@ class Cliente(Base):
     )
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     celular: Mapped[str] = mapped_column(String(30), nullable=False, unique=True, index=True)
+    codigo_pais: Mapped[str | None] = mapped_column(String(10), nullable=True, default="57")
     correo: Mapped[str | None] = mapped_column(String(200), nullable=True, default=None)
     cc: Mapped[str | None] = mapped_column(String(30), nullable=True, default=None)
     saldo: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)

@@ -94,6 +94,22 @@ def export_contactos(
     )
 
 
+@router.delete("/purge-vip", status_code=200)
+def purge_vip_contactos(
+    db: Session = Depends(get_db),
+    _user=Depends(require_admin),
+):
+    """Elimina todos los contactos cuyo cliente ya es VIP."""
+    subquery = db.query(Cliente.id).filter(Cliente.vip == True).subquery()
+    deleted = (
+        db.query(Contacto)
+        .filter(Contacto.cliente_id.in_(subquery))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"eliminados": deleted}
+
+
 @router.delete("/{contacto_id}", status_code=204)
 def delete_contacto(
     contacto_id: uuid.UUID,

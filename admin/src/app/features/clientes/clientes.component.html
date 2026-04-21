@@ -3,6 +3,17 @@
   <span class="total-badge">{{ total() | number }} registros</span>
 </div>
 
+<div class="stats-row">
+  <div class="stat-card stat-activos">
+    <span class="stat-label">Clientes activos</span>
+    <span class="stat-value">{{ totalActivos() | number }}</span>
+  </div>
+  <div class="stat-card stat-inactivos">
+    <span class="stat-label">Clientes inactivos</span>
+    <span class="stat-value">{{ totalInactivos() | number }}</span>
+  </div>
+</div>
+
 <div class="toolbar">
   <div class="search-bar">
     <input type="search" [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Buscar por nombre, celular o cc…" />

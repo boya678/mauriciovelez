@@ -14,6 +14,7 @@ export class ContactosComponent implements OnInit {
   loading = signal(false);
 
   deleteTarget: Contacto | null = null;
+  purgeVipConfirm = false;
 
   constructor(private svc: ContactosService) {}
 
@@ -36,6 +37,17 @@ export class ContactosComponent implements OnInit {
     this.svc.delete(this.deleteTarget.id).subscribe(() => {
       this.items.update(list => list.filter(c => c.id !== this.deleteTarget!.id));
       this.deleteTarget = null;
+    });
+  }
+
+  confirmPurgeVip() { this.purgeVipConfirm = true; }
+
+  cancelPurgeVip() { this.purgeVipConfirm = false; }
+
+  doPurgeVip() {
+    this.svc.purgeVip().subscribe(() => {
+      this.purgeVipConfirm = false;
+      this.load();
     });
   }
 

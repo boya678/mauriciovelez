@@ -123,7 +123,7 @@ export class LoginComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
     // Intentar login directo (sin OTP — clientes existentes pasan aquí)
-    this.authService.login({ ...this.form.value, celular: this.codigoPais + this.form.value.celular }).subscribe({
+    this.authService.login({ ...this.form.value, celular: this.form.value.celular, codigo_pais: this.codigoPais }).subscribe({
       next: res => {
         this.loading.set(false);
         this.handleLoginSuccess(res);
@@ -132,8 +132,7 @@ export class LoginComponent implements OnInit {
         const detail = err?.error?.detail;
         if (err.status === 403 && detail === 'otp_required') {
           // Cliente nuevo: enviar OTP por WhatsApp y mostrar modal
-          const celularCompleto = this.codigoPais + this.form.value.celular;
-          this.authService.sendOtp(celularCompleto).subscribe({
+          this.authService.sendOtp({ celular: this.form.value.celular, codigo_pais: this.codigoPais }).subscribe({
             next: res2 => {
               this.loading.set(false);
               this.otpExpiraEn = res2.expira_en;
@@ -173,7 +172,7 @@ export class LoginComponent implements OnInit {
     this.otpLoading.set(true);
     this.otpError.set('');
     // Paso 2: login con OTP incluido (cliente nuevo)
-    const payload = { ...this.form.value, celular: this.codigoPais + this.form.value.celular, otp_code: this.otpCode.trim() };
+    const payload = { ...this.form.value, celular: this.form.value.celular, codigo_pais: this.codigoPais, otp_code: this.otpCode.trim() };
     this.authService.login(payload).subscribe({
       next: res => {
         this.otpLoading.set(false);

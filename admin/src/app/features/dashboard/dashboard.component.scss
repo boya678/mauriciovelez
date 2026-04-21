@@ -62,9 +62,10 @@
 
   &:hover { transform: translateY(-2px); }
 
-  &.accent-gold { border-color: #f59e0b; }
+  &.accent-gold  { border-color: #f59e0b; }
   &.accent-green { border-color: #22c55e; }
   &.accent-blue  { border-color: #6366f1; }
+  &.accent-red   { border-color: #ef4444; }
 }
 
 .kpi-icon  { font-size: 1.6rem; }
