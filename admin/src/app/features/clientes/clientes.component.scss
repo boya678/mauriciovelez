@@ -85,6 +85,15 @@
   color: var(--text);
   cursor: pointer;
   input[type=checkbox] { width: auto; accent-color: var(--accent); }
+  &.disabled-label { opacity: 0.6; cursor: not-allowed; }
+}
+
+.hint-locked {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 4px;
 }
 
 .confirm-text {

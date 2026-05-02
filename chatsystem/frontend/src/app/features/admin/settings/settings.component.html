@@ -1,0 +1,36 @@
+<div class="settings-page">
+  <div class="page-header">
+    <h1>Configuración del bot</h1>
+  </div>
+
+  @if (loading()) {
+    <p class="loading-text">Cargando…</p>
+  } @else {
+    <div class="panel">
+      <div class="field-group">
+        <label for="prompt">System prompt (instrucciones del bot)</label>
+        <p class="field-hint">Define la personalidad, contexto y reglas que sigue el bot para responder a los usuarios.</p>
+        <textarea
+          id="prompt"
+          rows="16"
+          [(ngModel)]="promptText"
+          [disabled]="saving()"
+          placeholder="Eres un asistente de soporte para..."
+        ></textarea>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+      @if (saved()) {
+        <div class="alert alert-success">Guardado correctamente.</div>
+      }
+
+      <div class="actions">
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+          {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </div>
+    </div>
+  }
+</div>

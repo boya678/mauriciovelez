@@ -1,0 +1,50 @@
+<div class="dashboard-page">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+  </div>
+
+  @if (loading()) {
+    <p class="loading-text">Cargando estadísticas…</p>
+  } @else {
+    <div class="stat-grid">
+      @for (stat of stats(); track stat.label) {
+        <div class="stat-card panel">
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">
+            <span class="badge {{ stat.badge }}">{{ stat.label }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (agents().length > 0) {
+    <div class="agents-section panel">
+      <h2>Estado de agentes</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (agent of agents(); track agent.id) {
+            <tr>
+              <td>{{ agent.name }}</td>
+              <td>{{ agent.email }}</td>
+              <td>{{ agent.role }}</td>
+              <td>
+                <span class="badge" [class.badge-green]="agent.status === 'online'" [class.badge-gray]="agent.status === 'offline'">
+                  {{ agent.status === 'online' ? 'En línea' : 'Desconectado' }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

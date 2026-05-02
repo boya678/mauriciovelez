@@ -33,6 +33,7 @@ export interface DashboardStats {
   pct_ganadores_vip: number;
   pct_ganadores_free: number;
   suscripciones_iniciadas: number;
+  suscripciones_iniciadas_activas: number;
   nuevos_clientes: number;
   pct_3digitos_diferentes: number;
   total_resultados_mes: number;

@@ -95,6 +95,19 @@
     }
   </div>
 
+  @if (confirmRenovar) {
+    <div class="modal-overlay">
+      <div class="modal-box">
+        <h3>Confirmar renovación</h3>
+        <p>¿Renovar suscripción de <strong>{{ confirmRenovar.nombre }}</strong> ({{ confirmRenovar.celular }}) por 1 mes?</p>
+        <div class="modal-actions">
+          <button class="btn-sm btn-ghost" (click)="confirmRenovar = null">Cancelar</button>
+          <button class="btn-sm btn-primary" (click)="doRenovar()">Sí, renovar</button>
+        </div>
+      </div>
+    </div>
+  }
+
   <div class="pagination">
     <button class="btn-ghost btn-sm" (click)="prev()" [disabled]="page() <= 1">‹ Ant</button>
     <span class="page-info">Página {{ page() }} / {{ totalPages }} &nbsp;·&nbsp; {{ total() }} registros</span>

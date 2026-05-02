@@ -103,16 +103,21 @@ def renovar(
     cliente = db.get(Cliente, sus.cliente_id)
     now = datetime.now(timezone.utc)
 
-    # 1. Inactivar TODAS las suscripciones existentes del cliente
+    # 1. Inactivar solo las suscripciones vencidas del cliente (no las aún vigentes)
     db.query(Suscripcion).filter(
-        Suscripcion.cliente_id == sus.cliente_id
+        Suscripcion.cliente_id == sus.cliente_id,
+        Suscripcion.fin <= now,
     ).update({"activa": False}, synchronize_session="fetch")
 
-    # 2. Crear nueva suscripción desde ahora + 1 mes
+    # 2. Crear nueva suscripción sumando 1 mes desde el fin actual si aún está vigente,
+    #    o desde ahora si ya venció (así no se pierden los días restantes).
+    fin_actual = sus.fin if sus.fin.tzinfo else sus.fin.replace(tzinfo=timezone.utc)
+    base_fin = fin_actual if fin_actual > now else now
+    nueva_fin = base_fin + relativedelta(months=1)
     nueva = Suscripcion(
         cliente_id=sus.cliente_id,
         inicio=now,
-        fin=now + relativedelta(months=1),
+        fin=nueva_fin,
         activa=True,
     )
     db.add(nueva)
@@ -159,7 +164,7 @@ def renovar(
             "cliente_id": str(sus.cliente_id),
             "nombre": cliente.nombre if cliente else "",
             "nueva_inicio": now.isoformat(),
-            "nueva_fin": (now + relativedelta(months=1)).isoformat(),
+            "nueva_fin": nueva_fin.isoformat(),
         },
     ))
 

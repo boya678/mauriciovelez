@@ -1,0 +1,339 @@
+You are a senior software architect and full-stack engineer.
+
+Generate a production-ready, scalable multi-tenant WhatsApp conversation platform with AI multi-agent orchestration and human handoff.
+
+The system MUST use:
+- Python (FastAPI)
+- PostgreSQL (source of truth)
+- SQLAlchemy 2.0 + Alembic (migrations)
+- Redis (locks, presence, pub/sub)
+- Redis Streams (event processing, NO Kafka/RabbitMQ)
+- LangGraph (AI orchestration)
+- Angular (single frontend for admin + agents)
+- WebSockets (real-time updates)
+
+IMPORTANT CONSTRAINTS:
+- DO NOT use Kafka, RabbitMQ, SQS or any external queue system
+- Redis Streams is the ONLY event system allowed
+- PostgreSQL is the ONLY source of truth
+- System must be horizontally scalable (multiple backend instances)
+- No in-memory state that breaks across instances
+
+---
+
+# 1. HIGH LEVEL ARCHITECTURE
+
+Flow:
+
+WhatsApp (Meta Cloud API) → FastAPI Webhook → PostgreSQL (persist)
+                                              → Redis Streams (event)
+                                              → Workers (AI / assignment)
+                                              → PostgreSQL (update state)
+                                              → Redis Pub/Sub → WebSockets → Angular UI
+
+---
+
+# 2. DATABASE DESIGN (PostgreSQL)
+
+Use SQLAlchemy 2.0 style.
+
+## conversations
+- id (UUID PK)
+- phone_number (indexed)
+- status (ENUM: NEW, BOT_ACTIVE, WAITING_HUMAN, HUMAN_ACTIVE, CLOSED)
+- assigned_agent_id (FK nullable)
+- last_message_at
+- created_at
+- updated_at
+- metadata (JSONB)
+
+## messages
+- id (UUID PK)
+- conversation_id (FK indexed)
+- sender_type (user | bot | human)
+- sender_id (nullable)
+- content (text)
+- message_type (text, image, etc.)
+- external_id (unique, for WhatsApp deduplication)
+- status (PENDING, PROCESSING, PROCESSED, ERROR)
+- created_at
+
+## agents
+- id
+- name
+- email
+- status (ONLINE, OFFLINE)
+- max_concurrent_chats
+- last_assigned_at
+- created_at
+
+## assignments (optional but recommended)
+- id
+- conversation_id
+- agent_id
+- assigned_at
+- released_at
+
+Add:
+- proper indexes
+- constraints
+- Alembic migrations
+
+---
+
+# 3. REDIS DESIGN
+
+## Keys
+
+### Presence
+agent:{id}:online = true (TTL 30s, refreshed by heartbeat)
+
+### Locks
+lock:conversation:{id} (SET NX EX)
+
+### Round robin queue
+agents_queue (Redis list)
+
+### Pub/Sub
+channel:chat_events
+
+---
+
+# 4. REDIS STREAMS DESIGN
+
+Streams:
+
+- messages_stream → incoming messages
+- ai_processing_stream → AI processing tasks
+- human_assign_stream → human assignment
+- outgoing_stream → messages to WhatsApp
+
+Consumer groups:
+- workers_group
+- ai_group
+- assignment_group
+
+Use:
+- XADD
+- XREADGROUP
+- XACK
+- XAUTOCLAIM (for retries)
+
+---
+
+# 5. WEBHOOK (FastAPI)
+
+Requirements:
+
+- Endpoint: POST /webhook
+- Validate Meta signature
+- Idempotent insert (external_id UNIQUE)
+- Store message in DB
+- XADD to messages_stream
+- Respond <200ms
+
+DO NOT process AI here.
+
+---
+
+# 6. WORKERS (ASYNC)
+
+## Worker 1: message_ingestion_worker
+- Reads from messages_stream
+- Marks message PROCESSING
+- Routes to ai_processing_stream
+
+## Worker 2: ai_worker (LangGraph)
+- Reads from ai_processing_stream
+- Runs LangGraph multi-agent system
+
+Agents:
+- classifier_agent
+- faq_agent
+- sales_agent
+- support_agent
+
+Rules:
+- low confidence → escalate
+- user asks for human → escalate
+- too many turns → escalate
+
+If AI responds:
+- save bot message
+- XADD outgoing_stream
+
+If escalate:
+- update conversation → WAITING_HUMAN
+- XADD human_assign_stream
+
+## Worker 3: assignment_worker
+- Reads from human_assign_stream
+- Assigns agent using Redis round robin + DB validation
+
+Algorithm:
+1. lock conversation (Redis)
+2. RPOPLPUSH agents_queue
+3. validate agent availability (DB + Redis presence)
+4. assign in DB (transaction)
+5. update last_assigned_at
+
+## Worker 4: outgoing_worker
+- Sends messages to WhatsApp API
+- Updates DB
+
+---
+
+# 7. ROUND ROBIN (CRITICAL)
+
+Use Redis list:
+
+RPOPLPUSH agents_queue agents_queue
+
+BUT MUST validate:
+
+- agent is ONLINE (Redis)
+- agent has capacity (DB count active chats)
+
+Use DB transaction for final assignment.
+
+---
+
+# 8. CONCURRENCY CONTROL
+
+Use:
+
+- Redis locks (SET NX EX)
+- DB transactions
+- SELECT FOR UPDATE (only when needed)
+
+Ensure:
+- no double assignment
+- no race conditions
+
+---
+
+# 9. IDEMPOTENCY
+
+- external_id UNIQUE in messages
+- safe re-processing
+- at-least-once delivery (Redis Streams)
+
+---
+
+# 10. WEBSOCKETS
+
+FastAPI WebSocket manager.
+
+Events:
+- new_message
+- conversation_updated
+- agent_assigned
+
+Use Redis Pub/Sub to broadcast across instances.
+
+---
+
+# 11. ANGULAR FRONTEND
+
+Single app with 2 roles:
+
+## Admin Panel
+- CRUD agents
+- Configure:
+  - AI thresholds
+  - max turns
+- View system status
+
+## Agent Panel
+
+### Inbox
+- unassigned
+- assigned to me
+- bot active
+
+### Chat
+- real-time messages
+- send message
+- take conversation button
+
+### Presence
+- agent sets ONLINE/OFFLINE
+- heartbeat every 10s
+
+---
+
+# 12. LANGGRAPH SETUP
+
+Define graph:
+
+Input → classifier → route → agent → output
+
+Implement nodes and edges clearly.
+
+---
+
+# 13. PROJECT STRUCTURE
+
+/backend
+  /app
+    /api
+    /models
+    /schemas
+    /services
+    /workers
+    /agents
+    /db
+    /redis
+    /websocket
+  alembic/
+
+/frontend
+  Angular app
+
+---
+
+# 14. DELIVERABLES
+
+Generate:
+
+1. SQLAlchemy models
+2. Alembic migrations
+3. FastAPI app:
+   - webhook
+   - agents CRUD
+   - conversations API
+4. Redis client setup
+5. Redis Streams workers (all 4)
+6. LangGraph implementation
+7. Round robin service
+8. WebSocket manager
+9. Angular:
+   - services
+   - components (inbox, chat, admin)
+10. .env example
+11. Docker Compose (Postgres + Redis + backend + frontend)
+12. README with run instructions
+
+---
+
+# 15. CODE QUALITY
+
+- Type hints everywhere
+- Clean architecture
+- Logging
+- Error handling
+- Separation of concerns
+
+---
+
+# 16. BONUS
+
+- AI suggested replies for agents
+- Conversation summary
+- Metrics endpoint
+
+---
+
+Generate the backend first, then frontend.
+
+Be explicit, production-ready, and structured.

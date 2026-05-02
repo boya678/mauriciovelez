@@ -151,6 +151,10 @@ export class ClientesComponent implements OnInit {
   saveEdit() {
     if (!this.editTarget) return;
     this.editError.set(null);
+    // Si el cliente ya era VIP, no permitir quitarle el VIP desde el admin
+    if (this.editTarget.vip) {
+      this.editForm.vip = true;
+    }
     if (this.editForm.vip && !this.editForm.codigo_vip?.trim()) {
       this.editError.set('El código VIP es obligatorio cuando el cliente es VIP');
       return;

@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chatsystem-backend
+  namespace: mauriciovelez
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: webhook.mauricioveleznumerologo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chatsystem-backend
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - webhook.mauricioveleznumerologo.com
+      secretName: webhook-mauricioveleznumerologo-tls

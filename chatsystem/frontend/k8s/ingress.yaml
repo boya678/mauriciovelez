@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chatsystem-frontend
+  namespace: mauriciovelez
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: chat.mauricioveleznumerologo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chatsystem-frontend
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - chat.mauricioveleznumerologo.com
+      secretName: chat-mauricioveleznumerologo-tls

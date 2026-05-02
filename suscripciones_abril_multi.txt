@@ -1,0 +1,497 @@
+id|nombre|codigo_pais|celular|correo|vip|subs_abril
+c72d8acf-1aff-4ff5-8b3d-81c81c91efef|Mauricio Velez|57|3014420670||True|8
+78e27157-50f9-4f93-8c91-7d81d6effbdb|Alba Lucia Leal Baron|57|3004666833||True|5
+89ec219b-dd15-466d-851d-e61ecd1b9f07|Adolfopaya|57|3202791441||True|3
+b3eac527-5af4-4cb3-b66d-c5e495c6d881|Alba lucilamartinez|57|3243112718|lutilita1916@gmail.com|True|3
+20c91144-f682-4f8a-8f52-f4f9763743ab|Alexander pico solano|57|3160493067||True|3
+d3c0b317-1220-44f1-b3be-ec05918b29e5|Ana Julia castro|57|3173737292|None|True|3
+c0578140-0c0c-46ad-be3a-1c755b962356|Carlos Arturo Hoyos Gómez ast|57|3214778250|None|True|3
+727e54f4-71dc-4e79-b96b-888fed69af59|César López|57|3112434511|cesarlpz1438@gmail.com|True|3
+f8108b3d-340f-4b68-bb92-398983e8537f|Elvia Esperanza Siza Sánchez|57|3173141414||True|3
+1d6cfeed-84a2-4fe1-b785-8a582f9f0c36|Fanny muñoz|57|3204834003||True|3
+defe76c2-c7f9-46fe-adf4-0a41d8098459|Francisco Gallo|57|3108715064|None|True|3
+6b0bf804-6efa-4627-b4ce-7a4f6094dcdf|Gladys Gil Camargo|57|3013716364|glaskkada@yahoo.es|True|3
+854939fd-781e-43e5-9279-e55120646062|GLORIA  Castro|57|3135049146|None|True|3
+07b40396-300c-4e4e-84b7-cf64e053bb27|Gonzalo Paez|57|3103410923|None|True|3
+88c48a3c-4872-4de3-b87b-cbecc52e443d|Hernando Herrera Castro|57|3154569796||True|3
+7f035d64-b7e1-4c78-ae10-021040d94e77|Hilda Martinez |57|3106121615|None|True|3
+6b07754f-71b2-419f-8e4e-41b69de9054b|Hilda Rondón|57|3169837415|None|True|3
+2ab2ba0d-b182-4a92-bca2-1f6e6511d24d|Jorge Antonio runza|57|3138243064|None|True|3
+5cdb86f0-50e4-4f6e-986b-37956493078e|Luz mariela ramirez|57|3102894834||True|3
+09748705-29b9-4e2e-8b79-c2d2f2c4f0e6|María Josefina gallego salazar|57|3046625115||True|3
+5d3a0538-0339-43b5-bd86-a0342a6b3ae3|Mario Hernan Ulloa delgado|57|3152810930||True|3
+84d7a73c-55d7-4534-97a0-f1c1d7bef8b2|Mayerly Sánchez tocora|57|3233206577|None|True|3
+aed7dc82-3a70-4be0-bf0c-8c2b7c44c4c4|Miguel poveda|57|3134603923|None|True|3
+f34025eb-4f3c-4aa7-bf0e-94e8c11bfd1d|NEYLA diaz|57|3185779333||True|3
+a4b3f669-aa15-4202-a988-dad6f7385ad0|Nidia banquez|57|3145451282|None|True|3
+a12cff4a-c0b1-4466-978d-a456e3613b96|Rodolfo Estrada|57|3123096375||True|3
+f8cd56b4-726d-4eda-b26a-21d95ba963ff|ROSENDA ORTIZ GÓMEZ|57|3212354909|None|True|3
+806d2790-2622-44fa-8d53-6c7ee93d4ea6|Samuel Arcángel Cardona Pérez|57|3146107229|scardonape2@gmail.com|True|3
+0f8affc6-ad07-47e6-ace3-4f94945be3b6|Teotiste Hernández|57|3108054427||True|3
+f1407bfb-bcc3-4966-bf2e-ac3408a862c7|Walter palacio|57|3116771809|None|True|3
+68bcf633-729d-489d-880c-bbffdf848ad4|William gomez|57|3016178578||True|3
+2541bc7e-a63f-4f6c-8be8-533e7d24c528||57|3206032147|None|True|2
+f3056958-2316-44b3-a155-63474874da83||57|3207358968|None|True|2
+a19aa186-7b04-4a39-8ac9-499796980a14||57|3115759902|None|True|2
+ff406254-801b-4ab3-8dd9-fa1366a472cc||57|3104039927|None|True|2
+ab0fb94d-e12d-46cc-b690-07824a6a6e3e||57|3174800245|None|True|2
+a741d44e-0367-4677-800c-cb86e9fc9a1a||57|3124108799|None|True|2
+c759f7e7-c4a7-4e9a-b42d-455850fdd661||57|3224391524|None|True|2
+f7ced398-ad19-4744-81d1-55945017a69d||57|3125761220|None|True|2
+25d9fe0e-b411-4989-9178-d11f958a19a9||57|3108879357|None|True|2
+f926b125-8538-4221-aa14-d3e924cfe338||57|3133652016|None|True|2
+9c4de72c-0728-47eb-96e9-bce8ed909d71||57|3174347999|None|True|2
+eaaa6b6a-10a2-4963-96b2-bcac3fae94dc||57|3234184821|None|True|2
+a5ed0c12-00fd-44e4-b3c2-07445a63aead||57|3116433501|None|True|2
+95e6d237-1c63-4791-8a78-8d6072dcb63e||57|3104267751|None|True|2
+ce74788e-6ed5-4202-bf4e-b9c705e7b83e||57|3122388706|None|True|2
+394df276-047c-4f3d-8a68-47a262a0cd84||57|3012017650|None|True|2
+737ca900-b901-4756-9859-c6291618aea9||57|3004392196|None|True|2
+33ac2d1f-1641-4cb9-b289-142308fdf9be||57|3144203523|None|True|2
+ed87a44f-834b-4607-a7d3-6fe497a035dc||57|3115488460|None|True|2
+6ea877fa-22e6-47b4-90b5-4e7b8e175a5b||57|3117279060|None|True|2
+fb166338-25c5-4627-9b7d-1775e0d0df77||57|3135134638|None|True|2
+4460e5b6-7457-44c8-b698-fe80acc35d32||57|3143671853|None|True|2
+062328b4-06d8-42b9-b9c8-989540ad9214||57|3205750268|None|True|2
+3f599298-029c-4809-89cb-08b03899752a||57|3016231156|None|True|2
+1ae03150-3be0-4673-8a86-34e4a399c5c7||57|3126182619|None|True|2
+01cf666a-bcdf-4960-968d-91ea6a14e2c6||57|3108425920|None|True|2
+708a65f3-1825-4922-9c9f-d03b85af2a92|.|57|3011264865|None|True|2
+031cf6ab-358f-45f9-b3b0-b49adbefa35a|.|57|3213665156|None|True|2
+25687f22-d62d-495b-8382-58e3acd3e1ad|.|57|3145311272|None|True|2
+32d05a62-077b-4cc7-bb3a-1669b23215d2|.|57|3122628639|None|True|2
+86ec26c4-c6eb-41c1-a365-513d2d397f30|.|57|3027461755|None|True|2
+0888b886-95d4-41b3-b9f2-4242b591c90d|.|57|3214334483|None|True|2
+9f96dde4-a382-4a60-8e5f-9b1a9af36c6c|..|57|3242752740|None|True|2
+04ab3433-0f02-4245-bcb5-ddc35cf09d13|...|57|3132924317|None|True|2
+9d580aff-8408-40f2-8478-f76449f8daaa|3126101418|57|3126101418|None|True|2
+27633b8b-1731-44dc-a578-76cfd846fdeb|3172832509|57|3172832509|None|True|2
+dbe19e57-8beb-49fb-a787-7aab7a8b3dfb|573105180523|57|3105180523|None|True|2
+22eb6e3c-d191-48b3-8bf7-d54821a2153f|Adela galvez|57|3154603102||True|2
+35fb0cbe-98ae-4b5a-b2ef-186f253c7c8d|Alberto Uparela|57|3217114858|alucame@gmail.com|True|2
+297f4631-455c-4c3f-860c-e971463f125f|Alcidez rsmirez|57|3117118544||True|2
+9dbcc5a5-e9c9-435f-87a6-2c6c3a5d033d|Alejandro Hernández |57|3172950374|None|True|2
+b4ac50b0-7dcf-43fd-8a89-25c4372eb590|Alexander abreu|57|3108737763|None|True|2
+cf510dc2-5526-4665-b866-ad0095aade85|Alexandra Castillo|57|3106011267|None|True|2
+3a10565b-f38d-44f6-a07c-d7f145fb046e|Alfonso Cardona|57|3122823714|None|True|2
+b84deed4-4027-4926-9700-b283d811f6e5|Alfonso Velasco Roncancio|57|3203301741|None|True|2
+c0e16493-af4b-4a61-b21b-a67f7feded12|Alonso Cardenas|57|3212316843|alonso11cardenas@gmail.com|True|2
+2e9ef723-a217-47e2-9a94-580b7237628f|Alpiniano?. Quiroga|57|3115041883|alpinianoq@gmail.com|True|2
+9de9376a-44bc-423b-966d-cc839cbbf516|ALVARO|57|3114462228|None|True|2
+7302b2db-ac82-4e94-ba9e-4913f31bec66|Álvaro lujan|57|3195407926|None|True|2
+56f0d4b7-4591-4c86-a191-7c6e0459f038|Alvaro turizo|57|3126372462||True|2
+794291a0-f33a-45d1-8f6f-7caf7186c445|Amaury Montes alvis|57|3163444361|amontesalvis@gmail.com|True|2
+2326e153-8492-42e6-a581-38854f610d8c|Amilbia Sánchez|57|3052488964|None|True|2
+07399828-c474-4ce3-b630-579a1b755433|Amparo campo ospino|57|3004213429|22430067|True|2
+ce46acf0-f5e9-4944-9438-971ce634bd73|Ana Dolly cataño|57|3128519484||True|2
+5474cc99-946e-478a-b10c-f564ce49a31b|Ana maria ortega|57|3203007597|None|True|2
+07034039-9555-4b6e-8573-81cab7100da3|Ana Martínez|57|3144694988||True|2
+9e011854-822b-4da8-8e4d-c9b4ac6ef1bd|Ana omaira eschen vides|57|3106516420|None|True|2
+ce1514bf-29cf-4d52-8cf6-9b5ebd787505|Ana Patricia sanchez|57|3115500031|None|True|2
+132b7d1b-c4e2-497a-910b-1cd47a70e1d7|ANDREA RICAURTE|57|3133495307|anriya@hotmail.com|True|2
+47bbe034-a400-4df4-be0c-9a4eca224bea|Andrés bedoya|57|3215332978|None|True|2
+dffdb14b-1877-4c0c-9944-a8d1f43cc284|Andres Felipe gonzalez|57|3148423690|anfego0286@hotmail.com|True|2
+be77806d-ae5f-469c-9690-7a875eaad138|Angela garcia|57|3215942245|None|True|2
+40303970-2bdd-4ab5-997c-75782c29c771|Angela Maria Areiza Correa|57|3506703817|None|True|2
+02ecaca0-d8c9-4234-9b59-cccede069d54|Angela María Betancur|57|3122153383||True|2
+03b4d243-065f-4a3a-8763-b83e9191a4d7|Angela Maria Montoya|57|3145710752|None|True|2
+b71bc9a9-85bc-46bc-b7d0-376c3f64a887|Angel dariodelarosa. Sarmieto|57|3015384061|None|True|2
+704f507c-5577-4eb6-905e-04c1e88005d6|Angelica Mireya perdomo|57|3228705053||True|2
+aaf67e63-a792-40da-aade-d76822fc5bc5|Anibal sanmartin |57|3016901365|None|True|2
+bcc001ca-f683-4f26-8c67-6f8fcac0d0ca|Antonio Bachiller|57|3133652607|antoniobachiller813@gmail.com|True|2
+76d74fc0-25df-4943-803c-afa5d6ecd3e8|Aristofenes gaitan|57|3132870962|None|True|2
+ae510a29-54c9-4f70-af11-8392e73ab74c|Astrid Janeth Guzmán rivillas|57|3013360766||True|2
+b23aa003-08e1-4e6e-81ed-a3262914b39c|Auly Herrera Cucunuba|57|3143672326|fredydelsol@hotmail.com|True|2
+c004e18b-1e07-4172-ba60-1cc86ea1e4ea|Aura Maria Valencia ri|57|3106507571||True|2
+aa955eb3-9b93-41a5-ab80-ccfb3477c730|Aurelia albarracin|57|3102597219|None|True|2
+8cd3627d-8dec-4b6d-b61b-950a3181bdec|Aurora Rodriguez |57|3045237395|None|True|2
+be86cf42-5e6b-4831-ae21-68b5e2d37f53|beatriz|57|3173016912|None|True|2
+ff4db83d-3496-4e8a-881a-55afadc9dfed|Beatriz Rodriguez|57|3107333270||True|2
+6d2474da-25be-4b45-b912-eeca0d09d2ca|Bedaul coronado |57|3007490571|None|True|2
+c6aac7c4-d6d1-4ae4-aac8-e24996b0b993|Betsy val|57|3187702906|None|True|2
+2c261229-5391-4ebf-ae5b-3fd78d4b72b5|Blanca Cecilia Largo Días|57|3216245283|None|True|2
+ffb34526-a75f-413a-874e-b02890d27e94|Blanca margarita martinez|57|3104132680||True|2
+59bdd9ec-ac37-4772-a456-a919174777e5|Bruno|57|3113978125|None|True|2
+a4ddb65d-22c4-491a-82ff-ea02c0481bb1|Carlina marin|57|3104641060||True|2
+261b3462-cbc5-447a-b862-4a77fa0ac86c|Carlos Alberto Ortiz Aguirre |57|3135225933|None|True|2
+0a69cd8a-13ad-41d6-b527-43747e487ad6|Carlos Bacca trillos|57|3166166500||True|2
+e8283266-2878-4deb-9fdc-fa1e1e7ee2eb|Carlos Castaño|57|3103792841|pachocastano0113@gmail.com|True|2
+c27849b2-8980-4146-90fc-8ca2246d579c|Carlos Enrique hurrego|57|3025602944|None|True|2
+570f1945-d028-42ba-baf9-597d39532724|Carlos Mario Castrillón|57|3192468274|carloscastrillon0417@gmail.com|True|2
+d45d8408-0182-44a9-9b62-dadb8dd040a0|Carlos Zapata|57|3128650668|None|True|2
+39db23cd-7251-48ff-9a8b-27492a2ad62b|Carmen Adela rivera castañeda|57|3108979036||True|2
+d1c0209a-5d44-4be7-8b6a-6207c5c5fb11|Carmen Cecilia Oñate carrillo|57|3008035754||True|2
+bfc662a8-2a9e-4b9b-976a-4aba94f0d2f2|Cecilia florez|57|3236826464||True|2
+60affc47-05ff-43ce-889c-a5f539cef6c2|Celestina palacios chaverra|57|3108963558||True|2
+e4f3de87-4116-4008-a070-1f2e335ba00e|Cenelia agudelo|57|3161168318|None|True|2
+c45469c8-c27f-4e05-abc0-f5d9fba0642e|Cenia Luz Arias|57|3015686767|None|True|2
+5f2f0b55-3b1b-4523-bd3b-9c0dbe02136a|Christian Camilo|57|3052361658|None|True|2
+4ef62589-08bb-4137-935d-2c447f22675e|CIELO|57|3117753474|None|True|2
+ae5e7175-64b5-4708-bf43-e2c4fb70d95c|Ciro Alfonso pinzon|57|3175934047||True|2
+40fd4091-400a-4f03-8494-871cd3436e05|Clara Inés Martinez garcia|57|3172864980|None|True|2
+fb0addbf-273d-48f4-92cb-be922b5f5dd9|Clara Martínez|57|3208003241||True|2
+57a638bd-20b4-4970-9e9a-4c489a23b63c|Claudia alvarez|57|3187425212|None|True|2
+658b2bf9-c334-4914-806d-897411eb7383|Claudia Dinora Ríos Bedoya |57|3205693929|None|True|2
+a68fe31e-589b-40ac-af3e-5933ba2396df|Claudia Flórez|57|3242845902|None|True|2
+6fa42a8f-8a98-4dc2-92c2-f8d072ea476d|Claudia Patricia Suárez Rincón |57|3143161027||True|2
+2900de4d-9783-469c-8390-d2fb4211d0ee|Claudia sanchez|57|3163877086|pacas0208@gmail.com|True|2
+0757e64e-6dc3-4703-a6ce-18160b5f58ac|Cristóbal José cáliz Madrid |57|3226814052|None|True|2
+c9cd1dce-29b7-4e5e-8141-e36e01bc91e0|Cruz Elodia Córdoba Bejarano|57|3113474358||True|2
+049489fe-f88a-45f8-a201-674daa7f65bb|D|57|3205872836|None|True|2
+506b688d-fee2-4efd-a124-c4b9f5783562|Deisy Buendia|57|3194870567|None|True|2
+569682b3-32ce-4d9f-9780-bac745fbd263|Deisy johana giraldo restrepo|57|3207494238|None|True|2
+2a42998b-8759-426b-8288-e0c17fd49ab0|Delys Mass hoyos|57|3184984886|None|True|2
+2cb2b59b-c85f-4fe7-8900-4b708ac9120d|Diana eugenia garcia |57|3135315919|None|True|2
+d031934d-f689-4dc4-be56-36d2ee3c7d31|Didier Darío Gómez Ibarguen|57|3137256898|None|True|2
+5524939d-cb8e-4ef2-afa3-0aa349913cb2|Diego |57|3016758513|None|True|2
+58a5fb29-a03d-4270-8c1b-eee6f410eaf7|Diego Armando Salgado Bermeo|57|3103027551|diegoarmandosalgado10@gmail.com|True|2
+5dd2350c-e6e2-41a4-b67e-9ea4518c887d|Diego Erazo garcia|57|3138859317||True|2
+8a6e9411-c6a1-4a9f-a2a7-7cffb8480301|Diego Fernando Maldonado villamizar|57|3125214227|None|True|2
+d5fbb547-483f-42e8-8a32-d599bedf6b61|Diego león Muñoz moreno|57|3197373909|None|True|2
+201fbf5e-3e7c-4822-a3a1-d694e5bdb176|Diego Medina|57|3146209706|None|True|2
+297e9248-f572-46be-953a-826ab267d858|Diogenes moreno|57|3114795018|None|True|2
+512bac61-62ac-499d-a244-a39221b71068|Dione Stella Montoya M |57|3136030008|None|True|2
+7e60ffa9-2d00-45a6-adf5-7bd1bb7683a0|Dolly Duque |57|3046013252||True|2
+40efb15f-e2ce-44e0-877b-1bf6c2a833ce|Doris imbajoa|57|3184325162||True|2
+6a999eec-f731-4dbe-97f8-0b3af681e533|Doris Lilia Herrera|57|3208702045||True|2
+ba82a86e-639b-4688-a2db-55f02341d84a|Dory bandera|57|3177552733||True|2
+07c448ef-9e67-42d6-b828-75524d2c58b3|Duffay Millan|57|3168603843|None|True|2
+14af78cf-0712-40cc-aa4c-6fd516f356c9|Edgar Cortes|57|3125959396|None|True|2
+e882b6c2-cb9a-4ea3-abc1-3e9c9ef873d1|edgar salazar vandovino|57|3123143396||True|2
+7e1526be-7725-4ced-a100-ccef3a1329f1|Edier Ramirez|57|3127497946|None|True|2
+709dc123-372f-4078-b4e1-87cad830baac|Edilma maria lopera|57|3150006393||True|2
+fd2c7994-ed3f-40fd-8d52-f0ae93b79430|Eduardo moscote cantillo|57|3008174872|None|True|2
+2277a8f8-d142-419d-93bf-a883f447fec7|Eduar Hernández|57|3124141387|None|True|2
+64553042-cce5-4f4a-93a3-027953aab049|edwar castillo|57|3203525210|None|True|2
+a7da5a81-f173-4c31-bc0c-0623d1f6a33d|Edwin Sincelejo Mercado|57|3016190137|None|True|2
+756cceb1-dc3c-4635-81c5-642dc7950453|Efrén Bermudez|57|3127576959|None|True|2
+072a50c1-77c5-4b35-b036-022163054e7e|elcy Nicolasa fajardo jarava|57|3008723620|None|True|2
+04723b9d-a459-44bf-80e0-02a30fa948c0|Eliana Mora|57|3205012657|elianamorac77@gmail.com|True|2
+c58c93a0-fc88-4a2b-a975-a4b8c8b45a2e|Eliverio Rivas Moreno|57|3144146910|eliveriorivasmoreno1959@gmail.com|True|2
+0f7bfdfe-852d-443c-a7ac-6ccf36380828|ELIZABETH|57|3146640878||True|2
+feaf3343-0f53-4382-b8a7-4b198af70d4b|Elizabeth Cáceres Gomez|57|3008546861||True|2
+e70c6c6b-b66c-4398-b60d-286ca143836a|Elizabeth  garcia  gonzales|57|3102849732||True|2
+726afdd2-13e6-420f-8b91-c777d9faddff|Elizabeth Suárez|57|3217732481|None|True|2
+4cfc5953-0beb-416b-bcdf-d6dffeac2cd5|Elkin|57|3013540041|elkinval123@hotmail.com|True|2
+a56b95dc-67cc-4d9c-8de3-7b68b27f68fc|Elkin Rodolfo Florez Vargas |57|3187565633|None|True|2
+ee73271e-c536-44dc-9d91-c670f9dded85|ELVER|57|3112957709|None|True|2
+e62a31a1-1a1b-430c-8eff-4cd80b4385b1|Emilio Rendón gutierrez|57|3136884687||True|2
+f0b84c92-9a07-4e6f-84c5-4b7dc03dd09a|Emil Mendoza|57|3015816687|None|True|2
+43938059-f828-49ad-9c8a-bf47cb47cca6|Enadis agudelo pastrana|57|3145884502|None|True|2
+2809ddf8-31c8-46d4-ad43-e90221e73b29|Erica Patricia Villegas|57|3187310637|None|True|2
+a705c7b8-5ed2-47c2-858e-d41387901646|Erika buitrago |57|3138727677|None|True|2
+83103773-1132-49c0-8a79-5295bd906e4e|Ernesto Mazo|57|3177246720|None|True|2
+b5fce3cb-9723-44ce-9300-f5a13368dc9c|Ernesto Rojas|57|3133250810|None|True|2
+178dceb2-1acb-4740-931d-850c0b375038|Eudin manuel gonzalez baldovino|57|3025114772|None|True|2
+197b36c8-6372-4177-b53f-d8987b8e0124|Eudora moreno hinestroza|57|3104232562||True|2
+d593fc1b-fa17-4493-8a26-e5abed8b46a6|Eugenia Mateus|57|3118060065|None|True|2
+9ff3ef9f-e99b-4c86-855d-bbf77fe1ffa0|Evaristo ortiz|57|3103966516|None|True|2
+256b9d15-e54f-431f-abba-a94ee7ae25e4|Fabián ortega |57|3116419386|None|True|2
+182dbf54-9dca-4b36-bc18-712680429c42|Fanny colmenares|57|3184628861||True|2
+7a914b46-029d-4206-8205-797c0934e930|Farid Sierra|57|3168227084|None|True|2
+ed4064d7-f745-4d26-a1ca-0b0ac5212e86|Félix Antonio Hernández|57|3205213782||True|2
+f48f84db-d454-4c94-97d6-15c03dc0a286|Fernando murillo|57|3024257641|None|True|2
+af3548e3-916f-4c80-9dff-677795fd1786|Fernando Murillo |57|3207972863|None|True|2
+1415cc81-bfc4-46e4-8309-08c9c047b4e3|Fernando  rios|57|3215080307||True|2
+28364a49-4512-46ba-8260-42bcdc9f102d|FLOR ALBA GALVIS OSPINA|57|3169010222|None|True|2
+d94bb29f-cb53-4b8d-bb8e-3c8979a1aab4|Floria cornelia mena valencia|57|3127205124|None|True|2
+91a4abc3-2d62-4f5c-a045-f67e42fad195|Flor Vanegas|57|3213588306|None|True|2
+e9de012e-a9b0-4434-9d8e-dfad6e7e7ea8|francisco javier  gil cano|57|3022971246|None|True|2
+9d3dac2c-e16d-4543-88fa-8264ffbc5106|Franklin flores|57|3229197910||True|2
+1466a601-09e9-4d8d-b127-c608ab96a3b8|fredy jose manjarres rodriquez|57|3102861307|None|True|2
+c3949f79-1be1-4fa2-b76c-01b9a8d6b584|G|57|3044282689|None|True|2
+8c5128d2-ac4e-40b0-ae46-13e6693c41ea|gabriel cardenas|57|3236272271||True|2
+7a660736-5dab-4da0-88e0-d5bb3f510dd6|Geimy García |57|3208761679|None|True|2
+4e05d4a0-1d9e-4d90-922c-a8c6c332abf8|GermanA velasco|57|3204310920|None|True|2
+eb50b8f3-7f3e-4f83-819a-f2b8412c58ff|german mahecha|57|3115992695||True|2
+802abcdb-20a1-4ae9-95ac-5621001915a5|GERSON Hernandez TORRES|57|3155130976|gersonfabi2907@yahoo.com|True|2
+bd298ae1-f365-40b5-99da-9834c51084e2|Gilma Isabel Martínez Gómez|57|3007034094|None|True|2
+0f5ab095-b8b8-4d56-969d-f6706b64479f|Gladys Briceño|57|3246502881|None|True|2
+e727aadd-5d38-41ac-8d94-8b23aca5df4b|GLORIA|57|3043866148|None|True|2
+a780a6a2-5ca4-4300-a9d7-a5cf9451de10|Gloria Acevedo|57|3207102024|None|True|2
+e10bc752-2099-486b-bb35-17f567660f7a|Gloria E Salcedo|57|3219850246|None|True|2
+96f793ef-c11c-4369-8905-f33c2573a6a5|gloria franco|57|3155918990|None|True|2
+211508ea-f1ff-4f0a-97f2-ccc47cd5c1be|Gloria franco betancur|57|3006203894|None|True|2
+60e601de-0056-4f8c-8c74-5d5e6703ce83|Gloria Ines largo Quintero|57|3132592383|None|True|2
+9e472b96-b4ff-4acd-b91c-398f90fa950a|Gloria Jaramillo|57|3152448169|None|True|2
+ca152baa-df5a-4d14-a649-18ada8848ba9|Gloria Muñeton|57|3103847016||True|2
+a842fc89-9852-4567-b56c-80ad0228a07f|Gloria pulgarin|57|3023737391|None|True|2
+cd9fe157-04cd-4496-af50-a8ae7b795e61|Graciela caballero|57|3114641745|None|True|2
+04c035eb-6434-445d-82a4-60d59f26d999|Guillermo Bloom|57|3016126900|guillebloom@gmail.com|True|2
+d9802c27-3e68-40a7-85a8-f1e89ef2a9fb|Gustavo Amaya Acevedo|57|3168188705|gusam463@gmail.com|True|2
+aeb24751-8feb-4099-b078-0b6aa6b6bd75|Gustavo arenas cano|57|3163724554|None|True|2
+34f516de-2cd9-45c0-a2a4-ce19d7771c2f|Heliodoro Arenas|57|3168225667||True|2
+25e1bebb-f6c2-4119-8da5-20881a34b8f4|Henry Antonio Calle Calle|57|3002854844|None|True|2
+a1414e1d-484f-4abe-ba10-57bcea0223eb|Henry Marmolejo|57|3216225058|None|True|2
+84c6657a-fd40-46d9-9f35-16f0177dbc81|Heriberto  Castillo Montaño |57|3134433211|None|True|2
+6eb355b9-cce9-4135-b465-cf4f64fd3beb|Hernando de Jesus Arango|57|3217850641|None|True|2
+ebbad1a6-8900-45b0-be01-5b8b92c66683|hernando Ramirez|57|3143536394|None|True|2
+4b848f2e-51ba-4cc1-a22f-9db2ae1fcc48|Hernando Torres|57|3229174540|None|True|2
+210dd020-79ea-424b-8d92-4e8c32d5e203|Holver William García Pérez|57|3208367406|holver1968@gmail.com|True|2
+72277b40-30cd-48ea-b3f7-0ca76b55417b|horacio chavez|57|3164357722|None|True|2
+07e6fe0b-a42d-40ce-bde0-f3202fd3d8e3|Horacio Chávez NAVARRO|57|3155840782|None|True|2
+98aeaecb-5ee7-481a-900e-dae08bd47536|Horacio valois lozano|57|3044332440|None|True|2
+e31de6d8-e297-4a87-bc21-cae65c38fa19|Hortencia Correa Torres|57|3135217576||True|2
+10f75684-5c2f-4d50-9bdc-19eb4a5d32b7|inocencio parra|57|3204069525|inos1976@hotmail.com|True|2
+0d1db94c-8cc6-4ff8-89db-6d1255c33e97|Irma Beatriz Gómez |57|3144291681|None|True|2
+71ea21af-9622-4a29-867f-6f0802bb897d|Irma Rico|57|3132487618||True|2
+25ed363f-d52b-419c-8991-ce4ca7f7db43|Isabel|57|3151157530|None|True|2
+61811ab6-d630-4bfc-b141-4f9cf78f395b|Isila castro barros|57|3008037097|None|True|2
+749565f5-4b64-4604-b73a-618e49b469ad|Jackson avila|57|3236822955|None|True|2
+151bb42b-5a1a-430e-8fe5-aacf24152b02|Jader peñates|57|3145332796||True|2
+0e50a441-2fae-42b1-b930-6c74622c4477|Jairo Enrique Baron Lopez|57|3132581439|jairobaron1970@gmail.com|True|2
+27e61990-bfc5-4f20-b64d-34e3b8872b2a|Jairo soto|57|3008513637|None|True|2
+c65e9152-727f-4cdc-aa8f-b7ae1d78323a|Jakeline de la rosa|57|3043419205|None|True|2
+8c9d7932-95e2-4fe5-8437-c83aba5284de|Javier Forero|57|3127076029|None|True|2
+7a44edb9-12e9-4b67-9ba6-8e3a8e09a0b6|Javier Orlando Garcia Valbuena|57|3053478692|None|True|2
+2a2979e6-44ca-4c10-864a-d74fbaf2ef1f|Javier Ulabarry|57|3104320099|jaulda08@gmail.com|True|2
+478b44b9-9f70-47c9-888d-b75e80f70642|Jesús Ferney puerta|57|3155653231||True|2
+6b1b7495-f2ab-4c5f-b9a4-7bc604ef5509|Jhon Jairo|57|3207981504|None|True|2
+e6cab4ef-8f03-41cd-ad35-219cf97d5ed0|Jhon rojas|57|3046773408|None|True|2
+07fafce7-f487-4ca7-9721-af736f2fa24f|Jimena carvajal|57|3173098766|None|True|2
+52bf7355-cdb6-486c-90e0-eb0a9c907645|Joaquín Antonio Cabrales Ríos |57|3147332019|None|True|2
+62353322-267a-4409-894f-d344bcf07de9|Joaquín Darío arango benitez|57|3122387538|None|True|2
+11924e7f-4a0c-45f4-89cf-68b3b1f018e7|joha|57|3026315073|None|True|2
+67a13ee4-4cd4-4833-899e-241eced086ea|Johan Velasquez|57|3217137551|None|True|2
+4a231f89-3c92-4e1c-a3c3-a5d720671830|John Jairo Ocampo Acosta |57|3112755167|None|True|2
+13002927-a212-4f3e-ba6a-adfecd3ae8c3|Jorge Aguirre|57|3137826428|None|True|2
+f103a377-7224-4a77-9d00-280594376dec|Jorge jimenez|57|3158447162||True|2
+6ae5bbed-0f7c-42a1-af95-04c12c1329ce|Jorge rafael zea|57|3123940013|None|True|2
+72df34bc-e497-4969-8422-2234409493b7|jorge restrepo|57|3015295401|None|True|2
+071d92b3-221f-4118-ac7d-c56f65541a15|José Alfonso|57|3202359091||True|2
+53126482-7f3c-4ae5-ae93-185cb62e4398|José Alirio Castro torres |57|3213116831|None|True|2
+56aa819e-cfea-4a70-8b39-17d8cd96d29c|José Antonio Martin|57|3134323073||True|2
+a763369e-aec6-4f3b-9bce-db11878810ee|José Blas Castellanos|57|3103113804||True|2
+e6457862-5455-4425-962b-9200bb06d706|José David González Guiza |57|3107513588|None|True|2
+16fe1528-a61c-4d4d-82bb-52021150c73b|Jose domingo |57|3196819918|None|True|2
+4c8aee10-93db-4bac-9fd7-10add29cff05|Josefa Garcia Niebles|57|3225985906||True|2
+ce76fb54-1c5f-4242-926e-ff878bbad8ca|José Manuel Colmenares campos|57|3173818931||True|2
+703d9da9-5c31-49de-b20e-05256f41b9a5|José Muñoz herrera|57|3052441349|yhonatanlujan.1299@gmail.com|True|2
+8f702323-d918-4b64-b054-df90526fadc3|José Oquendo|57|3026042307|None|True|2
+c2b358a4-af30-49bc-8d30-ca239656b968|José Raúl Yamá|57|3138294926|raul.yama@gmail.com|True|2
+61a22bc3-6b8b-4302-812a-b609cd3afcb1|José Ricardo Cruz Martínez|57|3232086539||True|2
+cd80aa5c-90ea-44bb-b392-7db6a5c8878b|José ricardo forero nieto|57|3134515608||True|2
+2933f492-ef1c-449b-9b71-94c4e556ee2c|Jose Rios Arciniegas|57|3136311893||True|2
+1c97dc91-7526-4114-bda5-3495db968aea|José sinning|57|3007296127|None|True|2
+9175d634-55e9-4081-9b73-9fc302eeb8b4|Jose yamil florez|57|3108700732|None|True|2
+3049de81-09b1-4190-8b29-2f63d5345457|Jsus Antonio Garcia Ayala|57|3022625614||True|2
+d16702f2-acb2-45cc-830b-b2550b363260|Juana María Pavón gelbes|57|3143303030|None|True|2
+2e948688-b20d-4c30-9d96-e82a07f2bde1|Juan bohorquez|57|3025123697|None|True|2
+c1e6e5ba-ae2a-4f06-bbdc-fb038348cd41|JUAN CARLOS|57|3207787332|juank1974j@gmail.com|True|2
+5a211982-faef-4d18-aa1b-1a0b1018c869|Juan Carlos Vargas|57|3213198344|None|True|2
+70e69a72-0a3f-429b-a574-0306b43cac6e|JUAN C.LADINO C.|57|3134412959|camiloladino676@gmail.com|True|2
+76b36ca4-586f-466b-8446-6898abfb4cc7|Juan  hunmberto sanchez|57|3006192289|None|True|2
+54dc3457-875b-427c-bc7d-e980bc56d6d9|Juan Manuel Molina|57|3132600488|None|True|2
+c740d14f-1e01-4441-8b87-371395a40dfe|Juan Pablo Castañeda |57|3138001621|None|True|2
+d6cbabbf-11f6-49b4-9d0d-a07ccdaee33d|Juan pinzon zapata|57|3195780467|None|True|2
+64b8f226-d8dc-44b0-b6b8-6d442e41ed10|Juan vargas|57|3229482590|None|True|2
+54a245d6-aede-479f-8d15-ba4b5d6ae7c3|Judith miranda|57|3008606236|None|True|2
+8270be72-a708-4572-b30f-0842cb0dcaa1|Julia Edith Valencia Bedoya|57|3216769040||True|2
+dcc76f20-8b09-4d5c-9f85-6d53c2eeb54e|Julio Hernández|57|3002028656||True|2
+03c14cdc-e71d-40e2-ac86-0e04f4ff7416|Leonardo de Jesús Acevedo|57|3008922670|None|True|2
+62e05d37-b848-4c23-8618-8bb471a624ab|Leonardo Mantilla|57|3164370287|None|True|2
+b0c61b4f-e1a4-4a55-a7bb-48272a2e9b37|Libardo PINILLA cuesta|57|3143298965||True|2
+9059e52b-70e1-4226-bb2a-d3e0a991b669|Liliana Gutiérrez|57|3106033404|None|True|2
+8c88e87b-92ed-4a1c-ba00-af732591542a|Lilia Rosa Ordóñez Triana|57|3195562920|None|True|2
+c180ec31-12be-401f-b649-21554f840625|Lina Jiménez|57|3163200842|linjimon.05@gmail.com|True|2
+e791c7da-3fd1-4b44-8c7c-cf5cc884b898|Logan Williams|57|3118393576|None|True|2
+2134bbc0-10b8-4e95-ae05-b9a3e6463bbf|Lucelly martinez|57|3234354190||True|2
+8331eb61-001f-47f1-b65a-b2ea2f587701|Lucia Cardenas|57|3157652812|None|True|2
+507cc68a-f080-4b11-82b9-631ecafc1607|LUIS|57|3207480601|None|True|2
+03b13ee8-7832-4701-a368-89638d20d05e|Luis adriano taborda|57|3155328220||True|2
+af6c9d76-806c-40d0-87f9-7953c7d0d97c|Luis Alberto Marin Morales|57|3173175590||True|2
+3ecc8fd2-e01a-48ed-bde7-f7f4e9929e39|Luis Alberto Mosquera Mosquera|57|3154352882||True|2
+dbc19fbf-9894-440c-82b8-eb9ece58a8bf|Luis Alberto Paternina Camacho|57|3103936100|None|True|2
+15a2f2ac-9258-42db-a336-6d030525587c|Luis Alfredo Arce Azcárate|57|3217865529|luis.arce21@yahoo.com|True|2
+e89d591b-da9f-499b-a7d7-d77f6ecfb454|Luis Alfredo Durán Marentes|57|3107535756||True|2
+134be887-b615-4693-9b9c-e06e6eaf7c87|Luis Alfredo Salazar Quintero 16260808|57|3173732800|None|True|2
+7ad6e3da-d85f-46d7-bd45-e06e4bad88a8|Luis Aníbal navia caised|57|3155133429|None|True|2
+b7be9011-03a1-496d-8f30-9c35e19fcbc7|Luis Antonio RODRIGUEZ|57|3138039852|None|True|2
+84f7e619-644c-43c0-961a-4df056a63559|Luis carlos almenarez fuentes|57|3015020861|None|True|2
+a67d4e3d-1102-45fe-b39c-aabe9b1c8617|Luis Carlos quimbayo cruz|57|3144567109|luiscarlosquimbayo33@gmail.com|True|2
+a9655fd1-50be-4cf7-8bac-e17bd285939b|LUIS CUARTAS|57|3122847890|None|True|2
+82b9505b-2b7b-44b8-bef4-e08e297348ca|Luis Eduardo Calderón villarraga|57|3143465340|None|True|2
+9ea19eb9-cc2a-4481-83d0-4fa155fabee9|LUIS ENRIQUE LAZARO|57|3223626955|None|True|2
+606a7cef-77fe-403f-a374-94f379dd9cbb|Luis Eriberto Fajardo|57|3134302012||True|2
+38923d40-b4f8-4cda-aca8-d80b8df79f6b|Luis Fernando Carmona gaviria|57|3136569442||True|2
+fa83f91c-6fd5-4213-b436-e62f66c84dd7|Luis Fernando Lopez|57|3128251409|None|True|2
+f31cb9d2-e12e-41ab-8de1-76f1d4ac230e|Luis Fernando Ramirez Arias|57|3205613618|None|True|2
+205041cc-65c8-40b9-b47b-ef1ac7cf90c9|Luis Gómez Londoño|57|3208372428|None|True|2
+b8ee132a-48f9-4668-b6fa-2bd3d3a6c290|Luis Guzmán|57|3158599723|None|True|2
+97813f6c-e392-4920-812a-8f36a9146f8f|Luis riasco |57|3177654236|None|True|2
+c303e771-09ad-40a4-a4f2-e653770f0043|Luz amira balanta mosquera|57|3132426249|None|True|2
+204058ab-a8ff-402e-8840-e612cc8d1ac6|Luz amparo cano|57|3165214011|None|True|2
+be8a1f8a-efe5-43d4-9cb7-3feb65cb723b|Luz Amparo lopez|57|3123236667|None|True|2
+b2f121f9-3115-44ec-82d3-7cada7b6e922|Luz Dary Lopez Loaiza|57|3104343066|None|True|2
+8cbb4862-c7c9-4df6-aa79-554bc9de1776|Luzdivia Galindo vera|57|3112688841|Luzdevy111@gmail.com|True|2
+5f5034ee-ca4b-49c8-96a8-c28a063e666b|Luz Elena ríos Bohórquez |57|3178475873||True|2
+a3d4025b-bb48-4ed7-b584-6ecf477b72da|Luz Eneida Castro Cacianis|57|3217310848|luz.eneidacastrocacianis@gmail.com|True|2
+5ac3ceef-0ab2-430a-b209-45e0051a52c2|luz marina correa|57|3128944802|None|True|2
+3ea586a8-9699-4b89-a77e-5f0919d3598b|Luz marina herrera obando|57|3115365455|None|True|2
+5f59936b-d8f5-4c47-a38e-c6d141784b91|Luz marina vertel|57|3126224494||True|2
+b992c183-6364-4340-aad9-b670f6ff7865|Luz Miryam Venegas Lovera|57|3107713037||True|2
+20f12fe0-f915-4ac4-9799-24241e9264f3|Luz moreno|57|3134110882|None|True|2
+4a162710-6485-4025-a4aa-51c3f764359c|luz myriam romero|57|3143174290|None|True|2
+e2bf7717-0c9b-4552-9167-7c76dd404d7b|Luz Stella puentes|57|3137273426|None|True|2
+2e524b81-8e9b-4730-876b-034f1f80f919|Magdalena rudas|57|3022105800|None|True|2
+a2e52b33-ab6e-4399-99e9-e409e9646ebd|Magnolia molina|57|3217266139|None|True|2
+589f38b2-7150-4802-84b2-7abbb46bbee8|Manuel Monsalve Garcés|57|3125467018||True|2
+145d84d4-84fe-45f8-89df-8a32ea1496fe|Manuel Paternina|57|3168679910|None|True|2
+c2067c4d-a844-4567-afb0-3728e4328d59|Marco Antonio montenegro|57|3202189135|None|True|2
+2d158f85-af50-4d56-873f-7e31928dfa65|Marco Fidel Daza Mora|57|3147687800|None|True|2
+16a0ca3a-d120-4953-b65e-a86f4c302628|Marco Fidel Daza Mora|57|3246610348|None|True|2
+9441f6ba-63d5-4edb-a42a-d95bb6f46a22|Margarita Duarte Baltasar|57|3216412441||True|2
+c07327c3-0e45-435a-8c3a-3436c2510bfb|Margarita rivera|57|3133012310||True|2
+7954b276-3f91-41b9-a16d-ec9bc3d09f50|Margoth lara|57|3185960211|None|True|2
+e153c60d-850f-4a27-8020-ab63bd345469|María Amparo Escalante|57|3132599500|None|True|2
+2085fbdb-ddab-430d-bb98-21dcce15ec3e|María Balvanera Ramos|57|3136589759||True|2
+7aac7919-320e-4dd2-8d3e-c5340b18294a|Maria Cecilia Torres Torres|57|3004077312||True|2
+8d1a9d6c-ec51-48d9-93e4-aab7c40f3417|María Celina COSSÍO|57|3137970762||True|2
+9b0f0686-292b-4953-b949-90780df08ace|María cianci|57|3207966852|None|True|2
+7df0b1a0-6049-4ce2-9c98-1f97b60b841b|María del Carmen Campuzano Ulloa|57|3003862695|None|True|2
+257754b0-cdf8-4669-bbd2-76bfe693cecb|María del Consuelo Linares Agulera|57|3118242339|None|True|2
+6d194402-6a0f-4676-93de-799a61f3d7c6|Maria  del pilar grajales|57|3012937922|None|True|2
+4573a12e-cbca-42a4-b1c1-ca2496ac5d7b|Maria elisa Torres villareal|57|3002063273|None|True|2
+c3a85c91-d3ea-49a9-aef0-b27d71e020a2|María Irene plazas|57|3108503031|None|True|2
+01053884-bd31-46d5-b95d-0a6de7fd28aa|María.  Isabel. Lezama.|57|3234853447|None|True|2
+e3598eb7-c3eb-4347-a0d7-db6c807e6faf|María Josefina RAMIREZ Alzate|57|3173760665|None|True|2
+3ed62110-3072-40d2-b9c4-347d98033dce|María Luz Elva  Payares de  Mosquera |57|3028478570|None|True|2
+fc28bfe4-d5c8-4e10-af7d-b7ddbc44fcf9|Maria macias ortiz|57|3502432773|None|True|2
+a55a1e35-b73e-4954-a545-38f721425036|María noely betancur|57|3208497418|noely betancur 4@gmail.com|True|2
+29696e9d-5971-42d0-bc70-6206e2805f3c|Maria Nubia Puertas Amaya|57|3118543205|None|True|2
+d82fbd0a-2b4c-43ab-844f-583c95306a0d|Mariaofelia Guzmán|57|3116110325||True|2
+78c0c7e6-0b77-4fbf-9c78-866bcb0f35b7|Maria Polonia criollo|57|3108513419|None|True|2
+aa913fc8-c384-4364-8c1c-355d8510ff90|Maria Rios|57|3113728673||True|2
+1ef860cf-6f4e-4461-91b2-aeee743b57d6|Maria smith Vargas rincon|57|3204953210|mv6144143@gmail.com|True|2
+a93fd3b8-82f4-4d73-b2fa-08cd8830531c|María Tere Gil|57|3124805581||True|2
+15d1aad0-a168-4b5f-a934-66e0fd86cb22|María Teresa Duarte Aragón|57|3178437918||True|2
+022f6c93-7b0c-4846-9ceb-7318de31474f|María Trinidad Giraldo Vasquez|57|3207261285|None|True|2
+dd8b12b3-3823-4dfd-b366-bab1bee80ed4|Maria Ximena Velasco|57|3217646374|None|True|2
+aa5e833d-0895-4250-8d68-ce01e4ed69b4|MARIBEL RIVERA DURAN|57|3104364246|mariverad@hotmail.com|True|2
+1e695ec0-2c45-483c-8290-5b91247e5764|Mari Lara|57|3229040177|None|True|2
+33a1393e-2474-4988-86e1-d86215adab16|Mariluz Mosquera|57|3135941077|None|True|2
+fb471eb3-0c46-4bd3-b71d-5aa2bdf72811|Martha agudelo|57|3206146273|None|True|2
+59d764fa-2291-4148-8902-0f2358893be2|Martha Camargo|57|3132041202|None|True|2
+e71fba85-8275-4825-bedd-2aa9ceb5296d|Martha Cecilia Marin Cruz|57|3105201921||True|2
+d1afab77-07c5-481f-b97b-8fb7a4713a9d|Martha janeth moreno|57|3213632443|None|True|2
+74666abe-6b63-4a88-854e-48db5fb8a612|Martha Riascos|57|3136188890||True|2
+1aba2246-c888-4d53-9114-a18ae648e310|Martha Yaned|57|3046120856|None|True|2
+93367c58-5e1d-4d69-8ff4-652e4f23a5dd|Mary Betancur|57|3207263930|None|True|2
+fa84d069-d6ce-4ab7-98e7-41c7af925538|Maryna caraballo|57|3225339196|None|True|2
+32b4bb8f-b8b1-4b9f-bb3d-f48d96d428e0|Mati|57|3133128023|None|True|2
+e14b9666-aef5-4022-ab6e-edfdc498af47|Matilde|57|3125614168|None|True|2
+6c382661-69a5-4277-9a8e-1d94f83470aa|Matilde Beltrán|57|3184804069|None|True|2
+00c697e8-eb17-4813-9082-ecc07ac0e791|Mauricio samboni avirama|57|3146385314|maosam1981@gmail.com|True|2
+4625f882-cff2-48ef-b73c-f7e27731bd6a|Mauricio Solano|57|3013645745|condumao@hormail.com|True|2
+59505577-e785-4060-a469-6fc9defee20a|mayeli escobar|57|3223418304|None|True|2
+045babb4-d37e-4df4-8de9-98504287dd58|Merardo perez perez |57|3144875148|None|True|2
+4d8e95e8-0b80-49fd-94ab-76735cfd6770|Mercedes Duran|57|3223404653||True|2
+77da5f70-82cf-4996-8b49-03b55c71e03d|Mercedes Gomez|57|3133156001|None|True|2
+0e64bac7-ee08-4ef1-9a70-e86d51feb79c|merli caceres|57|3215302024|None|True|2
+d66be5d3-16bb-4e7b-bad3-2fdcb706bed2|Miguel Alfonso Suarez|57|3112159564|None|True|2
+b29455bf-47e3-4f4c-a661-9e67709bd178|Miguel Angel roldan|57|3008400946|None|True|2
+64e666e2-347d-4dce-a5aa-bbf98e94a436|Miriam Rodriguez|57|3148855222||True|2
+5b27f3d4-0ce9-4e83-90c8-f1da5e119209|Misael capera cupitra|57|3114933441|None|True|2
+4f27dc12-35c4-476c-a3b4-0b78ead4470b|Moisés Carrillo|57|3117199255|None|True|2
+ddb48af7-a841-4b7c-8c8f-cb1a53392055|Mónica Bedoya|57|3116395409|monicabedoyacordoba@gmail.com|True|2
+217219e7-b036-4bf5-b693-aec4799874a9|Morelia moreno|57|3127370834|None|True|2
+0ebfff42-f8cc-4911-ab8e-b6b128ad8189|Moreno  rengifo|57|3123135277|None|True|2
+59f21dca-cd54-46a0-a0a2-54c5e75e63a9|Morían amado arias|57|3122771733|None|True|2
+c913ddd2-1978-4d0f-8651-7786132d0f4d|Nancy Chacon Quintero|57|3138584299|None|True|2
+8db01d54-39e9-4061-a7ba-5275d48790b3|Nelly Sofía Rivera Carmona |57|3007056990|None|True|2
+769f5827-df49-45fe-90b4-c46a9ebbefad|Nelson Castaño|57|3184923519|None|True|2
+6554f923-bbbc-45af-bc7d-796ca05c11a4|Nelson Enrique Rodríguez Gomez|57|3222070986|None|True|2
+4de23e3d-7221-44f3-aaba-6a9ec15f937a|Nelson Rincón Pulgarin|57|3103077476|None|True|2
+b8726ee1-0261-4c42-9866-6308626d82c6|Nicolasa|57|3147626693|None|True|2
+d306016d-40d3-46cc-8bc2-580b1aa7b03d|Nidia Betancur|57|3164440635|None|True|2
+25b9a78a-7bcc-4186-a302-7eee50127af4|Nirma mazo|57|3233671419|None|True|2
+c6189ca4-08a8-4b94-a5ba-8c3c02711188|Noe zamora|57|3224147446|None|True|2
+ae79e682-3dea-4d5e-b60e-cf4b132f52e3|Norberto vargas varelas|57|3242322067|None|True|2
+83e7cf06-1f3a-43f7-b419-bba59d691681|Norbey pulgarin|57|3168196308||True|2
+ec91b6a3-76f7-43e8-a006-d52e246f30d1|Noyra Patricia reyes rada |57|3184607789|None|True|2
+cbb7639d-06a1-43fd-a94b-085d1a31013e|Nubia Magaly Salguero Peña|57|3227107423|None|True|2
+463a700c-1617-46c6-a60f-a2e450969604|Nuris mercado|57|3022330998||True|2
+b425facc-b9e6-473e-a706-e951fccdcf76|OLGA LUCIA CASTAÑEDA|57|3214738216|None|True|2
+0a98721e-2dfa-4a25-9f52-cf0838d7dce5|Olga luciría loaiza|57|3128701444||True|2
+168c8955-614f-4061-8162-a4cc0104aa3a|OLGA VARGAS|57|3002976138|None|True|2
+fce5926a-178b-40a8-b316-538d160c9b84|Olivia cuesta|57|3203011806|None|True|2
+6405ac84-9821-4812-a528-23f215b05ec0|Omaira Pinto|57|3209130031|None|True|2
+643703ac-8227-418d-8cd5-e7344ce85cd3|Orlando López|57|3127587044|None|True|2
+6fc4e19a-ea44-4460-87b2-7370ea84229c|Oscar Andres Alvarez|57|3162533255|oscandres1@gmail.como|True|2
+d953722d-49ea-4ca2-aa17-526332a09b64|Oscar Hernan medina lema|57|3150672949||True|2
+4c382a7f-8f8f-4a5b-b903-cb8f040d071c|Paola fandiño|57|3176721628|paofa83@hotmail.com|True|2
+a33a69b2-2a34-4ff3-b1c0-9244b034e0e4|Paola mejia|57|3022869176|None|True|2
+46be32f2-97af-46d6-aab6-f4533ff698ef|Pastor  ducuara|57|3204353799||True|2
+13f73268-956c-4e6f-a28b-3a21f0fd3ba0|Paulo Cifuentes|57|3116613761|None|True|2
+6ed86f29-27ef-442b-a71e-5f7d2548e062|PEDRO PEÑA|57|3001669264|None|True|2
+28bd78a1-af9c-4372-88e4-6c84bff28a23|R|57|3105809532|None|True|2
+9cddcc3a-73ab-4fd1-ae85-563f5d4776cb|Rafael Eduardo gallego|57|3116159745|rafaelgallegorivas@gmail.com|True|2
+364c3cbe-a736-4691-b71a-b8e2fd17b4ae|Rafael santos rangel Mendez|57|3126935427|None|True|2
+1e33ce14-af7e-4093-8e13-2a029af8c775|Ramiro Antonio castrillon Ruiz |57|3137948670|None|True|2
+b68f0497-e600-4e57-8cf1-c9dde4720824|Raul Ricardo rodriguez Gamez|57|3148694769||True|2
+3d59d58a-4bed-4723-a78e-b1233d89874a|Ricardo Hernández Cacua|57|3219735248|None|True|2
+da30f3e8-7740-4707-8d9b-9213f8ca4f5a|ricardo pineda|57|3102148525|None|True|2
+1af9b5a7-b1e6-4a91-8836-9edb54e51765|Robeiro Muñeton Betancur|57|3126252991|None|True|2
+17257abe-575d-4f92-b20a-4791da75bb4f|Roberto Antonio Escobar Valencia|57|3116943357||True|2
+74fe878c-6dec-48e7-bc6d-b6fc798d1020|Robinson Huertas|57|3118101601|None|True|2
+2f6ffff3-b1ad-42d2-bdd9-9b6ed048384f|Rodrigo Loaiza|57|3102059703|None|True|2
+f8c8658d-aac5-4c9a-9778-7b6e9c43efd4|rodrigo ortiz|57|3228074350|None|True|2
+3cc61dd6-f47c-4b3c-84ed-57a756f058fa|Rogelio Maldonado|57|3113080488||True|2
+287f44f5-72c5-43be-8b97-00be1f20ade2|rosa|57|3112856665|None|True|2
+1867d6c5-11db-4898-bf12-633c36e90d69|Rosa Arango|57|3151539360|None|True|2
+6b89259a-7589-4e61-8513-5e3fdff6377e|Rosa elena giron|57|3103333598|None|True|2
+0d48d3e5-9ed0-44d6-805f-8233089bd590|Rosa Elena Medina|57|3205394596|None|True|2
+736cad1c-14a7-4cd6-bb3d-dcb199dbbda7|Rosa   Robledo|57|3116189566|None|True|2
+89efb482-e1d0-4ba6-95a0-a2b06da2a163|Rosiris cordero|57|3116069547|None|True|2
+50a69f91-3e37-431d-95f3-70ee80b1fcef|Rubelia de los dolores agudelo|57|3244070618||True|2
+264d1dd2-6321-4d91-bc6c-1254beb0870d|Ruben garcis|57|3104401791|None|True|2
+6c4eab02-f364-47b3-ace2-d86bc4e0c34c|Ruby Cifuentes Ortega|57|3113815905|None|True|2
+ba2959ba-3dd9-4a84-8eb8-6922975baf85|Ruby Rendón |57|3168964498|None|True|2
+c4467e43-2702-4b4f-ae24-68fa9d39e2d9|Ruth esmeralda Rodriguez Galvis|57|3228288524|None|True|2
+d837278a-cb35-4228-8e28-ba424327ff02|Ruth Ester Rojas|57|3147376187||True|2
+4da5f49a-e656-497b-a8bd-534a1c0d8e0a|Sady  torres|57|3118941107|None|True|2
+e4ef2542-5931-4880-a0bf-18da2f095dcd|Salomón Andrade|57|3134173836|None|True|2
+1d35bdfa-3346-47a9-b4e7-32c2b1079521|Samuel sanchez|57|3145141747||True|2
+15a3c219-7526-4d0e-a9bf-2c6f9d919c6e|sanchez|57|3053484492|None|True|2
+f3c120ef-98d2-4562-ac3e-a6a532807922|Sandra Bibiana Usma Henao|57|3013795341|None|True|2
+54e88970-4ce2-4928-b336-1ba04a0066a1|Sandra Mariaca franco|57|3105657671||True|2
+c935201d-3579-4ae0-95c1-5ddedb42c898|sandra ospina|57|3203748763||True|2
+70f62930-d0c8-476a-a66c-13c5144c4b22|Sara|57|3142691334|None|True|2
+e5886ab9-9ff9-4692-b529-bcf8748c4c84|Sebastián restrepo|57|3194603411|None|True|2
+1fba0536-0338-445e-90e2-377ffc182782|Seila Berrocal|57|3115919478||True|2
+d9510825-86a1-4dd3-a0f2-f078fd52dcc0|Sergio Murillo |57|3025148611|None|True|2
+33712835-4d3c-4860-936d-a456a4f11353|Silvia Mosquera|57|3136822389|None|True|2
+19eea96b-be25-40ab-a110-53a366aca3c7|Silvio Guevara Ramírez|57|3234834558|None|True|2
+d186896f-90af-4702-be79-f10c5f65a58d|Socorro Montoya|57|3103962285|None|True|2
+92501e1e-0f93-4a64-a2f9-5aff6e5f0e14|Sonia Cristina Hernández|57|3162264013|None|True|2
+98997346-2070-48cc-9695-144d8d8b7ec5|Sonia duarte|57|3143221826|None|True|2
+9146c0db-0c02-4065-adac-d72dd330c8e6|Susana lemos  ramos|57|3245797351||True|2
+07e15374-edc3-4bfd-a299-df53f5ac1b6a|Tairon Elías Acosta|57|3023438860|None|False|2
+cc27d586-ed78-40c1-b93a-9e341014d750|Tatiana Munera Vasquez|57|3127930890|None|True|2
+ea33bdba-9385-4cb3-98bb-3f050e4e9271|Tinker orlando|57|3113096037||True|2
+3485d56c-bb3b-4190-9212-54f818e77012|Ulises Oviedo García|57|3102926689||True|2
+6e3fc85d-a3de-4032-942c-85e9b47d66e8|uriel valencia|57|3006181477|None|True|2
+d8664ffa-78cf-4a04-9140-361cfa3f0ad2|Uris Urriola|57|3105089443|None|True|2
+804cb7d2-5206-4c15-a38c-ac02a04be7c2|Valentina Sierra pinzón|57|3102146347||True|2
+10e3dfd3-0699-455c-a8a5-6cc4382906d0|Victor Duran|57|3115392574||True|2
+88e2b541-215e-4606-b57d-500e06d4c9a8|Victor Gamez|57|3017284154|None|True|2
+485480b0-7bd3-4d2f-a728-17aabc509fd9|Víctor Hugo  jaramillo|57|3207674978|None|True|2
+833d519c-4a01-48be-a488-49add45a5cca|WALTER|57|3128545020|None|True|2
+ff30dc66-ba44-44dc-bff7-1390f7b0a4e2|wbeimar|57|3044476791|None|True|2
+877fa239-f8e9-4d91-97fa-1a046936c275|Wilmar alvarez|57|3104227026|None|True|2
+0d459d7a-9284-4044-ae3d-06b0fee8b8dc|Wilson Aguirre|57|3144431634|None|True|2
+7dd7f7c6-e725-455e-88c7-e2064cc6047a|Wilson diaz|57|3164357821||True|2
+d05662b5-9553-4a78-9af3-c10cd7738ade|Wilson Garzon Gonzalez|57|3166978081|wilsinny69@outlook.com|True|2
+a5481ec8-5341-4abf-988f-b6ad8c8ce506|Wilson Zapata Agudelo|57|3017383816|None|True|2
+3cd54ef5-e0d6-48e8-af98-454090ff1e8e|Yamile Velez|57|3195838365|None|True|2
+4bdeaae7-c066-45f0-a62e-007b41be33e5|Yanina Ramos|57|3138824170||True|2
+03da463b-7d42-4d7b-8f71-2d340aa80ba8|Yasmin Ramirez|57|3242251568|None|True|2
+3803b049-b9e7-4661-9b2c-b94c9baf5eec|yeimmy Bibiana Hernández España|57|3113305866|None|True|2
+66031f3c-454e-45e4-a2eb-d141b40e8b33|Yenni sape|57|3217948344|None|True|2
+436a99a1-4466-43c8-bd0c-07b640a520f9|Yibe|57|3182489665|None|True|2
+17b53ebe-1bed-4871-96ec-6c3dfbee27c1|Yolanda Mendoza|57|3212818811|None|True|2
+8e6e0535-2354-4387-a40f-0dc359b05d0d|Yolis Manuel Buelvas prerz|57|3163885619|None|True|2
+4996d211-c38e-4fb5-ac42-730c723ccce1|Yulima Villegas|57|3136140672|None|True|2
+5bdc764a-45be-4fd2-ad2b-27655b0fd7a1|Yuri Collazos Dorronsoro|57|3154269436||True|2
+3daf865f-e4b2-4d5f-9868-d5b0f663b736|Yuri Paola Reyes Pinzón|57|3177319893|None|True|2
+fac6fd42-21d6-4e0c-a16d-ccc5cb4374a8|Zoraida Acevedo|57|3206142402|None|True|2

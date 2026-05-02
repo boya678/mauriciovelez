@@ -1,0 +1,61 @@
+@if (loading() && !conversation()) {
+  <div class="chat-loading">Cargando conversación…</div>
+}
+@if (loadError(); as err) {
+  <div class="chat-loading" style="color:#dc2626">Error: {{ err }}</div>
+}
+@if (conversation(); as conv) {
+  <div class="chat-wrap">
+    <!-- Header -->
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <span class="phone"><span class="material-icons" style="font-size:1em;vertical-align:middle">smartphone</span> {{ conv.phone }}</span>
+        <span class="badge badge-{{ conv.status === 'human_active' ? 'green' : conv.status === 'waiting_human' ? 'yellow' : 'blue' }}">
+          {{ conv.status === 'human_active' ? 'Con agente' : conv.status === 'waiting_human' ? 'Esperando' : 'Bot activo' }}
+        </span>
+      </div>
+      <div class="chat-header-actions">
+        @if (canTake) {
+          <button class="btn btn-primary" (click)="take()">Tomar conversación</button>
+        }
+        @if (canClose) {
+          <button class="btn btn-danger" (click)="close()">Cerrar</button>
+        }
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages" #msgContainer>
+      @for (msg of conv.messages; track msg.id) {
+        <div class="msg-row" [class.row-user]="msg.sender_type === 'user'" [class.row-agent]="msg.sender_type !== 'user'">
+          <div [class]="bubbleClass(msg)">
+            <span class="bubble-sender">{{ senderLabel(msg) }}</span>
+            <p>{{ msg.content }}</p>
+            <span class="bubble-time">{{ formatTime(msg.created_at) }}</span>
+          </div>
+        </div>
+      }
+      @if (conv.messages.length === 0) {
+        <div class="no-messages">Sin mensajes aún.</div>
+      }
+    </div>
+
+    <!-- Input -->
+    @if (canSend) {
+      <div class="chat-input-area">
+        <textarea
+          class="form-control chat-textarea"
+          placeholder="Escribe un mensaje… (Enter para enviar)"
+          [(ngModel)]="newMessage"
+          (keydown)="onEnter($event)"
+          rows="2"
+        ></textarea>
+        <button class="btn btn-primary send-btn" (click)="send()" [disabled]="sending() || !newMessage.trim()">
+          {{ sending() ? '…' : '➤' }}
+        </button>
+      </div>
+    } @else if (!canTake) {
+      <div class="chat-closed-note">Esta conversación está cerrada o asignada a otro agente.</div>
+    }
+  </div>
+}

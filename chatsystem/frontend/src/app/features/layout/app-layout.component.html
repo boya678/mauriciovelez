@@ -1,0 +1,61 @@
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2><span class="material-icons" style="vertical-align:middle;font-size:1.3em">chat</span> ChatSystem</h2>
+      @if (agentName()) {
+        <small>{{ agentName() }}</small>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      <a
+        class="nav-item"
+        routerLink="/inbox"
+        routerLinkActive="active"
+      >
+        <span class="material-icons icon">inbox</span> Bandeja
+      </a>
+
+      @if (isAdmin()) {
+        <a
+          class="nav-item"
+          routerLink="/admin/dashboard"
+          routerLinkActive="active"
+        >
+          <span class="material-icons icon">bar_chart</span> Dashboard
+        </a>
+        <a
+          class="nav-item"
+          routerLink="/admin/agents"
+          routerLinkActive="active"
+        >
+          <span class="material-icons icon">group</span> Agentes
+        </a>
+        <a
+          class="nav-item"
+          routerLink="/admin/settings"
+          routerLinkActive="active"
+        >
+          <span class="material-icons icon">tune</span> Bot / Prompt
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="status-toggle" (click)="toggleStatus()">
+        <span class="dot" [class.online]="agentStatus() === 'online'" [class.offline]="agentStatus() === 'offline'"></span>
+        {{ agentStatus() === 'online' ? 'En línea' : 'Desconectado' }}
+      </button>
+
+      <button class="nav-item danger" (click)="logout()">
+        <span class="material-icons icon">logout</span> Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <main class="main-content">
+    <router-outlet />
+  </main>
+</div>

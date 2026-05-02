@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatsystem-backend
+  namespace: mauriciovelez
+spec:
+  selector:
+    app: chatsystem-backend
+  ports:
+    - port: 80
+      targetPort: 8000

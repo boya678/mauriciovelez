@@ -51,9 +51,11 @@ def _clasificar(numero: str, resultado: str) -> list[str]:
     return []
 
 
-def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_num: str, tipo: str) -> None:
+def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_num: str) -> None:
     """Envía WhatsApp al cliente free ganador usando la template configurada."""
     numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    devuelto = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero
+    numero_texto = f'{numero} {devuelto}'
     url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
     headers = {
         'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
@@ -70,8 +72,8 @@ def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_n
                 {
                     'type': 'body',
                     'parameters': [
-                        {'type': 'text', 'text': numero},
-                        {'type': 'text', 'text': f'{loteria} {resultado_num} {tipo}'},
+                        {'type': 'text', 'text': numero_texto},
+                        {'type': 'text', 'text': f'{loteria} {resultado_num}'},
                     ],
                 },
             ],
@@ -85,9 +87,11 @@ def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_n
         logger.exception("Error al enviar WhatsApp ganador_free a %s", celular)
 
 
-def _notificar_ganador_vip(celular: str, numero: str, loteria: str, resultado_num: str, tipo: str) -> None:
+def _notificar_ganador_vip(celular: str, numero: str, loteria: str, resultado_num: str) -> None:
     """Envía WhatsApp al cliente VIP ganador (sin deshabilitar la cuenta)."""
     numero_dest = celular if celular.startswith('57') else f'57{celular}'
+    devuelto = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero
+    numero_texto = f'{numero} {devuelto}'
     url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
     headers = {
         'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
@@ -104,8 +108,8 @@ def _notificar_ganador_vip(celular: str, numero: str, loteria: str, resultado_nu
                 {
                     'type': 'body',
                     'parameters': [
-                        {'type': 'text', 'text': numero},
-                        {'type': 'text', 'text': f'{loteria} {resultado_num} {tipo}'},
+                        {'type': 'text', 'text': numero_texto},
+                        {'type': 'text', 'text': f'{loteria} {resultado_num}'},
                     ],
                 },
             ],
@@ -242,7 +246,6 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                                     numero=h.number,
                                     loteria=resultado.loteria,
                                     resultado_num=resultado.resultado,
-                                    tipo=tipo_legible,
                                 )
                                 logger.info(
                                     "Ganador VIP notificado: %s (%s) — %s %s %s",
@@ -255,7 +258,6 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                                     numero=h.number,
                                     loteria=resultado.loteria,
                                     resultado_num=resultado.resultado,
-                                    tipo=tipo_legible,
                                 )
                                 cliente_h.enabled = False
                                 db.add(Contacto(

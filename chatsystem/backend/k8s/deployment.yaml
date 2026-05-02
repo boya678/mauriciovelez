@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatsystem-backend
+  namespace: mauriciovelez
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatsystem-backend
+  template:
+    metadata:
+      labels:
+        app: chatsystem-backend
+    spec:
+      containers:
+        - name: backend
+          image: datara.azurecr.io/chatsystem-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: chatsystem-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatsystem-workers
+  namespace: mauriciovelez
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatsystem-workers
+  template:
+    metadata:
+      labels:
+        app: chatsystem-workers
+    spec:
+      containers:
+        - name: workers
+          image: datara.azurecr.io/chatsystem-backend:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "app.workers.runner"]
+          envFrom:
+            - secretRef:
+                name: chatsystem-secrets

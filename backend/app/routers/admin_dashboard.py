@@ -54,6 +54,7 @@ class DashboardStats(BaseModel):
     pct_ganadores_free: float
     # ── Suscripciones iniciadas en el mes ─────────────────────────────────
     suscripciones_iniciadas: int
+    suscripciones_iniciadas_activas: int
     # ── Nuevos clientes registrados en el mes ───────────────────────────
     nuevos_clientes: int
     # ── % resultados con últimos 3 dígitos todos diferentes ────────────────
@@ -168,6 +169,15 @@ def get_dashboard(
         .filter(Suscripcion.inicio >= first_dt, Suscripcion.inicio <= last_dt)
         .count()
     )
+    suscripciones_iniciadas_activas = (
+        db.query(Suscripcion)
+        .filter(
+            Suscripcion.inicio >= first_dt,
+            Suscripcion.inicio <= last_dt,
+            Suscripcion.activa == True,
+        )
+        .count()
+    )
 
     # ── Nuevos clientes registrados en el mes ───────────────────────────
     nuevos_clientes = (
@@ -247,6 +257,7 @@ def get_dashboard(
         pct_ganadores_vip=pct_ganadores_vip,
         pct_ganadores_free=pct_ganadores_free,
         suscripciones_iniciadas=suscripciones_iniciadas,
+        suscripciones_iniciadas_activas=suscripciones_iniciadas_activas,
         nuevos_clientes=nuevos_clientes,
         pct_3digitos_diferentes=pct_3digitos_diferentes,
         total_resultados_mes=total_res,

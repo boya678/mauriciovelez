@@ -205,9 +205,12 @@
         <input type="number" [(ngModel)]="editForm.saldo" step="0.01" />
       </div>
       <div class="form-group check-group">
-        <label>
-          <input type="checkbox" [(ngModel)]="editForm.vip" /> VIP
+        <label [class.disabled-label]="editTarget?.vip">
+          <input type="checkbox" [(ngModel)]="editForm.vip" [attr.disabled]="editTarget?.vip ? true : null" /> VIP
         </label>
+        @if (editTarget?.vip) {
+          <span class="hint-locked"><span class="material-icons-round" style="font-size:0.85rem;vertical-align:middle">lock</span> Solo el proceso automático puede quitar el VIP</span>
+        }
       </div>
       <div class="form-group check-group">
         <label>

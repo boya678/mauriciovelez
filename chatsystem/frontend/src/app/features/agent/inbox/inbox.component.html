@@ -1,0 +1,67 @@
+<div class="inbox">
+  <!-- Conversation list panel -->
+  <div class="conv-panel">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'waiting'"
+        (click)="selectTab('waiting')"
+      >
+        <span class="material-icons" style="font-size:1em;vertical-align:middle">schedule</span> Sin asignar
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'mine'"
+        (click)="selectTab('mine')"
+      >
+        <span class="material-icons" style="font-size:1em;vertical-align:middle">forum</span> Mis chats
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'bot'"
+        (click)="selectTab('bot')"
+      >
+        <span class="material-icons" style="font-size:1em;vertical-align:middle">smart_toy</span> Bot
+      </button>
+    </div>
+
+    <!-- List -->
+    <div class="conv-list">
+      @if (loading()) {
+        <div class="list-placeholder">Cargando…</div>
+      } @else if (conversations().length === 0) {
+        <div class="list-placeholder">Sin conversaciones</div>
+      } @else {
+        @for (conv of conversations(); track conv.id) {
+          <div
+            class="conv-item"
+            [class.selected]="selectedId() === conv.id"
+            (click)="selectConversation(conv.id)"
+          >
+            <div class="conv-avatar">{{ conv.phone.slice(-2) }}</div>
+            <div class="conv-meta">
+              <span class="conv-phone">{{ conv.phone }}</span>
+              <span class="conv-time">{{ formatDate(conv.updated_at) }}</span>
+            </div>
+            <span class="badge {{ STATUS_BADGE[conv.status] }}">
+              {{ STATUS_LABELS[conv.status] }}
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <!-- Chat panel -->
+  <div class="chat-panel">
+    @if (selectedId()) {
+      <app-chat [conversationId]="selectedId()!" />
+    } @else {
+      <div class="empty-chat">
+        <div class="empty-icon"><span class="material-icons" style="font-size:3rem">chat_bubble_outline</span></div>
+        <p>Selecciona una conversación</p>
+      </div>
+    }
+  </div>
+</div>

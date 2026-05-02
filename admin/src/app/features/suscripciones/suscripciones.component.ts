@@ -20,6 +20,7 @@ export class SuscripcionesComponent implements OnInit {
   soloActivas = false;
   loading = signal(false);
   renovandoId: string | null = null;
+  confirmRenovar: Suscripcion | null = null;
   runningCheck = signal(false);
   toast = signal<{ msg: string; type: 'ok' | 'err' } | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -44,6 +45,13 @@ export class SuscripcionesComponent implements OnInit {
   next() { if (this.page() < this.totalPages) { this.page.update(p => p + 1); this.load(); } }
 
   renovar(s: Suscripcion) {
+    this.confirmRenovar = s;
+  }
+
+  doRenovar() {
+    if (!this.confirmRenovar) return;
+    const s = this.confirmRenovar;
+    this.confirmRenovar = null;
     this.renovandoId = s.id;
     this.svc.renovar(s.id).subscribe({
       next: () => {

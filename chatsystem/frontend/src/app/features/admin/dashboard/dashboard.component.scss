@@ -1,0 +1,36 @@
+.dashboard-page {
+  padding: 24px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.page-header {
+  margin-bottom: 24px;
+  h1 { font-size: 20px; font-weight: 700; }
+}
+
+.loading-text { color: #64748b; font-size: 14px; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  padding: 24px 20px;
+  text-align: center;
+
+  .stat-value {
+    font-size: 36px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+}
+
+.agents-section {
+  h2 { padding: 16px 20px; font-size: 15px; font-weight: 700; border-bottom: 1px solid #e2e8f0; }
+}

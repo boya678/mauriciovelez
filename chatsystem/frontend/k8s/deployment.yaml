@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatsystem-frontend
+  namespace: mauriciovelez
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatsystem-frontend
+  template:
+    metadata:
+      labels:
+        app: chatsystem-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: datara.azurecr.io/chatsystem-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
