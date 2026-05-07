@@ -46,6 +46,31 @@
                 controls
                 [src]="'data:' + (msg.media_mime_type || 'audio/ogg') + ';base64,' + msg.media_content"
               ></audio>
+            } @else if (parseInteractive(msg.content); as menu) {
+              <p class="interactive-body">{{ menu.body }}</p>
+              @if (menu.menu_type === 'buttons') {
+                <div class="interactive-buttons">
+                  @for (btn of menu.buttons; track btn.id) {
+                    <span class="interactive-btn">{{ btn.title }}</span>
+                  }
+                </div>
+              } @else if (menu.menu_type === 'list') {
+                <div class="interactive-list">
+                  @for (section of menu.sections; track section.title) {
+                    @if (section.title) {
+                      <p class="interactive-list-section">{{ section.title }}</p>
+                    }
+                    @for (row of section.rows; track row.id) {
+                      <div class="interactive-list-row">
+                        <span class="interactive-list-title">{{ row.title }}</span>
+                        @if (row.description) {
+                          <span class="interactive-list-desc">{{ row.description }}</span>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              }
             } @else {
               <p>{{ msg.content }}</p>
             }

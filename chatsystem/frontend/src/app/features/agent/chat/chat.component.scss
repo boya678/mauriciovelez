@@ -175,6 +175,72 @@
   white-space: pre-wrap;
 }
 
+// ── Interactive menus (read-only preview) ────────────────────────────────────
+.interactive-body {
+  margin: 0 0 8px;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.interactive-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.interactive-btn {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1.5px solid currentColor;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.75;
+  cursor: default;
+  letter-spacing: 0.2px;
+}
+
+.interactive-list {
+  margin-top: 6px;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.interactive-list-section {
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  background: rgba(0,0,0,.04);
+}
+
+.interactive-list-row {
+  display: flex;
+  flex-direction: column;
+  padding: 7px 10px;
+  border-top: 1px solid rgba(0,0,0,.07);
+  cursor: default;
+
+  &:first-of-type { border-top: none; }
+}
+
+.interactive-list-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.interactive-list-desc {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 1px;
+}
+
 // ── Audio bubbles ─────────────────────────────────────────────────────────────
 .bubble-audio {
   display: block;

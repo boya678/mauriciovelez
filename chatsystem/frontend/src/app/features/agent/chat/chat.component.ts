@@ -165,6 +165,15 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   }
 
+  parseInteractive(content: string): any | null {
+    if (!content || !content.trim().startsWith('{')) return null;
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.menu_type === 'buttons' || parsed.menu_type === 'list') return parsed;
+    } catch { /* not JSON */ }
+    return null;
+  }
+
   openImg(event: MouseEvent): void {
     const img = event.target as HTMLImageElement;
     const overlay = document.createElement('div');
