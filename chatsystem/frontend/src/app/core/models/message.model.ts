@@ -7,6 +7,8 @@ export interface Message {
   sender_type: SenderType;
   content: string;
   message_type: string;
+  media_content: string | null;
+  media_mime_type: string | null;
   external_id: string | null;
   status: MessageStatus;
   created_at: string;

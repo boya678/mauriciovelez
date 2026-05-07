@@ -6,8 +6,6 @@ Create Date: 2026-05-02 00:00:00.000000
 """
 from typing import Sequence, Union
 
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 from alembic import op
 
 revision: str = "0003"
@@ -17,65 +15,40 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE TYPE tool_type AS ENUM ('HTTP', 'SQL', 'STATIC')")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE tool_type AS ENUM ('HTTP', 'SQL', 'STATIC');
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
 
-    op.create_table(
-        "agent_tools",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column(
-            "tenant_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("public.tenants.id", ondelete="CASCADE"),
-            nullable=False,
-            index=True,
-        ),
-        sa.Column("name", sa.String(100), nullable=False),
-        sa.Column("description", sa.Text, nullable=False),
-        sa.Column(
-            "tool_type",
-            sa.Enum("HTTP", "SQL", "STATIC", name="tool_type", create_type=False),
-            nullable=False,
-        ),
-        sa.Column("enabled", sa.Boolean, nullable=False, server_default="true"),
-        # HTTP fields
-        sa.Column("http_url", sa.Text, nullable=True),
-        sa.Column("http_method", sa.String(10), nullable=True, server_default="GET"),
-        sa.Column("http_headers", postgresql.JSONB, nullable=True),
-        sa.Column("http_body_tpl", sa.Text, nullable=True),
-        sa.Column("http_timeout_seconds", sa.Integer, nullable=True, server_default="10"),
-        # SQL fields
-        sa.Column("sql_dsn", sa.Text, nullable=True),
-        sa.Column("sql_query", sa.Text, nullable=True),
-        sa.Column("sql_params", postgresql.JSONB, nullable=True),
-        # STATIC fields
-        sa.Column("static_text", sa.Text, nullable=True),
-        # Timestamps
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.text("now()"),
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.text("now()"),
-        ),
-        schema="public",
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS public.agent_tools (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id   UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+            name        VARCHAR(100) NOT NULL,
+            description TEXT NOT NULL,
+            tool_type   tool_type NOT NULL,
+            enabled     BOOLEAN NOT NULL DEFAULT true,
+            http_url            TEXT,
+            http_method         VARCHAR(10) DEFAULT 'GET',
+            http_headers        JSONB,
+            http_body_tpl       TEXT,
+            http_timeout_seconds INTEGER DEFAULT 10,
+            sql_dsn     TEXT,
+            sql_query   TEXT,
+            sql_params  JSONB,
+            static_text TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
 
-    op.create_index(
-        "ix_agent_tools_tenant_enabled",
-        "agent_tools",
-        ["tenant_id", "enabled"],
-        schema="public",
-    )
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS ix_agent_tools_tenant_enabled
+        ON public.agent_tools (tenant_id, enabled)
+    """)
 
 
 def downgrade() -> None:

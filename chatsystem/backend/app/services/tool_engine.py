@@ -27,7 +27,7 @@ import re
 import uuid
 from typing import Any
 
-import aiohttp
+import httpx
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field, create_model
 from sqlalchemy import select, text
@@ -76,17 +76,22 @@ async def _exec_http(tool: AgentTool, ctx: dict[str, str], params: dict[str, str
         except json.JSONDecodeError:
             body = rendered
 
-    timeout = aiohttp.ClientTimeout(total=tool.http_timeout_seconds or 10)
+    timeout = tool.http_timeout_seconds or 10
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            req = session.request(method, url, headers=headers, json=body if isinstance(body, dict) else None, data=body if isinstance(body, str) else None)
-            async with req as resp:
-                text_resp = await resp.text()
-                try:
-                    data = json.loads(text_resp)
-                    return json.dumps(data, ensure_ascii=False)
-                except json.JSONDecodeError:
-                    return text_resp
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.request(
+                method,
+                url,
+                headers=headers,
+                json=body if isinstance(body, dict) else None,
+                content=body.encode() if isinstance(body, str) else None,
+            )
+            text_resp = resp.text
+            try:
+                data = json.loads(text_resp)
+                return json.dumps(data, ensure_ascii=False)
+            except json.JSONDecodeError:
+                return text_resp
     except Exception as exc:
         logger.error("HTTP tool %s failed: %s", tool.name, exc)
         return f"Error al consultar el servicio: {exc}"
@@ -108,6 +113,11 @@ async def _exec_sql(tool: AgentTool, ctx: dict[str, str], params: dict[str, str]
     try:
         engine = create_async_engine(dsn, pool_pre_ping=True)
         async with engine.connect() as conn:
+            # Set tenant schema so unqualified table names resolve correctly
+            tenant_slug = ctx.get("tenant_slug", "")
+            if tenant_slug:
+                schema = f"t_{tenant_slug}"
+                await conn.execute(text(f"SET search_path TO {schema}, public"))
             result = await conn.execute(text(query), params)
             rows = result.fetchall()
             cols = list(result.keys())
@@ -151,7 +161,10 @@ def _build_tool(tool: AgentTool, ctx: dict[str, str]) -> StructuredTool:
     InputModel = create_model(f"{tool.name}_input", **fields) if fields else create_model(f"{tool.name}_input")
 
     async def _run(**kwargs: str) -> str:
-        params = {k: str(v) for k, v in kwargs.items()}
+        # Merge context vars with whatever the LLM passed —
+        # ctx has phone/conversation_id/tenant_slug already resolved,
+        # so the query's :phone bind param is always satisfied.
+        params = {**ctx, **{k: str(v) for k, v in kwargs.items()}}
         if tool.tool_type == ToolType.HTTP:
             return await _exec_http(tool, ctx, params)
         elif tool.tool_type == ToolType.SQL:

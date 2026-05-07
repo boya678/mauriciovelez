@@ -94,7 +94,12 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             return
 
         history = await _load_history(db, conversation_id)
-        bot_turns = sum(1 for m in history if m["role"] == "bot")
+
+        # Check if there is an image awaiting description for this conversation.
+        # We use a FIFO list so multiple images are handled in arrival order.
+        pending_image_key = f"pending_images:{conversation_id}"
+        pending_image_id_str = await redis.lindex(pending_image_key, 0)  # peek first
+        has_pending_image = bool(pending_image_id_str)
 
         # Load dynamic tools for this tenant
         tools = await load_tools(
@@ -107,13 +112,38 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
 
         now = datetime.now(timezone.utc)
 
-        # Run LangGraph
+        # Run LangGraph — always start turns at 0 so the first-message
+        # escalation guard (turns <= 1) works correctly even when a
+        # conversation is reopened after previous exchanges.
         result = await run_graph(
             messages=history,
             tenant_system_prompt=system_prompt,
-            turns=bot_turns,
+            turns=0,
             tools=tools,
+            phone=phone,
+            has_pending_image=has_pending_image,
         )
+
+        # If the LLM confirmed the user described the image, persist it and
+        # clear the pending key.  If imagen_contexto is None the key stays in
+        # Redis so we try again on the next turn.
+        if has_pending_image and result.get("imagen_contexto"):
+            pending_image_id = uuid.UUID(
+                pending_image_id_str.decode()
+                if isinstance(pending_image_id_str, bytes)
+                else pending_image_id_str
+            )
+            await db.execute(
+                update(Message)
+                .where(Message.id == pending_image_id)
+                .values(imagen_descripcion=result["imagen_contexto"])
+            )
+            await db.commit()
+            await redis.lpop(pending_image_key)  # remove only the first item
+            logger.info(
+                "Tagged image %s with descripcion=%r (conv %s)",
+                pending_image_id, result["imagen_contexto"], conversation_id,
+            )
 
         if result["needs_escalation"]:
             # Send a goodbye bot message first if there is a reply
@@ -178,7 +208,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             )
             await db.commit()
 
-            await xadd(redis, OUTGOING_STREAM, {
+            outgoing_payload: dict = {
                 "tenant_id": tenant_id,
                 "tenant_slug": tenant_slug,
                 "phone": phone,
@@ -186,7 +216,13 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 "content": result["bot_reply"],
                 "phone_id": tenant.whatsapp_phone_id if tenant else "",
                 "token": tenant.whatsapp_token if tenant else "",
-            })
+            }
+            interactive = result.get("interactive_payload")
+            if interactive:
+                import json as _json
+                outgoing_payload["interactive_payload"] = _json.dumps(interactive)
+
+            await xadd(redis, OUTGOING_STREAM, outgoing_payload)
             logger.info("Bot replied to conv %s", conversation_id)
 
 

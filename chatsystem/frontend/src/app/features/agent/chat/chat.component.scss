@@ -73,6 +73,10 @@
   line-height: 1.5;
   position: relative;
 
+  &:has(.bubble-audio) {
+    max-width: 85%;
+  }
+
   p { margin: 2px 0 4px; word-break: break-word; white-space: pre-wrap; }
 
   .bubble-sender {
@@ -150,4 +154,33 @@
   text-align: center;
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
+}
+
+// ── Image bubbles ─────────────────────────────────────────────────────────────
+.bubble-img {
+  display: block;
+  max-width: 280px;
+  max-height: 320px;
+  width: 100%;
+  border-radius: 8px;
+  margin-top: 4px;
+  cursor: zoom-in;
+  object-fit: cover;
+}
+
+.bubble-caption {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: inherit;
+  white-space: pre-wrap;
+}
+
+// ── Audio bubbles ─────────────────────────────────────────────────────────────
+.bubble-audio {
+  display: block;
+  width: 100%;
+  min-width: 260px;
+  max-width: 420px;
+  margin-top: 4px;
+  border-radius: 8px;
 }

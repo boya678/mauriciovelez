@@ -1,0 +1,216 @@
+﻿<div class="tools-page">
+  <div class="page-header">
+    <h1>Tools / Bot</h1>
+    <button class="btn btn-primary" (click)="openCreate()">+ Nueva herramienta</button>
+  </div>
+
+  @if (loading()) {
+    <p class="loading-text">Cargando herramientas…</p>
+  } @else {
+    <div class="panel table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Descripción</th>
+            <th>Tipo</th>
+            <th>Activa</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (tool of tools(); track tool.id) {
+            <tr>
+              <td><strong>{{ tool.name }}</strong></td>
+              <td class="desc-cell">{{ tool.description }}</td>
+              <td><span class="badge type-badge type-{{ tool.tool_type.toLowerCase() }}">{{ tool.tool_type }}</span></td>
+              <td>
+                <button
+                  class="toggle-btn"
+                  [class.active]="tool.enabled"
+                  (click)="toggleEnabled(tool)"
+                  [title]="tool.enabled ? 'Desactivar' : 'Activar'">
+                  {{ tool.enabled ? 'Sí' : 'No' }}
+                </button>
+              </td>
+              <td>
+                @if (confirmDeleteId() === tool.id) {
+                  <span class="delete-confirm">
+                    ¿Eliminar?
+                    <button class="btn btn-danger btn-sm" (click)="confirmDelete(tool.id)">Sí</button>
+                    <button class="btn btn-ghost btn-sm" (click)="cancelDelete()">No</button>
+                  </span>
+                } @else {
+                  <div class="action-btns">
+                    <button class="btn btn-ghost btn-sm" (click)="openTest(tool)">Probar</button>
+                    <button class="btn btn-ghost btn-sm" (click)="openEdit(tool)">Editar</button>
+                    <button class="btn btn-danger btn-sm" (click)="requestDelete(tool.id)">Eliminar</button>
+                  </div>
+                }
+              </td>
+            </tr>
+          }
+          @if (tools().length === 0) {
+            <tr><td colspan="5" class="empty-row">Sin herramientas registradas</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+<!-- Edit / Create Modal -->
+@if (showModal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal modal-wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editTool() ? 'Editar herramienta' : 'Nueva herramienta' }}</h2>
+        <button class="btn btn-ghost btn-sm" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        @if (error()) {
+          <div class="alert-error">{{ error() }}</div>
+        }
+
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Nombre <span class="required">*</span></label>
+            <input class="form-control" type="text" [(ngModel)]="form.name" placeholder="consultar_precio" />
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select class="form-control" [(ngModel)]="form.tool_type">
+              @for (t of toolTypes; track t) {
+                <option [value]="t">{{ t }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group form-group-check">
+            <label>Activa</label>
+            <input type="checkbox" [(ngModel)]="form.enabled" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Descripción (el LLM usará esto para decidir cuándo llamar a la herramienta)</label>
+          <textarea class="form-control" rows="2" [(ngModel)]="form.description" placeholder="Consulta el precio de un producto dado su código."></textarea>
+        </div>
+
+        <!-- HTTP fields -->
+        @if (form.tool_type === 'HTTP') {
+          <div class="type-section">
+            <p class="section-label">Configuración HTTP</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Método</label>
+                <select class="form-control" [(ngModel)]="form.http_method">
+                  @for (m of methods; track m) {
+                    <option [value]="m">{{ m }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group flex-2">
+                <label>URL</label>
+                <input class="form-control" type="text" [(ngModel)]="form.http_url" placeholder="https://api.ejemplo.com/precio?codigo={codigo}" />
+              </div>
+              <div class="form-group">
+                <label>Timeout (seg)</label>
+                <input class="form-control" type="number" [(ngModel)]="form.http_timeout_seconds" min="1" max="60" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Headers (JSON) — usa <code>&#123;env:VAR&#125;</code> para variables de entorno</label>
+              <textarea class="form-control mono" rows="3" [(ngModel)]="form.http_headers" placeholder='{"Authorization": "Bearer {env:API_KEY}"}'></textarea>
+            </div>
+            <div class="form-group">
+              <label>Body template (JSON) — usa <code>&#123;param&#125;</code> para parámetros del LLM</label>
+              <textarea class="form-control mono" rows="4" [(ngModel)]="form.http_body_tpl" placeholder='{"codigo": "{codigo}", "tenant": "{tenant_slug}"}'></textarea>
+            </div>
+          </div>
+        }
+
+        <!-- SQL fields -->
+        @if (form.tool_type === 'SQL') {
+          <div class="type-section">
+            <p class="section-label">Configuración SQL (solo SELECT)</p>
+            <div class="form-group">
+              <label>DSN de conexión — usa <code>&#123;env:VAR&#125;</code> para credenciales</label>
+              <input class="form-control mono" type="text" [(ngModel)]="form.sql_dsn" placeholder="postgresql+asyncpg://{env:DB_USER}:{env:DB_PASS}@host/db" />
+            </div>
+            <div class="form-group">
+              <label>Query — usa <code>:param</code> para parámetros</label>
+              <textarea class="form-control mono" rows="4" [(ngModel)]="form.sql_query" placeholder="SELECT precio FROM productos WHERE codigo = :codigo LIMIT 1"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Parámetros (nombres separados por coma, en orden)</label>
+              <input class="form-control" type="text" [(ngModel)]="form.sql_params" placeholder="codigo, tenant_slug" />
+            </div>
+          </div>
+        }
+
+        <!-- STATIC fields -->
+        @if (form.tool_type === 'STATIC') {
+          <div class="type-section">
+            <p class="section-label">Texto estático</p>
+            <div class="form-group">
+              <label>Texto de respuesta fija — puedes usar <code>&#123;phone&#125;</code>, <code>&#123;tenant_slug&#125;</code></label>
+              <textarea class="form-control" rows="4" [(ngModel)]="form.static_text" placeholder="Nuestro horario es Lunes a Viernes de 9 a 18 hs."></textarea>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Test Panel -->
+@if (testToolId()) {
+  <div class="modal-backdrop" (click)="closeTest()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Probar herramienta</h2>
+        <button class="btn btn-ghost btn-sm" (click)="closeTest()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="section-label">Parámetros de prueba</p>
+
+        @for (param of testParams(); track param; let i = $index) {
+          <div class="form-row test-param-row">
+            <div class="form-group flex-1">
+              <input class="form-control" type="text" [(ngModel)]="param.key" placeholder="clave" />
+            </div>
+            <div class="form-group flex-2">
+              <input class="form-control" type="text" [(ngModel)]="param.value" placeholder="valor" />
+            </div>
+            <button class="btn btn-ghost btn-sm rm-btn" (click)="removeTestParam(i)">✕</button>
+          </div>
+        }
+
+        <button class="btn btn-ghost btn-sm" (click)="addTestParam()">+ Agregar parámetro</button>
+
+        @if (testResult() !== null) {
+          <div class="test-result">
+            <p class="section-label">Resultado</p>
+            <pre>{{ testResult() }}</pre>
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeTest()">Cerrar</button>
+        <button class="btn btn-primary" (click)="runTest()" [disabled]="testLoading()">
+          {{ testLoading() ? 'Ejecutando…' : 'Ejecutar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

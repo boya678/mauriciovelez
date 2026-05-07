@@ -13,6 +13,8 @@ class MessageOut(BaseModel):
     sender_type: SenderType
     content: str
     message_type: str
+    media_content: str | None = None
+    media_mime_type: str | None = None
     status: MessageStatus
     created_at: datetime
 

@@ -30,7 +30,25 @@
         <div class="msg-row" [class.row-user]="msg.sender_type === 'user'" [class.row-agent]="msg.sender_type !== 'user'">
           <div [class]="bubbleClass(msg)">
             <span class="bubble-sender">{{ senderLabel(msg) }}</span>
-            <p>{{ msg.content }}</p>
+            @if (msg.message_type === 'image' && msg.media_content) {
+              <img
+                class="bubble-img"
+                [src]="'data:' + (msg.media_mime_type || 'image/jpeg') + ';base64,' + msg.media_content"
+                alt="imagen"
+                (click)="openImg($event)"
+              />
+              @if (msg.content && msg.content !== '[imagen]') {
+                <p class="bubble-caption">{{ msg.content }}</p>
+              }
+            } @else if (msg.message_type === 'audio' && msg.media_content) {
+              <audio
+                class="bubble-audio"
+                controls
+                [src]="'data:' + (msg.media_mime_type || 'audio/ogg') + ';base64,' + msg.media_content"
+              ></audio>
+            } @else {
+              <p>{{ msg.content }}</p>
+            }
             <span class="bubble-time">{{ formatTime(msg.created_at) }}</span>
           </div>
         </div>

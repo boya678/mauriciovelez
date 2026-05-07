@@ -13,6 +13,7 @@ Responsibilities:
   5. Route to correct downstream stream
 """
 import asyncio
+import base64
 import json
 import logging
 import uuid
@@ -25,6 +26,8 @@ from app.db.session import AsyncSessionLocal, make_tenant_session
 from app.db.tenant import set_tenant_schema
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import Message, MessageStatus, SenderType
+from app.models.tenant import Tenant
+from app.services.whatsapp import download_media
 from app.redis.client import get_redis
 from app.redis.streams import (
     MESSAGES_STREAM,
@@ -53,6 +56,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
     phone = str(data.get("phone", ""))
     content = data.get("content", "")
     message_type = data.get("message_type", "text")
+    media_id = data.get("media_id", "")
 
     schema = f"t_{data['tenant_slug']}"
     set_tenant_schema(schema)
@@ -105,7 +109,29 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             # Refresh to get updated status for routing below
             await db.refresh(conv)
 
-        # 3. Insert message
+        # 3. Insert message — download media if present
+        media_content: str | None = None
+        media_mime_type: str | None = None
+
+        if media_id:
+            try:
+                # Load tenant token to authenticate against Meta API
+                tenant = await db.scalar(
+                    select(Tenant).where(Tenant.id == uuid.UUID(tenant_id))
+                )
+                if tenant and tenant.whatsapp_token:
+                    raw_bytes, mime = await download_media(media_id, tenant.whatsapp_token)
+                    media_content = base64.b64encode(raw_bytes).decode("ascii")
+                    media_mime_type = mime
+                    logger.info(
+                        "Downloaded media %s (%s, %d bytes) for conv %s",
+                        media_id, mime, len(raw_bytes), conversation_id,
+                    )
+                else:
+                    logger.warning("No whatsapp_token for tenant %s — media not downloaded", tenant_id)
+            except Exception as exc:
+                logger.error("Failed to download media %s: %s", media_id, exc)
+
         msg = Message(
             id=uuid.uuid4(),
             conversation_id=conversation_id,
@@ -113,12 +139,23 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             sender_type=SenderType.USER,
             content=content,
             message_type=message_type,
+            media_content=media_content,
+            media_mime_type=media_mime_type,
             status=MessageStatus.PROCESSING,
             created_at=now,
         )
         db.add(msg)
         await db.commit()
         await db.refresh(conv)
+
+        # If the incoming message is an image, push its ID to the FIFO queue
+        # so multiple images are processed in arrival order.
+        PENDING_IMAGE_TTL = 3600  # 1 hour
+        if message_type == "image":
+            queue_key = f"pending_images:{conversation_id}"
+            await redis.rpush(queue_key, str(msg.id))
+            await redis.expire(queue_key, PENDING_IMAGE_TTL)
+            logger.info("Queued pending image %s for conv %s", msg.id, conversation_id)
 
         # Notify agents via WebSocket so the UI updates in real time
         await manager.publish(data["tenant_slug"], {
@@ -128,6 +165,9 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 "id": str(msg.id),
                 "content": content,
                 "sender_type": SenderType.USER.value,
+                "message_type": message_type,
+                "media_content": media_content,
+                "media_mime_type": media_mime_type,
                 "created_at": now.isoformat(),
             },
         })
@@ -149,6 +189,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             "message_id": str(msg.id),
             "phone": phone,
             "content": content,
+            "message_type": message_type,
         }
         if conv.assigned_agent_id:
             payload["agent_id"] = str(conv.assigned_agent_id)

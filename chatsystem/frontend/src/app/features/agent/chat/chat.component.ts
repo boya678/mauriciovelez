@@ -165,6 +165,18 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   }
 
+  openImg(event: MouseEvent): void {
+    const img = event.target as HTMLImageElement;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out';
+    const clone = document.createElement('img');
+    clone.src = img.src;
+    clone.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 32px #0008';
+    overlay.appendChild(clone);
+    overlay.addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
+  }
+
   ngOnDestroy(): void {
     this.wsSub?.unsubscribe();
   }

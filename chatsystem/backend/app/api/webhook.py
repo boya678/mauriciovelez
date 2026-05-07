@@ -138,6 +138,7 @@ async def receive_webhook(
             "phone": phone,
             "content": msg_data.get("content", ""),
             "message_type": msg_data.get("message_type", "text"),
+            "media_id": msg_data.get("media_id", ""),
             "received_at": datetime.now(timezone.utc).isoformat(),
         })
         logger.info("Queued incoming msg from %s (conv %s)", phone, conversation_id)

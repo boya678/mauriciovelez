@@ -38,6 +38,11 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/admin/settings/settings.component').then(m => m.SettingsComponent),
           },
+          {
+            path: 'tools',
+            loadComponent: () =>
+              import('./features/admin/tools/tools.component').then(m => m.ToolsComponent),
+          },
           { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
         ],
       },

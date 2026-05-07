@@ -41,7 +41,10 @@ class Message(Base):
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     message_type: Mapped[str] = mapped_column(String(30), nullable=False, default="text")
+    media_content: Mapped[str | None] = mapped_column(Text, nullable=True)       # base64
+    media_mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True)
+    imagen_descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,

@@ -238,6 +238,4 @@ export class ToolsComponent implements OnInit {
       },
     });
   }
-
-  trackByIdx(i: number): number { return i; }
 }

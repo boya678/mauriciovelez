@@ -6,6 +6,7 @@ Side effects   : Sends message via WhatsApp Cloud API
                  Updates Message.status → PROCESSED | ERROR
 """
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -23,7 +24,7 @@ from app.redis.streams import (
     xack,
     xautoclaim,
 )
-from app.services.whatsapp import send_text_message
+from app.services.whatsapp import send_text_message, send_interactive_message
 
 logger = logging.getLogger(__name__)
 CONSUMER_NAME = "outgoing-1"
@@ -39,16 +40,26 @@ async def _process_entry(entry_id: str, data: dict) -> None:
     phone_id = data.get("phone_id", "")
     token = data.get("token", "")
     tenant_slug = data.get("tenant_slug", "")
+    interactive_raw = data.get("interactive_payload", "")
 
     schema = f"t_{tenant_slug}" if tenant_slug else "public"
 
     try:
-        await send_text_message(
-            phone_id=phone_id,
-            token=token,
-            to=phone,
-            text=content,
-        )
+        if interactive_raw:
+            interactive = json.loads(interactive_raw) if isinstance(interactive_raw, str) else interactive_raw
+            await send_interactive_message(
+                phone_id=phone_id,
+                token=token,
+                to=phone,
+                interactive=interactive,
+            )
+        else:
+            await send_text_message(
+                phone_id=phone_id,
+                token=token,
+                to=phone,
+                text=content,
+            )
         new_status = MessageStatus.PROCESSED
     except Exception as exc:
         logger.error("WhatsApp send failed for msg %s: %s", message_id, exc)
