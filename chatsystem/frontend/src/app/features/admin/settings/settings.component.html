@@ -19,6 +19,30 @@
         ></textarea>
       </div>
 
+      <div class="field-group">
+        <label for="templateName">Plantilla de WhatsApp (nombre)</label>
+        <p class="field-hint">Nombre exacto de la plantilla aprobada en Meta, usada para iniciar o reabrir conversaciones fuera de la ventana de 24 h.</p>
+        <input
+          id="templateName"
+          type="text"
+          [(ngModel)]="templateName"
+          [disabled]="saving()"
+          placeholder="hello_world"
+        />
+      </div>
+
+      <div class="field-group">
+        <label for="templateLanguage">Idioma de la plantilla</label>
+        <p class="field-hint">Código de idioma de la plantilla (p. ej. <code>es</code>, <code>es_MX</code>, <code>en_US</code>).</p>
+        <input
+          id="templateLanguage"
+          type="text"
+          [(ngModel)]="templateLanguage"
+          [disabled]="saving()"
+          placeholder="es"
+        />
+      </div>
+
       @if (error()) {
         <div class="alert alert-error">{{ error() }}</div>
       }

@@ -91,7 +91,7 @@ export class ClientesComponent implements OnInit {
 
   openEdit(c: Cliente) {
     this.editTarget = c;
-    this.editForm = { nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled };
+    this.editForm = { nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled, tipo_cliente: c.tipo_cliente };
     if (c.fecha_nacimiento) {
       const [ay, am, ad] = c.fecha_nacimiento.split('-').map(Number);
       this.editBdAnio = ay; this.editBdMes = am; this.editBdDia = ad;
@@ -102,7 +102,7 @@ export class ClientesComponent implements OnInit {
   }
 
   openCreate() {
-    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true };
+    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true, tipo_cliente: 1 };
     this.createBdDia = 0; this.createBdMes = 0; this.createBdAnio = 0;
     this.createError.set(null);
     this.showCreate = true;
@@ -120,12 +120,22 @@ export class ClientesComponent implements OnInit {
 
   onCreateAnioChange() { this.onCreateMesChange(); }
 
+  onCreateTipoChange(tipo: any) {
+    const t = Number(tipo);
+    this.createForm.tipo_cliente = t;
+    if (t !== 1) { this.createForm.vip = false; }
+  }
+
   onEditMesChange() {
     const max = (this.editBdMes && this.editBdAnio) ? new Date(this.editBdAnio, this.editBdMes, 0).getDate() : 31;
     if (this.editBdDia > max) this.editBdDia = 0;
   }
 
   onEditAnioChange() { this.onEditMesChange(); }
+
+  onEditTipoChange(tipo: number) {
+    if (tipo !== 1) { this.editForm.vip = false; }
+  }
 
   private composeFecha(dia: number, mes: number, anio: number): string | null {
     if (!dia || !mes || !anio) return null;
@@ -135,7 +145,7 @@ export class ClientesComponent implements OnInit {
   saveCreate() {
     this.createError.set(null);
     if (this.createForm.vip && !this.createForm.codigo_vip?.trim()) {
-      this.createError.set('El código VIP es obligatorio cuando el cliente es VIP');
+      this.createError.set('El código es obligatorio cuando el cliente es VIP');
       return;
     }
     const payload = { ...this.createForm, fecha_nacimiento: this.composeFecha(this.createBdDia, this.createBdMes, this.createBdAnio) };
@@ -156,7 +166,7 @@ export class ClientesComponent implements OnInit {
       this.editForm.vip = true;
     }
     if (this.editForm.vip && !this.editForm.codigo_vip?.trim()) {
-      this.editError.set('El código VIP es obligatorio cuando el cliente es VIP');
+      this.editError.set('El código es obligatorio cuando el cliente es VIP');
       return;
     }
     const payload = { ...this.editForm, fecha_nacimiento: this.composeFecha(this.editBdDia, this.editBdMes, this.editBdAnio) };

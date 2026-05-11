@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
+import { saAuthGuard } from './core/guards/sa-auth.guard';
 
 export const routes: Routes = [
   {
@@ -47,6 +48,30 @@ export const routes: Routes = [
         ],
       },
       { path: '', redirectTo: 'inbox', pathMatch: 'full' },
+    ],
+  },
+  {
+    path: 'sa/login',
+    loadComponent: () =>
+      import('./features/superadmin/login/sa-login.component').then(m => m.SaLoginComponent),
+  },
+  {
+    path: 'sa',
+    loadComponent: () =>
+      import('./features/superadmin/layout/sa-layout.component').then(m => m.SaLayoutComponent),
+    canActivate: [saAuthGuard],
+    children: [
+      {
+        path: 'tenants',
+        loadComponent: () =>
+          import('./features/superadmin/tenants/sa-tenants.component').then(m => m.SaTenantsComponent),
+      },
+      {
+        path: 'users',
+        loadComponent: () =>
+          import('./features/superadmin/users/sa-users.component').then(m => m.SaUsersComponent),
+      },
+      { path: '', redirectTo: 'tenants', pathMatch: 'full' },
     ],
   },
   { path: '**', redirectTo: '' },

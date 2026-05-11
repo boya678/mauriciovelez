@@ -1,5 +1,6 @@
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ConversationsService } from '../../../core/services/conversations.service';
 import { WebSocketService } from '../../../core/services/websocket.service';
@@ -7,18 +8,19 @@ import { AuthService } from '../../../core/services/auth.service';
 import { Conversation, ConversationStatus, STATUS_LABELS, STATUS_BADGE } from '../../../core/models/conversation.model';
 import { ChatComponent } from '../chat/chat.component';
 
-type Tab = 'waiting' | 'mine' | 'bot';
+type Tab = 'waiting' | 'mine' | 'bot' | 'closed';
 
-const TAB_STATUS: Record<Tab, ConversationStatus> = {
+const TAB_STATUS: Record<Tab, ConversationStatus | null> = {
   waiting: 'waiting_human',
   mine: 'human_active',
   bot: 'bot_active',
+  closed: 'closed',
 };
 
 @Component({
   selector: 'app-inbox',
   standalone: true,
-  imports: [CommonModule, ChatComponent],
+  imports: [CommonModule, FormsModule, ChatComponent],
   templateUrl: './inbox.component.html',
   styleUrl: './inbox.component.scss',
 })
@@ -27,6 +29,21 @@ export class InboxComponent implements OnInit, OnDestroy {
   conversations = signal<Conversation[]>([]);
   selectedId = signal<string | null>(null);
   loading = signal(false);
+  searchTerm = signal('');
+
+  // New conversation modal
+  newConvModal = signal(false);
+  newConvPhone = '';
+  newConvStep = signal<'form' | 'confirm' | 'bot_active' | 'human_active' | 'waiting_human'>('form');
+  newConvLoading = signal(false);
+  newConvError = signal<string | null>(null);
+  newConvBotConvId = signal<string | null>(null);
+
+  filteredConversations = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!term) return this.conversations();
+    return this.conversations().filter(c => c.phone.toLowerCase().includes(term));
+  });
 
   readonly STATUS_LABELS = STATUS_LABELS;
   readonly STATUS_BADGE = STATUS_BADGE;
@@ -47,7 +64,8 @@ export class InboxComponent implements OnInit, OnDestroy {
         ev.type === 'new_message' ||
         ev.type === 'conversation_assigned' ||
         ev.type === 'conversation_closed' ||
-        ev.type === 'conversation_waiting'
+        ev.type === 'conversation_waiting' ||
+        ev.type === 'conversation_started'
       ) {
         this.fetchConversations();
       }
@@ -57,12 +75,11 @@ export class InboxComponent implements OnInit, OnDestroy {
   fetchConversations(): void {
     this.loading.set(true);
     const status = TAB_STATUS[this.activeTab()];
-    this.conversationsService.list(status).subscribe({
+    this.conversationsService.list(status ?? undefined).subscribe({
       next: (list) => {
         // For "mine" tab, filter by assigned agent
         if (this.activeTab() === 'mine') {
           const myId = this.auth.getAgentId();
-          console.log('[inbox] myId:', myId, 'assigned_agent_ids:', list.map(c => c.assigned_agent_id));
           this.conversations.set(list.filter((c) => c.assigned_agent_id === myId));
         } else {
           this.conversations.set(list);
@@ -80,8 +97,95 @@ export class InboxComponent implements OnInit, OnDestroy {
   }
 
   selectConversation(id: string): void {
-    console.log('[inbox] selectConversation', id);
     this.selectedId.set(id);
+  }
+
+  openNewConvModal(): void {
+    this.newConvPhone = '';
+    this.newConvStep.set('form');
+    this.newConvError.set(null);
+    this.newConvModal.set(true);
+  }
+
+  closeNewConvModal(): void {
+    this.newConvModal.set(false);
+  }
+
+  confirmNewConv(): void {
+    if (!this.newConvPhone.trim()) return;
+    this.newConvStep.set('confirm');
+  }
+
+  submitNewConv(): void {
+    this.newConvLoading.set(true);
+    this.newConvError.set(null);
+    this.conversationsService.startConversation(this.newConvPhone.trim()).subscribe({
+      next: (conv) => {
+        this.newConvLoading.set(false);
+        this.newConvModal.set(false);
+        this.selectTab('mine');
+        this.selectedId.set(conv.id);
+      },
+      error: (err) => {
+        this.newConvLoading.set(false);
+        const detail = err?.error?.detail;
+        if (detail?.code === 'bot_active') {
+          this.newConvBotConvId.set(detail.conversation_id);
+          this.newConvStep.set('bot_active');
+          return;
+        }
+        if (detail?.code === 'human_active') {
+          this.newConvBotConvId.set(detail.conversation_id);
+          this.newConvStep.set('human_active');
+          return;
+        }
+        if (detail?.code === 'waiting_human') {
+          this.newConvBotConvId.set(detail.conversation_id);
+          this.newConvStep.set('waiting_human');
+          return;
+        }
+        this.newConvError.set(typeof detail === 'string' ? detail : 'Error al iniciar la conversación.');
+        this.newConvStep.set('form');
+      },
+    });
+  }
+
+  takeoverBot(): void {
+    const id = this.newConvBotConvId();
+    if (!id) return;
+    this.newConvLoading.set(true);
+    this.conversationsService.take(id).subscribe({
+      next: () => {
+        this.newConvLoading.set(false);
+        this.newConvModal.set(false);
+        this.selectTab('mine');
+        this.selectedId.set(id);
+      },
+      error: () => {
+        this.newConvLoading.set(false);
+        this.newConvError.set('Error al tomar la conversación.');
+        this.newConvStep.set('form');
+      },
+    });
+  }
+
+  takeover(): void {
+    const id = this.newConvBotConvId();
+    if (!id) return;
+    this.newConvLoading.set(true);
+    this.conversationsService.take(id).subscribe({
+      next: () => {
+        this.newConvLoading.set(false);
+        this.newConvModal.set(false);
+        this.selectTab('mine');
+        this.selectedId.set(id);
+      },
+      error: () => {
+        this.newConvLoading.set(false);
+        this.newConvError.set('Error al reasignar la conversación.');
+        this.newConvStep.set('form');
+      },
+    });
   }
 
   formatDate(iso: string): string {

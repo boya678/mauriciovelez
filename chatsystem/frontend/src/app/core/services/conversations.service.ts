@@ -31,4 +31,12 @@ export class ConversationsService {
   sendMessage(id: string, content: string) {
     return this.http.post<Message>(`${environment.apiUrl}/api/v1/conversations/${id}/send`, { content });
   }
+
+  startConversation(phone: string) {
+    return this.http.post<Conversation>(`${environment.apiUrl}/api/v1/conversations`, { phone });
+  }
+
+  reopen(id: string) {
+    return this.http.post<Conversation>(`${environment.apiUrl}/api/v1/conversations/${id}/reopen`, {});
+  }
 }

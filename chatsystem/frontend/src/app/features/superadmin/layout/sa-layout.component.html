@@ -1,0 +1,30 @@
+<div class="sa-shell">
+  <!-- Sidebar -->
+  <aside class="sa-sidebar">
+    <div class="sa-logo">
+      <span class="material-icons">admin_panel_settings</span>
+      <span>Panel Global</span>
+    </div>
+
+    <nav class="sa-nav">
+      <a class="sa-nav-item" routerLink="/sa/tenants" routerLinkActive="active">
+        <span class="material-icons">business</span> Tenants
+      </a>
+      <a class="sa-nav-item" routerLink="/sa/users" routerLinkActive="active">
+        <span class="material-icons">manage_accounts</span> Superadmins
+      </a>
+    </nav>
+
+    <div class="sa-sidebar-footer">
+      <span class="sa-user-name">{{ auth.getName() }}</span>
+      <button class="btn-logout" (click)="auth.logout()" title="Cerrar sesión">
+        <span class="material-icons">logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="sa-main">
+    <router-outlet />
+  </main>
+</div>

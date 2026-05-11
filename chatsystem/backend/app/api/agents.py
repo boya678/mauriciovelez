@@ -150,6 +150,8 @@ async def create_agent(
 
 class PromptSettings(BaseModel):
     ai_system_prompt: str | None = None
+    whatsapp_template_name: str | None = None
+    whatsapp_template_language: str | None = None
 
 
 @router.get("/settings", response_model=PromptSettings)
@@ -158,7 +160,11 @@ async def get_settings(
     _=Depends(require_admin),
 ):
     """Returns editable tenant settings (system prompt)."""
-    return PromptSettings(ai_system_prompt=tenant.ai_system_prompt)
+    return PromptSettings(
+        ai_system_prompt=tenant.ai_system_prompt,
+        whatsapp_template_name=tenant.whatsapp_template_name,
+        whatsapp_template_language=tenant.whatsapp_template_language,
+    )
 
 
 @router.put("/settings", response_model=PromptSettings)
@@ -175,11 +181,17 @@ async def update_settings(
     if not t:
         raise HTTPException(status_code=404, detail="Tenant not found")
     t.ai_system_prompt = body.ai_system_prompt
+    t.whatsapp_template_name = body.whatsapp_template_name
+    t.whatsapp_template_language = body.whatsapp_template_language
     await db.commit()
-    # Invalidate in-process cache so next request picks up new prompt
+    # Invalidate in-process cache so next request picks up new settings
     _tenant_cache.pop(tenant.slug, None)
     _tenant_cache.pop(str(tenant.id), None)
-    return PromptSettings(ai_system_prompt=t.ai_system_prompt)
+    return PromptSettings(
+        ai_system_prompt=t.ai_system_prompt,
+        whatsapp_template_name=t.whatsapp_template_name,
+        whatsapp_template_language=t.whatsapp_template_language,
+    )
 
 
 @router.put("/{agent_id}", response_model=AgentOut)

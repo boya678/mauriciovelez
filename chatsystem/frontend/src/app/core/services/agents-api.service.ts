@@ -3,6 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { Agent, AgentCreate, AgentStatus, AgentUpdate } from '../models/agent.model';
 
+export interface TenantSettings {
+  ai_system_prompt: string | null;
+  whatsapp_template_name: string | null;
+  whatsapp_template_language: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AgentsApiService {
   constructor(private http: HttpClient) {}
@@ -36,10 +42,10 @@ export class AgentsApiService {
   }
 
   getSettings() {
-    return this.http.get<{ ai_system_prompt: string | null }>(`${environment.apiUrl}/api/v1/agents/settings`);
+    return this.http.get<TenantSettings>(`${environment.apiUrl}/api/v1/agents/settings`);
   }
 
-  updateSettings(prompt: string | null) {
-    return this.http.put<{ ai_system_prompt: string | null }>(`${environment.apiUrl}/api/v1/agents/settings`, { ai_system_prompt: prompt });
+  updateSettings(data: TenantSettings) {
+    return this.http.put<TenantSettings>(`${environment.apiUrl}/api/v1/agents/settings`, data);
   }
 }

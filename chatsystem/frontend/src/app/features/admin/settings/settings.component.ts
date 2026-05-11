@@ -12,6 +12,8 @@ import { AgentsApiService } from '../../../core/services/agents-api.service';
 })
 export class SettingsComponent implements OnInit {
   promptText = '';
+  templateName = '';
+  templateLanguage = 'es';
   loading = signal(true);
   saving = signal(false);
   saved = signal(false);
@@ -23,6 +25,8 @@ export class SettingsComponent implements OnInit {
     this.agentsApi.getSettings().subscribe({
       next: (s) => {
         this.promptText = s.ai_system_prompt ?? '';
+        this.templateName = s.whatsapp_template_name ?? '';
+        this.templateLanguage = s.whatsapp_template_language ?? 'es';
         this.loading.set(false);
       },
       error: () => {
@@ -36,7 +40,11 @@ export class SettingsComponent implements OnInit {
     this.saving.set(true);
     this.saved.set(false);
     this.error.set(null);
-    this.agentsApi.updateSettings(this.promptText || null).subscribe({
+    this.agentsApi.updateSettings({
+      ai_system_prompt: this.promptText || null,
+      whatsapp_template_name: this.templateName || null,
+      whatsapp_template_language: this.templateLanguage || null,
+    }).subscribe({
       next: () => {
         this.saving.set(false);
         this.saved.set(true);

@@ -2,9 +2,11 @@ import {
   AfterViewChecked,
   Component,
   ElementRef,
+  EventEmitter,
   input,
   OnDestroy,
   OnInit,
+  output,
   signal,
   ViewChild,
   effect,
@@ -27,12 +29,15 @@ import { Message } from '../../../core/models/message.model';
 })
 export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   conversationId = input.required<string>();
+  conversationReopened = output<void>();
 
   conversation = signal<ConversationDetail | null>(null);
   loading = signal(false);
   sending = signal(false);
   loadError = signal<string | null>(null);
   newMessage = '';
+  showReopenConfirm = signal(false);
+  reopening = signal(false);
 
   private shouldScroll = false;
   private wsSub?: Subscription;
@@ -147,6 +152,25 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   get canClose(): boolean {
     return this.conversation()?.status === 'human_active' && this.isAssignedToMe;
+  }
+
+  get isClosed(): boolean {
+    return this.conversation()?.status === 'closed';
+  }
+
+  reopen(): void {
+    const id = this.conversation()?.id;
+    if (!id) return;
+    this.reopening.set(true);
+    this.conversationsService.reopen(id).subscribe({
+      next: () => {
+        this.reopening.set(false);
+        this.showReopenConfirm.set(false);
+        this.load(id);
+        this.conversationReopened.emit();
+      },
+      error: () => this.reopening.set(false),
+    });
   }
 
   bubbleClass(msg: Message): string {

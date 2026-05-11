@@ -38,6 +38,36 @@ async def send_text_message(
     return resp.json()
 
 
+async def send_template_message(
+    phone_id: str,
+    token: str,
+    to: str,
+    template_name: str,
+    language: str = "es",
+) -> dict:
+    """Send a WhatsApp template message (no variables). Returns Meta API response dict."""
+    url = f"{WA_API_BASE}/{phone_id}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {"code": language},
+        },
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+    if resp.status_code >= 400:
+        logger.error("WhatsApp template send failed %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def send_interactive_message(
     phone_id: str,
     token: str,

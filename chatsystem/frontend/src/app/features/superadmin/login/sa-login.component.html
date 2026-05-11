@@ -1,0 +1,38 @@
+<div class="sa-login-wrap">
+  <div class="sa-login-card">
+    <div class="sa-login-logo">
+      <span class="material-icons" style="font-size:2.5rem;color:#6366f1">admin_panel_settings</span>
+      <h1>Panel Global</h1>
+    </div>
+
+    @if (error()) {
+      <div class="alert-error">{{ error() }}</div>
+    }
+
+    <div class="form-group">
+      <label>Email</label>
+      <input
+        class="form-control"
+        type="email"
+        [(ngModel)]="email"
+        placeholder="admin@sistema.com"
+        (keyup.enter)="submit()"
+      />
+    </div>
+
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input
+        class="form-control"
+        type="password"
+        [(ngModel)]="password"
+        placeholder="••••••••"
+        (keyup.enter)="submit()"
+      />
+    </div>
+
+    <button class="btn btn-primary btn-full" (click)="submit()" [disabled]="loading()">
+      {{ loading() ? 'Ingresando…' : 'Ingresar' }}
+    </button>
+  </div>
+</div>

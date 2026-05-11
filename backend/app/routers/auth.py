@@ -111,6 +111,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             codigo_pais=payload.codigo_pais,
             correo=payload.correo,
             cc=payload.cc,
+            tipo_cliente=1,
         )
         db.add(cliente)
         db.flush()  # obtener el ID antes del commit

@@ -31,7 +31,7 @@ export class AgentsMgmtComponent implements OnInit {
 
   form: AgentForm = this.emptyForm();
 
-  readonly roles: AgentRole[] = ['agent', 'admin', 'superadmin'];
+  readonly roles: AgentRole[] = ['agent', 'admin'];
 
   constructor(private agentsApi: AgentsApiService) {}
 

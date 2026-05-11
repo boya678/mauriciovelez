@@ -46,30 +46,32 @@
                 controls
                 [src]="'data:' + (msg.media_mime_type || 'audio/ogg') + ';base64,' + msg.media_content"
               ></audio>
-            } @else if (parseInteractive(msg.content); as menu) {
-              <p class="interactive-body">{{ menu.body }}</p>
-              @if (menu.menu_type === 'buttons') {
-                <div class="interactive-buttons">
-                  @for (btn of menu.buttons; track btn.id) {
-                    <span class="interactive-btn">{{ btn.title }}</span>
-                  }
-                </div>
-              } @else if (menu.menu_type === 'list') {
-                <div class="interactive-list">
-                  @for (section of menu.sections; track section.title) {
-                    @if (section.title) {
-                      <p class="interactive-list-section">{{ section.title }}</p>
+            } @else if (parseInteractive(msg.content)) {
+              @if (parseInteractive(msg.content); as menu) {
+                <p class="interactive-body">{{ menu.body }}</p>
+                @if (menu.menu_type === 'buttons') {
+                  <div class="interactive-buttons">
+                    @for (btn of menu.buttons; track btn.id) {
+                      <span class="interactive-btn">{{ btn.title }}</span>
                     }
-                    @for (row of section.rows; track row.id) {
-                      <div class="interactive-list-row">
-                        <span class="interactive-list-title">{{ row.title }}</span>
-                        @if (row.description) {
-                          <span class="interactive-list-desc">{{ row.description }}</span>
-                        }
-                      </div>
+                  </div>
+                } @else if (menu.menu_type === 'list') {
+                  <div class="interactive-list">
+                    @for (section of menu.sections; track section.title) {
+                      @if (section.title) {
+                        <p class="interactive-list-section">{{ section.title }}</p>
+                      }
+                      @for (row of section.rows; track row.id) {
+                        <div class="interactive-list-row">
+                          <span class="interactive-list-title">{{ row.title }}</span>
+                          @if (row.description) {
+                            <span class="interactive-list-desc">{{ row.description }}</span>
+                          }
+                        </div>
+                      }
                     }
-                  }
-                </div>
+                  </div>
+                }
               }
             } @else {
               <p>{{ msg.content }}</p>
@@ -97,8 +99,32 @@
           {{ sending() ? '…' : '➤' }}
         </button>
       </div>
+    } @else if (isClosed) {
+      <div class="chat-closed-note">
+        <span>Esta conversación está cerrada.</span>
+        <button class="btn btn-primary" (click)="showReopenConfirm.set(true)">Reabrir</button>
+      </div>
     } @else if (!canTake) {
-      <div class="chat-closed-note">Esta conversación está cerrada o asignada a otro agente.</div>
+      <div class="chat-closed-note">Esta conversación está asignada a otro agente.</div>
     }
   </div>
+
+  <!-- Reopen confirmation modal -->
+  @if (showReopenConfirm()) {
+    <div class="modal-overlay" (click)="showReopenConfirm.set(false)">
+      <div class="modal-box" (click)="$event.stopPropagation()">
+        <h2 class="modal-title">Reabrir conversación</h2>
+        <p class="modal-desc">
+          ¿Deseas reabrir la conversación con <strong>{{ conversation()?.phone }}</strong>?<br>
+          Se enviará un mensaje de texto si fue cerrada hace menos de 24 h, o la plantilla de WhatsApp si pasó más tiempo.
+        </p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" (click)="showReopenConfirm.set(false)" [disabled]="reopening()">Cancelar</button>
+          <button class="btn btn-primary" (click)="reopen()" [disabled]="reopening()">
+            {{ reopening() ? 'Reabriendo…' : 'Confirmar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 }

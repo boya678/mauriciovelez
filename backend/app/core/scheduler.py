@@ -344,7 +344,10 @@ def _reasignar_numeros_vencidos() -> None:
     db = SessionLocal()
     try:
         today = datetime.now(COLOMBIA_TZ).date()
-        clientes = db.query(Cliente).filter(Cliente.enabled == True).all()
+        clientes = db.query(Cliente).filter(
+            Cliente.enabled == True,
+            Cliente.tipo_cliente == 1,
+        ).all()
         asignados = 0
         print(f"   Procesando {len(clientes)} cliente(s)...")
 

@@ -12,6 +12,9 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from alembic.config import Config
+from alembic import command
+
 from app.core.config import settings
 from app.api.webhook import router as webhook_router
 from app.api.conversations import router as conversations_router
@@ -19,6 +22,7 @@ from app.api.agents import router as agents_router
 from app.api.ws import router as ws_router
 from app.api.tenants import router as tenants_router
 from app.api.tools import router as tools_router
+from app.api.superadmin import router as superadmin_router
 from app.redis.client import init_redis, close_redis
 from app.workers.runner import start_workers, stop_workers
 from app.websocket.manager import manager
@@ -34,6 +38,15 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Startup
     logger.info("Starting ChatsSystem backend…")
+
+    # Run Alembic migrations
+    try:
+        alembic_cfg = Config("/app/alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations applied")
+    except Exception as exc:
+        logger.warning("Alembic migration failed (continuing): %s", exc)
+
     redis = await init_redis()
     manager.set_redis(redis)
 
@@ -74,6 +87,7 @@ app.include_router(conversations_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(tenants_router, prefix="/api/v1")
 app.include_router(tools_router, prefix="/api/v1")
+app.include_router(superadmin_router, prefix="/api/v1")
 app.include_router(ws_router)  # WebSocket has its own path prefix
 
 

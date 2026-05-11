@@ -1,0 +1,90 @@
+<div class="sa-page">
+  <div class="sa-page-header">
+    <h1>Superadmins</h1>
+    <button class="btn btn-primary" (click)="openCreate()">+ Nuevo superadmin</button>
+  </div>
+
+  @if (loading()) {
+    <p class="loading-text">Cargando…</p>
+  } @else {
+    <div class="panel table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Creado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of users(); track u.id) {
+            <tr>
+              <td>
+                {{ u.name }}
+                @if (u.id === myId) { <span class="badge badge-purple">Tú</span> }
+              </td>
+              <td>{{ u.email }}</td>
+              <td>{{ formatDate(u.created_at) }}</td>
+              <td>
+                @if (u.id !== myId) {
+                  @if (confirmDeleteId() === u.id) {
+                    <span class="delete-confirm">
+                      ¿Eliminar?
+                      <button class="btn btn-danger btn-sm" (click)="confirmDelete(u.id)">Sí</button>
+                      <button class="btn btn-ghost btn-sm" (click)="cancelDelete()">No</button>
+                    </span>
+                  } @else {
+                    <button class="btn btn-danger btn-sm" (click)="requestDelete(u.id)">Eliminar</button>
+                  }
+                }
+              </td>
+            </tr>
+          }
+          @if (users().length === 0) {
+            <tr><td colspan="4" class="empty-row">Sin superadmins registrados</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+@if (showModal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Nuevo superadmin</h2>
+        <button class="btn btn-ghost btn-sm" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        @if (error()) {
+          <div class="alert-error">{{ error() }}</div>
+        }
+
+        <div class="form-group">
+          <label>Nombre</label>
+          <input class="form-control" type="text" [(ngModel)]="form.name" placeholder="Admin Global" />
+        </div>
+
+        <div class="form-group">
+          <label>Email</label>
+          <input class="form-control" type="email" [(ngModel)]="form.email" placeholder="admin@sistema.com" />
+        </div>
+
+        <div class="form-group">
+          <label>Contraseña <span class="hint">(mínimo 8 caracteres)</span></label>
+          <input class="form-control" type="password" [(ngModel)]="form.password" placeholder="••••••••" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

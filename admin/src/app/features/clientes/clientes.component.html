@@ -46,9 +46,10 @@
             <th>Celular</th>
             <th>CC</th>
             <th>Correo</th>
+            <th class="center">Tipo</th>
             <th class="right">Saldo</th>
             <th class="center">VIP</th>
-            <th class="center">Cód. VIP</th>
+            <th class="center">Código</th>
             <th class="center">Habilitado</th>
             <th class="center">Acciones</th>
           </tr>
@@ -60,6 +61,11 @@
               <td>{{ c.celular }}</td>
               <td>{{ c.cc || '—' }}</td>
               <td>{{ c.correo || '—' }}</td>
+              <td class="center">
+                @if (c.tipo_cliente === 2) { <span class="badge promotor">Promotor</span> }
+                @else if (c.tipo_cliente === 3) { <span class="badge aliado">Aliado</span> }
+                @else { <span class="text-muted">Cliente</span> }
+              </td>
               <td class="right mono">{{ c.saldo | number:'1.2-2' }}</td>
               <td class="center">
                 @if (c.vip) { <span class="badge vip">VIP</span> } @else { <span class="text-muted">—</span> }
@@ -134,13 +140,24 @@
         </div>
       </div>
       <div class="form-group">
+        <label>Tipo de cliente</label>
+        <select [(ngModel)]="createForm.tipo_cliente" (ngModelChange)="onCreateTipoChange($event)">
+          <option [value]="1">Cliente (con números asignados)</option>
+          <option [value]="2">Promotor (sin números)</option>
+          <option [value]="3">Aliado (sin números)</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Saldo inicial</label>
         <input type="number" [(ngModel)]="createForm.saldo" step="0.01" />
       </div>
       <div class="form-group check-group">
-        <label>
-          <input type="checkbox" [(ngModel)]="createForm.vip" /> VIP
+        <label [class.disabled-label]="(createForm.tipo_cliente ?? 1) !== 1">
+          <input type="checkbox" [(ngModel)]="createForm.vip" [attr.disabled]="(createForm.tipo_cliente ?? 1) !== 1 ? true : null" /> VIP
         </label>
+        @if ((createForm.tipo_cliente ?? 1) !== 1) {
+          <span class="hint-locked"><span class="material-icons-round" style="font-size:0.85rem;vertical-align:middle">block</span> Solo clientes tipo 1 pueden ser VIP</span>
+        }
       </div>
       <div class="form-group check-group">
         <label>
@@ -148,7 +165,7 @@
         </label>
       </div>
       <div class="form-group">
-        <label>Código VIP @if (createForm.vip) { <span class="required">*</span> }</label>
+        <label>Código @if (createForm.vip) { <span class="required">*</span> }</label>
         <input type="text" [(ngModel)]="createForm.codigo_vip" placeholder="Requerido si es VIP" [class.input-error]="createForm.vip && !createForm.codigo_vip?.trim()" />
       </div>
       @if (createError()) {
@@ -201,15 +218,28 @@
         </div>
       </div>
       <div class="form-group">
+        <label>Tipo de cliente</label>
+        <select [(ngModel)]="editForm.tipo_cliente" disabled>
+          <option [value]="1">Cliente (con números asignados)</option>
+          <option [value]="2">Promotor (sin números)</option>
+          <option [value]="3">Aliado (sin números)</option>
+        </select>
+        <span class="hint-locked"><span class="material-icons-round" style="font-size:0.85rem;vertical-align:middle">lock</span> El tipo de cliente no puede cambiarse</span>
+      </div>
+      <div class="form-group">
         <label>Saldo</label>
         <input type="number" [(ngModel)]="editForm.saldo" step="0.01" />
       </div>
       <div class="form-group check-group">
-        <label [class.disabled-label]="editTarget?.vip">
-          <input type="checkbox" [(ngModel)]="editForm.vip" [attr.disabled]="editTarget?.vip ? true : null" /> VIP
-        </label>
-        @if (editTarget?.vip) {
+        @if (editTarget!.vip) {
+          <label class="disabled-label">
+            <input type="checkbox" checked disabled /> VIP
+          </label>
           <span class="hint-locked"><span class="material-icons-round" style="font-size:0.85rem;vertical-align:middle">lock</span> Solo el proceso automático puede quitar el VIP</span>
+        } @else {
+          <label>
+            <input type="checkbox" [(ngModel)]="editForm.vip" /> VIP
+          </label>
         }
       </div>
       <div class="form-group check-group">
@@ -218,7 +248,7 @@
         </label>
       </div>
       <div class="form-group">
-        <label>Código VIP @if (editForm.vip) { <span class="required">*</span> }</label>
+        <label>Código @if (editForm.vip) { <span class="required">*</span> }</label>
         <div class="input-with-btn">
           <input type="text" [(ngModel)]="editForm.codigo_vip" placeholder="Requerido si es VIP" [class.input-error]="editForm.vip && !editForm.codigo_vip?.trim()" />
           <button type="button" class="btn-ghost btn-sm" (click)="generateCode()">Generar</button>

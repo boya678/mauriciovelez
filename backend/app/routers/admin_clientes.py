@@ -37,6 +37,7 @@ class ClienteOut(BaseModel):
     vip: bool
     codigo_vip: Optional[str]
     enabled: bool
+    tipo_cliente: int = 1
     fecha_nacimiento: Optional[date] = None
 
     model_config = {"from_attributes": True}
@@ -52,6 +53,7 @@ class ClienteUpdate(BaseModel):
     vip: Optional[bool] = None
     codigo_vip: Optional[str] = None
     enabled: Optional[bool] = None
+    tipo_cliente: Optional[int] = None
     fecha_nacimiento: Optional[date] = None
 
     @field_validator('correo', 'cc', 'codigo_vip', mode='before')
@@ -70,6 +72,7 @@ class ClienteCreate(BaseModel):
     vip: bool = False
     codigo_vip: Optional[str] = None
     enabled: bool = True
+    tipo_cliente: int = 1
     fecha_nacimiento: Optional[date] = None
 
     @field_validator('nombre', 'celular')
@@ -130,6 +133,7 @@ def create_cliente(
         vip=payload.vip,
         codigo_vip=payload.codigo_vip or None,
         enabled=payload.enabled,
+        tipo_cliente=payload.tipo_cliente,
         fecha_nacimiento=payload.fecha_nacimiento,
     )
     db.add(nuevo)
@@ -138,12 +142,15 @@ def create_cliente(
     # Número completo con código de país para WhatsApp
     celular_wp = f"{nuevo.codigo_pais or '57'}{nuevo.celular}"
 
-    # Siempre asignar número free
-    nueva_free = assign_number(db, nuevo.id, "free")
-    free_number = nueva_free.number
-    free_valid_until = nueva_free.valid_until
+    # Solo tipo_cliente == 1 (cliente) recibe números asignados automáticamente
+    free_number = None
+    free_valid_until = None
+    if payload.tipo_cliente == 1:
+        nueva_free = assign_number(db, nuevo.id, "free")
+        free_number = nueva_free.number
+        free_valid_until = nueva_free.valid_until
 
-    if payload.vip:
+    if payload.vip and payload.tipo_cliente == 1:
         now = datetime.now(timezone.utc)
         db.add(Suscripcion(
             cliente_id=nuevo.id,
@@ -158,10 +165,11 @@ def create_cliente(
         db.flush()
         notificar_nuevo_numero_vip(celular_wp, number_vip, valid_until_vip)
 
-    _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular})
+    _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular, "tipo_cliente": nuevo.tipo_cliente})
     try:
         db.commit()
-        notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
+        if free_number:
+            notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
     except IntegrityError as e:
         db.rollback()
         orig = str(e.orig)
@@ -274,8 +282,8 @@ def update_cliente(
             setattr(obj, key, val)
 
         # Si el cliente es (o acaba de ser marcado como) VIP, asegurar que tenga número VIP.
-        # Esto cubre tanto la activación nueva como clientes que ya eran VIP sin número asignado.
-        if obj.vip:
+        # Solo aplica a tipo_cliente == 1 (clientes con números asignados).
+        if obj.vip and obj.tipo_cliente == 1:
             # autoflush=False evita que la query dispare un flush prematuro
             with db.no_autoflush:
                 vip_row = db.execute(

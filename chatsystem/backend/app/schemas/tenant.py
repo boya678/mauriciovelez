@@ -10,6 +10,12 @@ class TenantOut(BaseModel):
     slug: str
     active: bool
     created_at: datetime
+    whatsapp_phone_id: str | None = None
+    whatsapp_token: str | None = None
+    webhook_secret: str | None = None
+    ai_system_prompt: str | None = None
+    whatsapp_template_name: str | None = None
+    whatsapp_template_language: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -29,3 +35,5 @@ class TenantUpdate(BaseModel):
     whatsapp_token: str | None = None
     webhook_secret: str | None = None
     ai_system_prompt: str | None = None
+    whatsapp_template_name: str | None = None
+    whatsapp_template_language: str | None = None
