@@ -47,4 +47,58 @@
       </table>
     </div>
   }
+
+  <!-- Message stats -->
+  <div class="msg-section panel">
+    <h2>Mensajes <span class="msg-subtitle">últimos 6 meses</span></h2>
+    @if (msgLoading()) {
+      <p class="loading-text">Cargando…</p>
+    } @else if (msgRows().length === 0) {
+      <p class="loading-text">Sin registros de mensajes todavía.</p>
+    } @else {
+      <div class="msg-cards">
+        @for (r of msgRows(); track r.month) {
+          <div class="msg-card">
+            <div class="msg-month">{{ monthLabel(r.month) }} {{ r.year }}</div>
+            <div class="msg-row"><span>Usuarios</span><strong class="col-user">{{ fmt(r.user_messages) }}</strong></div>
+            <div class="msg-row"><span>Bot</span><strong class="col-bot">{{ fmt(r.bot_messages) }}</strong></div>
+            <div class="msg-row is-total"><span>Agentes</span><strong class="col-human">{{ fmt(r.human_messages) }}</strong></div>
+          </div>
+        }
+      </div>
+      <div class="msg-totals">
+        <span class="totals-label">Total período:</span>
+        <span class="col-user">{{ fmt(msgTotal('user')) }} usuarios</span>
+        <span class="col-bot">{{ fmt(msgTotal('bot')) }} bot</span>
+        <span class="col-human">{{ fmt(msgTotal('human')) }} agentes</span>
+      </div>
+    }
+  </div>
+
+  <!-- Token usage -->
+  <div class="tokens-section panel">
+    <h2>Uso de tokens <span class="tokens-subtitle">últimos 6 meses</span></h2>
+    @if (usageLoading()) {
+      <p class="loading-text">Cargando…</p>
+    } @else if (usageRows().length === 0) {
+      <p class="loading-text">Sin registros de uso todavía.</p>
+    } @else {
+      <div class="token-cards">
+        @for (r of usageRows(); track r.month) {
+          <div class="token-card">
+            <div class="token-month">{{ monthLabel(r.month) }} {{ r.year }}</div>
+            <div class="token-row"><span>Entrada</span><strong class="col-in">{{ fmt(r.tokens_in) }}</strong></div>
+            <div class="token-row"><span>Salida</span><strong class="col-out">{{ fmt(r.tokens_out) }}</strong></div>
+            <div class="token-row is-total"><span>Total</span><strong>{{ fmt(r.tokens_total) }}</strong></div>
+          </div>
+        }
+      </div>
+      <div class="token-totals">
+        <span class="totals-label">Total período:</span>
+        <span class="col-in">{{ fmt(usageTotal('in')) }} entrada</span>
+        <span class="col-out">{{ fmt(usageTotal('out')) }} salida</span>
+        <strong>{{ fmt(usageTotal('total')) }} total</strong>
+      </div>
+    }
+  </div>
 </div>

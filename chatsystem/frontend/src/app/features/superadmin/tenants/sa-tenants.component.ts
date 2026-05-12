@@ -19,6 +19,15 @@ export class SaTenantsComponent implements OnInit {
   showModal = signal(false);
   editTenant = signal<TenantOut | null>(null);
 
+  // Knowledge management
+  knowledgeTenant = signal<TenantOut | null>(null);
+  knowledgeText = signal('');
+  knowledgeChunks = signal<number | null>(null);
+  knowledgeLoading = signal(false);
+  knowledgeSaving = signal(false);
+  knowledgeError = signal('');
+  showKnowledgeModal = signal(false);
+
   form: TenantCreate = this.emptyForm();
 
   constructor(private api: SuperadminApiService) {}
@@ -92,6 +101,64 @@ export class SaTenantsComponent implements OnInit {
       error: (e) => {
         this.error.set(e?.error?.detail ?? 'Error al guardar.');
         this.saving.set(false);
+      },
+    });
+  }
+
+  // ── Knowledge management ──────────────────────────────────────────────────
+
+  openKnowledge(t: TenantOut): void {
+    this.knowledgeTenant.set(t);
+    this.knowledgeText.set('');
+    this.knowledgeChunks.set(null);
+    this.knowledgeError.set('');
+    this.showKnowledgeModal.set(true);
+    this.knowledgeLoading.set(true);
+    this.api.getKnowledgeStatus(t.id).subscribe({
+      next: (s) => { this.knowledgeChunks.set(s.chunks); this.knowledgeLoading.set(false); },
+      error: () => this.knowledgeLoading.set(false),
+    });
+  }
+
+  closeKnowledgeModal(): void {
+    this.showKnowledgeModal.set(false);
+    this.knowledgeTenant.set(null);
+  }
+
+  saveKnowledge(): void {
+    const t = this.knowledgeTenant();
+    if (!t) return;
+    const text = this.knowledgeText().trim();
+    if (!text) { this.knowledgeError.set('Pega el texto del documento primero.'); return; }
+
+    this.knowledgeSaving.set(true);
+    this.knowledgeError.set('');
+    this.api.uploadKnowledge(t.id, text).subscribe({
+      next: (res) => {
+        this.knowledgeChunks.set(res.chunks);
+        this.knowledgeText.set('');
+        this.knowledgeSaving.set(false);
+      },
+      error: (e) => {
+        this.knowledgeError.set(e?.error?.detail ?? 'Error al cargar el conocimiento.');
+        this.knowledgeSaving.set(false);
+      },
+    });
+  }
+
+  deleteKnowledge(): void {
+    const t = this.knowledgeTenant();
+    if (!t) return;
+    this.knowledgeSaving.set(true);
+    this.knowledgeError.set('');
+    this.api.deleteKnowledge(t.id).subscribe({
+      next: () => {
+        this.knowledgeChunks.set(0);
+        this.knowledgeSaving.set(false);
+      },
+      error: (e) => {
+        this.knowledgeError.set(e?.error?.detail ?? 'Error al eliminar el conocimiento.');
+        this.knowledgeSaving.set(false);
       },
     });
   }

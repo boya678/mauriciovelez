@@ -36,12 +36,23 @@ def list_audit(
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=200),
     entity: Optional[str] = None,
+    q: Optional[str] = Query(None, description="Búsqueda libre: usuario, acción, entidad, id"),
     db: Session = Depends(get_db),
     _user=Depends(require_admin),
 ):
     query = db.query(AuditLog)
     if entity:
         query = query.filter(AuditLog.entity == entity)
+    if q:
+        term = f"%{q.strip()}%"
+        from sqlalchemy import cast, Text
+        query = query.filter(
+            AuditLog.usuario.ilike(term)
+            | AuditLog.action.ilike(term)
+            | AuditLog.entity.ilike(term)
+            | AuditLog.entity_id.ilike(term)
+            | cast(AuditLog.detail, Text).ilike(term)
+        )
     total = query.count()
     items = (
         query.order_by(AuditLog.created_at.desc())

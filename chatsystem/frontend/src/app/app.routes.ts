@@ -71,6 +71,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/superadmin/users/sa-users.component').then(m => m.SaUsersComponent),
       },
+      {
+        path: 'tokens',
+        loadComponent: () =>
+          import('./features/superadmin/tokens/sa-tokens.component').then(m => m.SaTokensComponent),
+      },
       { path: '', redirectTo: 'tenants', pathMatch: 'full' },
     ],
   },

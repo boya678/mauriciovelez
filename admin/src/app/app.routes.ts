@@ -45,7 +45,15 @@ export const routes: Routes = [
         path: 'contactos',
         loadComponent: () => import('./features/contactos/contactos.component').then(m => m.ContactosComponent),
       },
+      {
+        path: 'vip',
+        loadComponent: () => import('./features/vip/vip.component').then(m => m.VipComponent),
+      },
     ],
+  },
+  {
+    path: 'live',
+    loadComponent: () => import('./features/live/live.component').then(m => m.LiveComponent),
   },
   { path: '**', redirectTo: '/login' },
 ];

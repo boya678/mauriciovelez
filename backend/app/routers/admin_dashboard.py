@@ -40,10 +40,10 @@ class DashboardStats(BaseModel):
     efectividad_numerica_pct: float    # aciertos / numeros_entregados
     efectividad_personal_pct: float    # clientes que ganaron / clientes con números
     clientes_con_numeros: int
-    exactos: int
-    directo_devuelto: int
-    tres_orden: int
-    tres_desorden: int
+    directos: int
+    directo_metodo: int
+    tres_directo: int
+    tres_metodo: int
     clientes_con_aciertos: int
     numero_mas_frecuente: Optional[str]
     top_loterias: list[TopLoteria]
@@ -111,10 +111,10 @@ def get_dashboard(
     # ── Clientes distintos con números en el mes ─────────────────────────────
     clientes_con_numeros = len(set(h.id_user for h in historics))
 
-    exactos = sum(1 for a in aciertos if a.tipo == "exacto")
-    directo_devuelto = sum(1 for a in aciertos if a.tipo == "directo_devuelto")
-    tres_orden = sum(1 for a in aciertos if a.tipo == "tres_orden")
-    tres_desorden = sum(1 for a in aciertos if a.tipo == "tres_desorden")
+    directos = sum(1 for a in aciertos if a.tipo == "directo")
+    directo_devuelto_val = sum(1 for a in aciertos if a.tipo == "directo_metodo")
+    tres_orden_val = sum(1 for a in aciertos if a.tipo == "tres_directo")
+    tres_desorden_val = sum(1 for a in aciertos if a.tipo == "tres_metodo")
 
     # ── Distinct clients with aciertos ───────────────────────────────────────
     historic_ids_with_aciertos = {a.historic_id for a in aciertos}
@@ -245,10 +245,10 @@ def get_dashboard(
         efectividad_numerica_pct=efectividad_numerica,
         efectividad_personal_pct=efectividad_personal,
         clientes_con_numeros=clientes_con_numeros,
-        exactos=exactos,
-        directo_devuelto=directo_devuelto,
-        tres_orden=tres_orden,
-        tres_desorden=tres_desorden,
+        directos=directos,
+        directo_metodo=directo_devuelto_val,
+        tres_directo=tres_orden_val,
+        tres_metodo=tres_desorden_val,
         clientes_con_aciertos=clientes_con_aciertos,
         numero_mas_frecuente=numero_mas_frecuente,
         top_loterias=top_loterias,

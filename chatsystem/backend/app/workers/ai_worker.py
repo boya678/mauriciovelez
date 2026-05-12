@@ -40,6 +40,8 @@ from app.redis.streams import (
     xack,
     xautoclaim,
 )
+from app.services.token_usage import record_tokens
+from app.services.message_stats import record_messages
 from app.services.tool_engine import load_tools
 from app.websocket.manager import manager
 
@@ -118,6 +120,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
         result = await run_graph(
             messages=history,
             tenant_system_prompt=system_prompt,
+            tenant_id=tenant_id,
             turns=0,
             tools=tools,
             phone=phone,
@@ -182,6 +185,16 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 "phone": phone,
             })
 
+            # Record token usage for the classifier + farewell LLM calls
+            t_in  = result.get("tokens_in",  0)
+            t_out = result.get("tokens_out", 0)
+            if t_in or t_out:
+                try:
+                    async with AsyncSessionLocal() as tok_db:
+                        await record_tokens(uuid.UUID(tenant_id), t_in, t_out, tok_db)
+                except Exception:
+                    logger.warning("Failed to record tokens for tenant %s", tenant_id)
+
             # Notify agents via WebSocket
             await manager.publish(tenant_slug, {
                 "type": "conversation_waiting",
@@ -224,6 +237,23 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
 
             await xadd(redis, OUTGOING_STREAM, outgoing_payload)
             logger.info("Bot replied to conv %s", conversation_id)
+
+            # Record token usage
+            t_in  = result.get("tokens_in",  0)
+            t_out = result.get("tokens_out", 0)
+            if t_in or t_out:
+                try:
+                    async with AsyncSessionLocal() as tok_db:
+                        await record_tokens(uuid.UUID(tenant_id), t_in, t_out, tok_db)
+                except Exception:
+                    logger.warning("Failed to record tokens for tenant %s", tenant_id)
+
+            # Accumulate bot message counter
+            try:
+                async with AsyncSessionLocal() as stats_db:
+                    await record_messages(uuid.UUID(tenant_id), stats_db, bot=1)
+            except Exception:
+                logger.warning("Failed to record bot message stat for tenant %s", tenant_id)
 
 
 async def run(stop_event: asyncio.Event) -> None:

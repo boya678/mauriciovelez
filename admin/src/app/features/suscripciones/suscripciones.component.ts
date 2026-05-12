@@ -21,6 +21,7 @@ export class SuscripcionesComponent implements OnInit {
   loading = signal(false);
   renovandoId: string | null = null;
   confirmRenovar: Suscripcion | null = null;
+  private _renovarLock = false;
   runningCheck = signal(false);
   toast = signal<{ msg: string; type: 'ok' | 'err' } | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -49,17 +50,20 @@ export class SuscripcionesComponent implements OnInit {
   }
 
   doRenovar() {
-    if (!this.confirmRenovar) return;
+    if (!this.confirmRenovar || this._renovarLock) return;
+    this._renovarLock = true;
     const s = this.confirmRenovar;
     this.confirmRenovar = null;
     this.renovandoId = s.id;
     this.svc.renovar(s.id).subscribe({
       next: () => {
+        this._renovarLock = false;
         this.renovandoId = null;
         this.showToast('Suscripción renovada correctamente', 'ok');
         this.load();
       },
       error: () => {
+        this._renovarLock = false;
         this.renovandoId = null;
         this.showToast('Error al renovar — intenta de nuevo', 'err');
       },

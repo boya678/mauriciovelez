@@ -33,6 +33,14 @@
         <span class="nav-icon material-icons-round">contact_phone</span>
         @if (sidebarOpen()) { <span>Contactos</span> }
       </a>
+      <a routerLink="/admin/vip" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon material-icons-round">workspace_premium</span>
+        @if (sidebarOpen()) { <span>VIP</span> }
+      </a>
+      <a routerLink="/live" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon material-icons-round">live_tv</span>
+        @if (sidebarOpen()) { <span>En Vivo</span> }
+      </a>
       @if (auth.isAdmin()) {
         <a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-item">
           <span class="nav-icon material-icons-round">admin_panel_settings</span>

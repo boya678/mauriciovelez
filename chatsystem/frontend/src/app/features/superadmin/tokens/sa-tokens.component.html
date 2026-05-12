@@ -1,0 +1,103 @@
+<div class="sa-tokens">
+  <div class="page-header">
+    <h1 class="page-title">
+      <span class="material-icons">data_usage</span>
+      Uso de Tokens
+    </h1>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label>Año</label>
+        <select [(ngModel)]="filterYear" (ngModelChange)="load()">
+          <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Mes</label>
+        <select [(ngModel)]="filterMonth" (ngModelChange)="load()">
+          <option [value]="null">Todos</option>
+          <option *ngFor="let m of monthNames; let i = index" [value]="i + 1">{{ m }}</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="loading()">
+    <div class="spinner"></div>
+    <span>Cargando datos…</span>
+  </div>
+
+  <div class="error-state" *ngIf="error()">
+    <span class="material-icons">error_outline</span>
+    {{ error() }}
+  </div>
+
+  <ng-container *ngIf="!loading() && !error()">
+    <div class="summary-cards">
+      <div class="summary-card">
+        <span class="card-label">Tenants</span>
+        <span class="card-value">{{ groups().length }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="card-label">Tokens entrada</span>
+        <span class="card-value col-in">{{ fmt(calcTotal('in')) }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="card-label">Tokens salida</span>
+        <span class="card-value col-out">{{ fmt(calcTotal('out')) }}</span>
+      </div>
+      <div class="summary-card highlight">
+        <span class="card-label">Total global</span>
+        <span class="card-value col-total">{{ fmt(calcTotal('all')) }}</span>
+      </div>
+    </div>
+
+    <div class="tenant-table">
+      <div class="table-header tenant-row">
+        <span>Tenant</span>
+        <span class="col-num">Tokens entrada</span>
+        <span class="col-num">Tokens salida</span>
+        <span class="col-num">Total</span>
+        <span class="col-icon"></span>
+      </div>
+
+      <ng-container *ngFor="let g of groups()">
+        <div class="tenant-row summary-row" (click)="toggle(g)">
+          <span class="tenant-name">
+            <span class="badge">{{ g.tenant_slug }}</span>
+            {{ g.tenant_name }}
+          </span>
+          <span class="col-num col-in">{{ fmt(g.totalIn) }}</span>
+          <span class="col-num col-out">{{ fmt(g.totalOut) }}</span>
+          <span class="col-num col-total">{{ fmt(g.totalAll) }}</span>
+          <span class="col-icon">
+            <span class="material-icons expand-icon" [class.expanded]="g.expanded">expand_more</span>
+          </span>
+        </div>
+
+        <div class="detail-rows" *ngIf="g.expanded">
+          <div class="detail-row" *ngFor="let r of g.rows">
+            <span class="month-label">{{ monthLabel(r.month) }} {{ r.year }}</span>
+            <span class="col-num col-in">{{ fmt(r.tokens_in) }}</span>
+            <span class="col-num col-out">{{ fmt(r.tokens_out) }}</span>
+            <span class="col-num col-total">{{ fmt(r.tokens_total) }}</span>
+            <span class="col-icon"></span>
+          </div>
+        </div>
+      </ng-container>
+
+      <div class="tenant-row total-row" *ngIf="groups().length > 1">
+        <span>TOTAL</span>
+        <span class="col-num col-in">{{ fmt(calcTotal('in')) }}</span>
+        <span class="col-num col-out">{{ fmt(calcTotal('out')) }}</span>
+        <span class="col-num col-total">{{ fmt(calcTotal('all')) }}</span>
+        <span class="col-icon"></span>
+      </div>
+
+      <div class="empty-state" *ngIf="groups().length === 0">
+        <span class="material-icons">analytics</span>
+        <p>No hay datos de uso para el período seleccionado.</p>
+      </div>
+    </div>
+  </ng-container>
+</div>

@@ -101,8 +101,8 @@
         <h3>Confirmar renovación</h3>
         <p>¿Renovar suscripción de <strong>{{ confirmRenovar.nombre }}</strong> ({{ confirmRenovar.celular }}) por 1 mes?</p>
         <div class="modal-actions">
-          <button class="btn-sm btn-ghost" (click)="confirmRenovar = null">Cancelar</button>
-          <button class="btn-sm btn-primary" (click)="doRenovar()">Sí, renovar</button>
+          <button class="btn-sm btn-ghost" (click)="confirmRenovar = null" [disabled]="!!renovandoId">Cancelar</button>
+          <button class="btn-sm btn-primary" (click)="doRenovar()" [disabled]="!!renovandoId">{{ renovandoId ? 'Renovando…' : 'Sí, renovar' }}</button>
         </div>
       </div>
     </div>

@@ -24,9 +24,10 @@ export class AuditService {
   private base = `${environment.apiUrl}/admin/audit`;
   constructor(private http: HttpClient) {}
 
-  list(page = 1, size = 50, entity = '') {
+  list(page = 1, size = 50, entity = '', q = '') {
     let params = new HttpParams().set('page', page).set('size', size);
     if (entity) params = params.set('entity', entity);
+    if (q.trim()) params = params.set('q', q.trim());
     return this.http.get<PaginatedAudit>(this.base, { params });
   }
 }

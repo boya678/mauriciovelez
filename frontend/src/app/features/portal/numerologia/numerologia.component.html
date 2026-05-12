@@ -77,33 +77,42 @@
       <div class="numero-badge libre-badge">✦ GRATUITO · VIGENTE 10 DÍAS</div>
       <h2 class="numero-section-title">Tu Número de la Semana</h2>
 
-      <div class="numero-display">
-        @for (d of digitos(data.numero_libre.numero); track $index) {
-          <div class="digit-card" [style.animation-delay]="$index * 0.1 + 's'">
-            {{ d }}
-          </div>
-        }
-      </div>
-
-      <div class="metodo-row">
-        <span class="metodo-label">Método Victorioso</span>
-        <div class="metodo-numero">
-          @for (d of digitos(data.numero_libre.numero_metodo); track $index) {
-            <span>{{ d }}</span>
+      @if (!data.enabled) {
+        <div class="estado-box bloqueado">
+          <span class="material-icons-round">lock</span>
+          <p>No tienes números disponibles. ¡Conviértete en VIP para seguir participando!</p>
+        </div>
+      } @else {
+        <div class="numero-display">
+          @for (d of digitos(data.numero_libre.numero); track $index) {
+            <div class="digit-card" [style.animation-delay]="$index * 0.1 + 's'">
+              {{ d }}
+            </div>
           }
         </div>
-      </div>
 
-      <div class="vigencia-row">
-        <span class="material-icons-round vigencia-icon">calendar_today</span>
-        <span>
-          Válido hasta <strong>{{ data.numero_libre.vigencia_hasta }}</strong>
-          &nbsp;·&nbsp;
-          <span [class.urgente]="data.numero_libre.dias_restantes <= 3">
-            {{ data.numero_libre.dias_restantes }} día{{ data.numero_libre.dias_restantes !== 1 ? 's' : '' }} restante{{ data.numero_libre.dias_restantes !== 1 ? 's' : '' }}
+        <div class="metodo-row">
+          <span class="metodo-label">Método Victorioso</span>
+          <div class="metodo-numero">
+            @for (d of digitos(data.numero_libre.numero_metodo); track $index) {
+              <span>{{ d }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="vigencia-row">
+          <span class="material-icons-round vigencia-icon">calendar_today</span>
+          <span>
+            Válido hasta <strong>{{ data.numero_libre.vigencia_hasta }}</strong>
+            @if (data.numero_libre.dias_restantes > 0) {
+              &nbsp;·&nbsp;
+              <span [class.urgente]="data.numero_libre.dias_restantes <= 3">
+                {{ data.numero_libre.dias_restantes }} día{{ data.numero_libre.dias_restantes !== 1 ? 's' : '' }} restante{{ data.numero_libre.dias_restantes !== 1 ? 's' : '' }}
+              </span>
+            }
           </span>
-        </span>
-      </div>
+        </div>
+      }
     </section>
 
       </div><!-- /num-left -->

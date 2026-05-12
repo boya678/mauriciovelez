@@ -48,6 +48,32 @@
   }
 }
 
+// ── Window status banner ──────────────────────────────────────────────────────
+.window-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+  border-bottom: 1px solid transparent;
+
+  .material-icons { font-size: 15px; }
+
+  &.window-open {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+  }
+
+  &.window-closed {
+    background: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+  }
+}
+
 // ── Messages ──────────────────────────────────────────────────────────────────
 .messages {
   flex: 1;
@@ -121,6 +147,30 @@
   color: #94a3b8;
   font-size: 13px;
   margin-top: 32px;
+}
+
+// ── Send error ────────────────────────────────────────────────────────────────
+.send-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  border-top: 1px solid #fecaca;
+  flex-shrink: 0;
+}
+
+.send-error-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #dc2626;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
 }
 
 // ── Input area ────────────────────────────────────────────────────────────────

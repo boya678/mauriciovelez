@@ -18,7 +18,7 @@ class NumeroAcierto(Base):
     resultado_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("loteria_resultados.id", ondelete="CASCADE"), nullable=False
     )
-    # exacto | tres_orden | tres_desorden
+    # directo | directo_metodo | tres_directo | tres_metodo
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")

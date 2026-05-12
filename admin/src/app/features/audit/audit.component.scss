@@ -4,12 +4,19 @@
 }
 
 .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 16px;
-  .inline {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    label { margin: 0; white-space: nowrap; }
+  flex-wrap: wrap;
+
+  .toolbar-search {
+    flex: 1;
+    min-width: 220px;
+  }
+
+  select {
+    width: 180px;
   }
 }
 

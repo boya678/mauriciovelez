@@ -123,6 +123,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(cliente)
         notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
+        from app.core.live_events import publish_event
+        publish_event("nuevo_cliente", {"nombre": cliente.nombre})
         es_nuevo = True
     else:
         # Cliente existente: acceso directo sin OTP

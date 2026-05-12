@@ -1,0 +1,261 @@
+:host {
+  display: block;
+  height: 100vh;
+  background: #0a0a0f;
+  color: #fff;
+  font-family: 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+.live-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #12121a;
+  border-bottom: 1px solid #2a2a3a;
+  flex-shrink: 0;
+}
+
+.live-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-icon {
+  color: #ff3d3d;
+  font-size: 28px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.live-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #ff3d3d;
+  text-shadow: 0 0 12px rgba(255, 61, 61, 0.6);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #444;
+  transition: background 0.3s;
+
+  &.dot-on {
+    background: #22dd88;
+    box-shadow: 0 0 8px #22dd88;
+    animation: blink 1.2s ease-in-out infinite;
+  }
+}
+
+.mute-btn {
+  background: #1e1e2e;
+  border: 1px solid #333;
+  color: #aaa;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #2a2a3a;
+    color: #fff;
+  }
+
+  .material-icons-round {
+    font-size: 22px;
+  }
+}
+
+/* ── Feed ────────────────────────────────────────────────── */
+.live-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.empty-state {
+  text-align: center;
+  margin-top: 80px;
+  color: #555;
+
+  .material-icons-round {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  p {
+    font-size: 18px;
+  }
+}
+
+/* ── Cards ───────────────────────────────────────────────── */
+.event-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border-left: 5px solid transparent;
+  background: #16161f;
+  animation: slide-in 0.3s ease;
+  position: relative;
+
+  &.card-ganador {
+    border-left-color: #ffc107;
+    background: linear-gradient(135deg, #1e1a08 0%, #16161f 100%);
+  }
+
+  &.card-nuevo_cliente {
+    border-left-color: #22dd88;
+    background: linear-gradient(135deg, #0b1e14 0%, #16161f 100%);
+  }
+
+  &.card-nuevo_vip {
+    border-left-color: #a855f7;
+    background: linear-gradient(135deg, #160d22 0%, #16161f 100%);
+  }
+}
+
+.card-icon {
+  font-size: 36px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-nombre {
+  font-size: clamp(18px, 3vw, 26px);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.card-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.numero-badge {
+  font-size: clamp(20px, 4vw, 32px);
+  font-weight: 800;
+  color: #ffc107;
+  letter-spacing: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.loteria-label {
+  font-size: clamp(13px, 2vw, 16px);
+  color: #aaa;
+  align-self: flex-end;
+  padding-bottom: 4px;
+}
+
+.tipo-badge {
+  background: #ffc10733;
+  color: #ffc107;
+  border: 1px solid #ffc10766;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.veces-label {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #ffc107bb;
+  font-style: italic;
+}
+
+.card-msg {
+  font-size: clamp(14px, 2.5vw, 20px);
+  color: #bbb;
+  margin-top: 4px;
+}
+
+.card-time {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 11px;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .live-header {
+    padding: 10px 14px;
+  }
+
+  .live-title {
+    font-size: 18px;
+    letter-spacing: 2px;
+  }
+
+  .live-feed {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .event-card {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .card-icon {
+    font-size: 28px;
+  }
+}

@@ -27,5 +27,8 @@ pydantic[email]>=2.0.0
 # HTTP client (WhatsApp Cloud API)
 httpx>=0.27.0
 
+# pgvector Python client
+pgvector>=0.3.0
+
 # WebSockets (bundled with uvicorn[standard], listed for clarity)
 websockets>=12.0

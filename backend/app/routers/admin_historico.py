@@ -169,12 +169,12 @@ def export_historico(
     # Header: columnas base + VIP cliente + tipo número + aciertos dinámicos
     header = ["Fecha", "Nombre", "Celular", "CC", "Número", "VIP Cliente", "Tipo Número"]
     for i in range(1, max_aciertos + 1):
-        header += [f"Tipo {i}", f"Lotería {i}", f"Resultado {i}"]
+        header += [f"Tipo {i}", f"Fecha acierto {i}", f"Lotería {i}", f"Resultado {i}"]
     ws.append(header)
 
     for r, aciertos in rows_data:
         row: list = [
-            str(r.fecha),
+            r.fecha,
             r.nombre,
             r.celular,
             r.cc or "",
@@ -183,8 +183,8 @@ def export_historico(
             r.tipo_numero or "—",
         ]
         for a in aciertos:
-            row += [a.tipo, a.resultado.loteria, a.resultado.resultado]
-        row += ["", "", ""] * (max_aciertos - len(aciertos))
+            row += [a.tipo, a.resultado.fecha, a.resultado.loteria, a.resultado.resultado]
+        row += ["", "", "", ""] * (max_aciertos - len(aciertos))
         ws.append(row)
 
     output = io.BytesIO()

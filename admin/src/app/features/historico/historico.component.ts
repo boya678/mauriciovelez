@@ -23,6 +23,7 @@ export class HistoricoComponent implements OnInit {
   page = signal(1);
   size = 20;
   loading = signal(false);
+  exporting = signal(false);
 
   desde = yesterday();
   hasta = yesterday();
@@ -55,13 +56,19 @@ export class HistoricoComponent implements OnInit {
   next() { if (this.page() < this.totalPages) { this.page.update(p => p + 1); this.load(); } }
 
   downloadExcel() {
-    this.svc.export(this.desde, this.hasta, this.soloGanadores, this.filtroVip).subscribe(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `historico_${this.desde}_${this.hasta}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    this.svc.export(this.desde, this.hasta, this.soloGanadores, this.filtroVip).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `historico_${this.desde}_${this.hasta}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: () => this.exporting.set(false),
     });
   }
 
@@ -80,10 +87,10 @@ export class HistoricoComponent implements OnInit {
 
   tipoLabel(tipo: string): string {
     const map: Record<string, string> = {
-      exacto: 'Exacto (4)',
-      directo_devuelto: 'Directo devuelto',
-      tres_orden: 'Últimas 3 (orden)',
-      tres_desorden: 'Últimas 3 (devuelto)',
+      directo: 'Directo',
+      directo_metodo: 'Directo Método',
+      tres_directo: 'Tres Directo',
+      tres_metodo: 'Tres Método',
     };
     return map[tipo] ?? tipo;
   }

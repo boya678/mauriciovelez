@@ -14,6 +14,8 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   closed_at: string | null;
+  last_user_message_at: string | null;
+  window_open: boolean;
 }
 
 export interface ConversationDetail extends Conversation {

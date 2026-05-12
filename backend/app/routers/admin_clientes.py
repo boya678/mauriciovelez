@@ -170,6 +170,8 @@ def create_cliente(
         db.commit()
         if free_number:
             notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
+        from app.core.live_events import publish_event
+        publish_event("nuevo_cliente", {"nombre": nuevo.nombre})
     except IntegrityError as e:
         db.rollback()
         orig = str(e.orig)

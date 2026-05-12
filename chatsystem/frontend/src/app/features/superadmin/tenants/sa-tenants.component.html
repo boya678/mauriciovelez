@@ -31,6 +31,7 @@
               <td>{{ formatDate(t.created_at) }}</td>
               <td>
                 <button class="btn btn-ghost btn-sm" (click)="openEdit(t)">Editar</button>
+                <button class="btn btn-ghost btn-sm" (click)="openKnowledge(t)" style="margin-left:6px">Conocimiento</button>
               </td>
             </tr>
           }
@@ -104,6 +105,61 @@
         <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
           {{ saving() ? 'Guardando…' : 'Guardar' }}
         </button>
+      </div>
+    </div>
+  </div>
+}
+@if (showKnowledgeModal()) {
+  <div class="modal-backdrop" (click)="closeKnowledgeModal()">
+    <div class="modal" (click)="$event.stopPropagation()" style="max-width:600px">
+      <div class="modal-header">
+        <h2>Base de conocimiento — {{ knowledgeTenant()?.name }}</h2>
+        <button class="btn btn-ghost btn-sm" (click)="closeKnowledgeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        @if (knowledgeError()) {
+          <div class="alert-error">{{ knowledgeError() }}</div>
+        }
+
+        @if (knowledgeLoading()) {
+          <p class="loading-text">Cargando estado…</p>
+        } @else {
+          <div style="margin-bottom:12px">
+            @if (knowledgeChunks() !== null) {
+              <span class="badge" [class.badge-green]="(knowledgeChunks() ?? 0) > 0" [class.badge-gray]="(knowledgeChunks() ?? 0) === 0">
+                {{ (knowledgeChunks() ?? 0) > 0 ? (knowledgeChunks() + ' chunks cargados') : 'Sin conocimiento cargado' }}
+              </span>
+            }
+          </div>
+        }
+
+        <div class="form-group">
+          <label>Documento de conocimiento <span class="hint">(pega el texto plano completo)</span></label>
+          <textarea
+            class="form-control"
+            rows="10"
+            [ngModel]="knowledgeText()"
+            (ngModelChange)="knowledgeText.set($event)"
+            placeholder="Pega aquí el contenido del documento: preguntas frecuentes, catálogo, políticas, etc."
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between">
+        <button
+          class="btn btn-danger btn-sm"
+          (click)="deleteKnowledge()"
+          [disabled]="knowledgeSaving() || (knowledgeChunks() ?? 0) === 0"
+        >
+          Eliminar conocimiento
+        </button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" (click)="closeKnowledgeModal()">Cancelar</button>
+          <button class="btn btn-primary" (click)="saveKnowledge()" [disabled]="knowledgeSaving()">
+            {{ knowledgeSaving() ? 'Procesando…' : 'Cargar conocimiento' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

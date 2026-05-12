@@ -18,9 +18,10 @@ export class AuditComponent implements OnInit {
   page = signal(1);
   size = 50;
   entityFilter = '';
+  busqueda = '';
   loading = signal(false);
 
-  entities = ['', 'clientes', 'platform_users'];
+  entities = ['', 'clientes', 'platform_users', 'suscripciones'];
 
   constructor(private svc: AuditService, auth: AuthService, router: Router) {
     if (!auth.isAdmin()) router.navigate(['/admin/clientes']);
@@ -30,7 +31,7 @@ export class AuditComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.svc.list(this.page(), this.size, this.entityFilter).subscribe(res => {
+    this.svc.list(this.page(), this.size, this.entityFilter, this.busqueda).subscribe(res => {
       this.items.set(res.items);
       this.total.set(res.total);
       this.loading.set(false);

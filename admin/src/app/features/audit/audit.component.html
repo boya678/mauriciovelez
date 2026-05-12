@@ -4,14 +4,14 @@
 </div>
 
 <div class="toolbar">
-  <div class="form-group inline">
-    <label>Filtrar por entidad</label>
-    <select [(ngModel)]="entityFilter" (ngModelChange)="onFilter()" style="width:180px">
-      <option value="">Todas</option>
-      <option value="clientes">Clientes</option>
-      <option value="platform_users">Usuarios</option>
-    </select>
-  </div>
+  <input type="text" class="toolbar-search" [(ngModel)]="busqueda" placeholder="Buscar en usuario, acción, entidad, detalle…" (keyup.enter)="onFilter()" />
+  <select [(ngModel)]="entityFilter">
+    <option value="">Todas las entidades</option>
+    <option value="clientes">Clientes</option>
+    <option value="platform_users">Usuarios</option>
+    <option value="suscripciones">Suscripciones</option>
+  </select>
+  <button class="btn-primary btn-sm" (click)="onFilter()">Filtrar</button>
 </div>
 
 <div class="card table-card">

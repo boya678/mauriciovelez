@@ -1,3 +1,9 @@
+:host {
+  display: block;
+  height: 100%;
+  overflow: hidden;
+}
+
 .dashboard-page {
   padding: 24px;
   overflow-y: auto;
@@ -34,3 +40,158 @@
 .agents-section {
   h2 { padding: 16px 20px; font-size: 15px; font-weight: 700; border-bottom: 1px solid #e2e8f0; }
 }
+
+// ── Token usage section ───────────────────────────────────────────────────────
+
+.tokens-section {
+  margin-top: 24px;
+
+  h2 {
+    padding: 16px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .tokens-subtitle {
+    font-size: 12px;
+    font-weight: 400;
+    color: #94a3b8;
+  }
+}
+
+.token-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.token-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+
+  .token-month {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 10px;
+  }
+
+  .token-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #64748b;
+    padding: 3px 0;
+
+    &.is-total {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      color: #0f172a;
+      font-weight: 600;
+    }
+  }
+}
+
+.token-totals {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #f3f0ff;
+  border-top: 1px solid #e0d8ff;
+  font-size: 13px;
+  color: #4c1d95;
+  border-radius: 0 0 8px 8px;
+
+  .totals-label { font-weight: 700; margin-right: 4px; }
+}
+
+.col-in  { color: #1976d2; }
+.col-out { color: #388e3c; }
+
+// ── Message stats section ────────────────────────────────────────────────────
+
+.msg-section {
+  margin-top: 24px;
+
+  h2 {
+    padding: 16px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .msg-subtitle {
+    font-size: 12px;
+    font-weight: 400;
+    color: #94a3b8;
+  }
+}
+
+.msg-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.msg-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+
+  .msg-month {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 10px;
+  }
+
+  .msg-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #64748b;
+    padding: 3px 0;
+
+    &.is-total {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+    }
+  }
+}
+
+.msg-totals {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #f0fdf4;
+  border-top: 1px solid #bbf7d0;
+  font-size: 13px;
+  color: #14532d;
+  border-radius: 0 0 8px 8px;
+
+  .totals-label { font-weight: 700; margin-right: 4px; }
+}
+
+.col-user  { color: #7c3aed; }
+.col-bot   { color: #0369a1; }
+.col-human { color: #15803d; }

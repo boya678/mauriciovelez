@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 class ChatState(TypedDict, total=False):
     messages: list[dict]
     tenant_system_prompt: str
+    tenant_id: str                # UUID string of the tenant — used for RAG lookup
     phone: str                    # WhatsApp number of the user (e.g. 573001234567)
     intent: str
     bot_reply: str
@@ -52,6 +53,8 @@ class ChatState(TypedDict, total=False):
     interactive_payload: dict | None  # Meta interactive object when bot replies with a menu
     has_pending_image: bool       # True when there is an image awaiting user description
     imagen_contexto: str | None   # LLM-extracted description of the pending image
+    tokens_in: int                # prompt tokens consumed this turn (accumulated over tool loops)
+    tokens_out: int               # completion tokens produced this turn
 
 
 # ── Escalation node ───────────────────────────────────────────────────────────
@@ -167,6 +170,7 @@ def build_graph(tools: list[StructuredTool] | None = None) -> Any:
 async def run_graph(
     messages: list[dict],
     tenant_system_prompt: str = "",
+    tenant_id: str = "",
     turns: int = 0,
     tools: list[StructuredTool] | None = None,
     phone: str = "",
@@ -178,6 +182,7 @@ async def run_graph(
     Args:
         messages: Full conversation history [{"role": "user"|"bot", "content": str}, ...]
         tenant_system_prompt: Tenant-specific system prompt / knowledge base
+        tenant_id: UUID string of the tenant (used for RAG knowledge lookup)
         turns: Current turn count for this conversation
         phone: WhatsApp phone number of the user
         tools: LangChain StructuredTools loaded for this tenant (may be empty)
@@ -190,6 +195,7 @@ async def run_graph(
     initial_state: ChatState = {
         "messages": messages,
         "tenant_system_prompt": tenant_system_prompt,
+        "tenant_id": tenant_id,
         "phone": phone,
         "turns": turns,
         "needs_escalation": False,
@@ -197,6 +203,8 @@ async def run_graph(
         "tool_messages": [],
         "has_pending_image": has_pending_image,
         "imagen_contexto": None,
+        "tokens_in": 0,
+        "tokens_out": 0,
     }
 
     try:
@@ -217,4 +225,6 @@ async def run_graph(
         "needs_escalation": final_state.get("needs_escalation", False),
         "interactive_payload": final_state.get("interactive_payload"),
         "imagen_contexto": final_state.get("imagen_contexto"),
+        "tokens_in": final_state.get("tokens_in", 0),
+        "tokens_out": final_state.get("tokens_out", 0),
     }

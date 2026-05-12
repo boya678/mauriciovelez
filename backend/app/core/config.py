@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     CRON_NUMEROS: str = "0 8 * * *"        # reasignación de números 08:00 COL
     CRON_VIP_CHECK: str = "0 22 * * *"     # desactivar VIP vencidos 22:00 COL
     CRON_LOTERIAS: str = "0 10,14,18,23 * * *"  # procesar loterías (repetir a las horas indicadas COL)
+    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_TTL: int = 14400  # segundos — tiempo de vida del historial de eventos live (4h)
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,4 +1,7 @@
 import redis.asyncio as aioredis
+from redis.asyncio.retry import Retry
+from redis.backoff import ExponentialBackoff
+from redis.exceptions import ConnectionError, TimeoutError
 
 from app.core.config import settings
 
@@ -11,6 +14,14 @@ async def init_redis() -> aioredis.Redis:
         settings.REDIS_URL,
         encoding="utf-8",
         decode_responses=True,
+        # Reconnect automatically on connection drops
+        retry=Retry(ExponentialBackoff(cap=10, base=0.5), retries=6),
+        retry_on_error=[ConnectionError, TimeoutError, OSError],
+        retry_on_timeout=True,
+        # Keep connections healthy; detect idle closures before they cause errors
+        health_check_interval=30,
+        socket_keepalive=True,
+        socket_connect_timeout=10,
     )
     await _redis.ping()
     return _redis

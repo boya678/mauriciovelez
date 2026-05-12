@@ -123,6 +123,7 @@ def renovar(
 
     # 3. Asegurar que el cliente quede marcado como VIP y habilitado
     if cliente:
+        era_vip = cliente.vip
         if not cliente.vip:
             cliente.vip = True
         cliente.enabled = True
@@ -169,6 +170,10 @@ def renovar(
 
     db.commit()
     db.refresh(nueva)
+
+    if cliente and not era_vip:
+        from app.core.live_events import publish_event
+        publish_event("nuevo_vip", {"nombre": cliente.nombre})
 
     return SuscripcionOut(
         id=nueva.id,

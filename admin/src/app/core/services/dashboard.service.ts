@@ -20,10 +20,10 @@ export interface DashboardStats {
   efectividad_numerica_pct: number;
   efectividad_personal_pct: number;
   clientes_con_numeros: number;
-  exactos: number;
-  directo_devuelto: number;
-  tres_orden: number;
-  tres_desorden: number;
+  directos: number;
+  directo_metodo: number;
+  tres_directo: number;
+  tres_metodo: number;
   clientes_con_aciertos: number;
   numero_mas_frecuente: string | null;
   top_loterias: TopLoteria[];

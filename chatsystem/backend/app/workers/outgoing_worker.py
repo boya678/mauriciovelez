@@ -24,7 +24,7 @@ from app.redis.streams import (
     xack,
     xautoclaim,
 )
-from app.services.whatsapp import send_text_message, send_interactive_message
+from app.services.whatsapp import send_text_message, send_interactive_message, send_template_message
 
 logger = logging.getLogger(__name__)
 CONSUMER_NAME = "outgoing-1"
@@ -41,6 +41,10 @@ async def _process_entry(entry_id: str, data: dict) -> None:
     token = data.get("token", "")
     tenant_slug = data.get("tenant_slug", "")
     interactive_raw = data.get("interactive_payload", "")
+    # Window flag: absent (bot replies) or "1" means open; "0" means expired → use template
+    window_open = data.get("window_open", "1") != "0"
+    template_name = data.get("template_name", "")
+    template_language = data.get("template_language", "es") or "es"
 
     schema = f"t_{tenant_slug}" if tenant_slug else "public"
 
@@ -52,6 +56,16 @@ async def _process_entry(entry_id: str, data: dict) -> None:
                 token=token,
                 to=phone,
                 interactive=interactive,
+            )
+        elif not window_open and template_name:
+            # 24-hour window expired — must use a pre-approved template
+            logger.info("Window expired for %s — sending template '%s'", phone, template_name)
+            await send_template_message(
+                phone_id=phone_id,
+                token=token,
+                to=phone,
+                template_name=template_name,
+                language=template_language,
             )
         else:
             await send_text_message(

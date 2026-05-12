@@ -6,55 +6,97 @@
   @if (loading()) {
     <p class="loading-text">Cargando…</p>
   } @else {
-    <div class="panel">
-      <div class="field-group">
-        <label for="prompt">System prompt (instrucciones del bot)</label>
-        <p class="field-hint">Define la personalidad, contexto y reglas que sigue el bot para responder a los usuarios.</p>
-        <textarea
-          id="prompt"
-          rows="16"
-          [(ngModel)]="promptText"
-          [disabled]="saving()"
-          placeholder="Eres un asistente de soporte para..."
-        ></textarea>
+    <div class="settings-grid">
+
+      <!-- Prompt y plantilla -->
+      <div class="panel">
+        <h2 class="panel-title">Prompt y plantilla</h2>
+
+        <div class="field-group">
+          <label for="prompt">System prompt</label>
+          <p class="field-hint">Personalidad, contexto y reglas del bot.</p>
+          <textarea
+            id="prompt"
+            rows="14"
+            [(ngModel)]="promptText"
+            [disabled]="saving()"
+            placeholder="Eres un asistente de soporte para..."
+          ></textarea>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label for="templateName">Plantilla WhatsApp</label>
+            <p class="field-hint">Nombre exacto aprobado en Meta.</p>
+            <input id="templateName" type="text" [(ngModel)]="templateName" [disabled]="saving()" placeholder="hello_world" />
+          </div>
+          <div class="field-group">
+            <label for="templateLanguage">Idioma</label>
+            <p class="field-hint">Ej. <code>es</code>, <code>en_US</code></p>
+            <input id="templateLanguage" type="text" [(ngModel)]="templateLanguage" [disabled]="saving()" placeholder="es" />
+          </div>
+        </div>
+
+        @if (error()) {
+          <div class="alert alert-error">{{ error() }}</div>
+        }
+        @if (saved()) {
+          <div class="alert alert-success">Guardado correctamente.</div>
+        }
+
+        <div class="actions">
+          <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+            {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+          </button>
+        </div>
       </div>
 
-      <div class="field-group">
-        <label for="templateName">Plantilla de WhatsApp (nombre)</label>
-        <p class="field-hint">Nombre exacto de la plantilla aprobada en Meta, usada para iniciar o reabrir conversaciones fuera de la ventana de 24 h.</p>
-        <input
-          id="templateName"
-          type="text"
-          [(ngModel)]="templateName"
-          [disabled]="saving()"
-          placeholder="hello_world"
-        />
+      <!-- Base de conocimiento -->
+      <div class="panel knowledge-panel">
+        <div class="knowledge-header">
+          <div>
+            <h2 class="panel-title">Base de conocimiento (RAG)</h2>
+            <p class="field-hint">Texto de referencia que usa el bot para responder.</p>
+          </div>
+          @if (knowledgeChunks() !== null) {
+            <span class="chunk-badge" [class.has-chunks]="(knowledgeChunks() ?? 0) > 0">
+              {{ knowledgeChunks() }} {{ (knowledgeChunks() ?? 0) === 1 ? 'fragmento' : 'fragmentos' }}
+            </span>
+          }
+        </div>
+
+        <div class="field-group">
+          <label for="knowledgeText">Nuevo contenido</label>
+          <p class="field-hint">Reemplaza completamente la base actual al guardar.</p>
+          <textarea
+            id="knowledgeText"
+            rows="14"
+            [(ngModel)]="knowledgeText"
+            [disabled]="knowledgeSaving()"
+            placeholder="Pega documentación, preguntas frecuentes, políticas…"
+          ></textarea>
+        </div>
+
+        @if (knowledgeError()) {
+          <div class="alert alert-error">{{ knowledgeError() }}</div>
+        }
+        @if (knowledgeSaved()) {
+          <div class="alert alert-success">Base de conocimiento actualizada.</div>
+        }
+
+        <div class="actions">
+          @if ((knowledgeChunks() ?? 0) > 0) {
+            <button class="btn btn-danger" (click)="deleteKnowledge()" [disabled]="knowledgeDeleting() || knowledgeSaving()">
+              {{ knowledgeDeleting() ? 'Eliminando…' : 'Eliminar conocimiento' }}
+            </button>
+          }
+          <button class="btn btn-primary" (click)="saveKnowledge()" [disabled]="knowledgeSaving() || !knowledgeText.trim()">
+            {{ knowledgeSaving() ? 'Procesando…' : 'Guardar conocimiento' }}
+          </button>
+        </div>
       </div>
 
-      <div class="field-group">
-        <label for="templateLanguage">Idioma de la plantilla</label>
-        <p class="field-hint">Código de idioma de la plantilla (p. ej. <code>es</code>, <code>es_MX</code>, <code>en_US</code>).</p>
-        <input
-          id="templateLanguage"
-          type="text"
-          [(ngModel)]="templateLanguage"
-          [disabled]="saving()"
-          placeholder="es"
-        />
-      </div>
-
-      @if (error()) {
-        <div class="alert alert-error">{{ error() }}</div>
-      }
-      @if (saved()) {
-        <div class="alert alert-success">Guardado correctamente.</div>
-      }
-
-      <div class="actions">
-        <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
-          {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
-        </button>
-      </div>
     </div>
   }
 </div>
+

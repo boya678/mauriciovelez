@@ -28,6 +28,7 @@ from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import Message, MessageStatus, SenderType
 from app.models.tenant import Tenant
 from app.services.whatsapp import download_media
+from app.services.message_stats import record_messages
 from app.redis.client import get_redis
 from app.redis.streams import (
     MESSAGES_STREAM,
@@ -90,12 +91,13 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 status=ConversationStatus.BOT_ACTIVE,
                 created_at=now,
                 updated_at=now,
+                last_user_message_at=now,
             )
             db.add(conv)
             await db.flush()
         else:
             # Reopen closed conversations so the bot can respond again
-            new_values: dict = {"updated_at": now}
+            new_values: dict = {"updated_at": now, "last_user_message_at": now}
             if conv.status == ConversationStatus.CLOSED:
                 new_values["status"] = ConversationStatus.BOT_ACTIVE
                 new_values["assigned_agent_id"] = None
@@ -198,6 +200,14 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
         logger.info(
             "Ingested msg %s → %s (conv %s)", msg.id, target_stream, conversation_id
         )
+
+        # Accumulate user message counter
+        try:
+            from app.db.session import AsyncSessionLocal
+            async with AsyncSessionLocal() as stats_db:
+                await record_messages(uuid.UUID(tenant_id), stats_db, user=1)
+        except Exception:
+            logger.warning("Failed to record user message stat for tenant %s", tenant_id)
 
 
 async def run(stop_event: asyncio.Event) -> None:

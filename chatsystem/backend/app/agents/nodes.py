@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from typing import Any, Callable, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -22,6 +23,7 @@ from langchain_core.tools import StructuredTool
 from langchain_openai import AzureChatOpenAI
 
 from app.core.config import settings
+from app.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +79,18 @@ async def classifier_node(state: dict) -> dict:
     if intent not in {"faq", "sales", "support", "escalate"}:
         intent = "faq"
 
+    usage_meta = getattr(response, "usage_metadata", None) or {}
+    tokens_in  = int(usage_meta.get("input_tokens",  0))
+    tokens_out = int(usage_meta.get("output_tokens", 0))
+
     logger.debug("Classifier intent: %s", intent)
-    return {**state, "intent": intent, "turns": state.get("turns", 0) + 1}
+    return {
+        **state,
+        "intent": intent,
+        "turns": state.get("turns", 0) + 1,
+        "tokens_in":  state.get("tokens_in",  0) + tokens_in,
+        "tokens_out": state.get("tokens_out", 0) + tokens_out,
+    }
 
 
 # ── Specialist system prompts ──────────────────────────────────────────────────
@@ -207,6 +219,7 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
     async def specialist_node(state: dict) -> dict:
         messages = state["messages"]
         tenant_prompt = state.get("tenant_system_prompt", "")
+        tenant_id_str = state.get("tenant_id", "")
         intent = state.get("intent", "faq")
         tool_messages: list[Any] = list(state.get("tool_messages", []))
 
@@ -214,6 +227,30 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         system_content = base_prompt + _MENU_FORMAT_INSTRUCTIONS
         if tenant_prompt:
             system_content += f"\n\nConocimiento específico del negocio:\n{tenant_prompt}"
+
+        # ── RAG: inject relevant knowledge chunks ──────────────────────────
+        if tenant_id_str and messages:
+            try:
+                from app.services.knowledge import search_knowledge
+                # Use the last user message as the search query
+                last_user = next(
+                    (m["content"] for m in reversed(messages) if m["role"] == "user"),
+                    None,
+                )
+                if last_user:
+                    async with AsyncSessionLocal() as rag_db:
+                        chunks = await search_knowledge(
+                            uuid.UUID(tenant_id_str), last_user, rag_db, top_k=3
+                        )
+                    if chunks:
+                        rag_context = "\n\n---\n".join(chunks)
+                        system_content += (
+                            f"\n\nINFORMACIÓN DE REFERENCIA (base de conocimiento):\n"
+                            f"{rag_context}"
+                        )
+            except Exception as _rag_err:
+                logger.warning("RAG search failed (continuing without context): %s", _rag_err)
+        # ── end RAG ────────────────────────────────────────────────────────
 
         # When waiting for the user to describe a previously sent image, instruct
         # the LLM to embed a special tag if the user's message answers that question.
@@ -264,11 +301,19 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
 
         response: AIMessage = await llm.ainvoke(lc_messages)
 
+        # Capture token usage from the response metadata
+        usage_meta = getattr(response, "usage_metadata", None) or {}
+        tokens_in  = int(usage_meta.get("input_tokens",  0))
+        tokens_out = int(usage_meta.get("output_tokens", 0))
+
         # If the model wants to call a tool, store and let ToolNode handle it
         if tools and getattr(response, "tool_calls", None):
             return {
                 **state,
                 "tool_messages": tool_messages + [response],
+                # Accumulate tokens even for intermediate tool-call steps
+                "tokens_in":  state.get("tokens_in",  0) + tokens_in,
+                "tokens_out": state.get("tokens_out", 0) + tokens_out,
             }
 
         # Final text reply
@@ -301,6 +346,8 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
             "imagen_contexto": imagen_contexto,
             "confidence": confidence,
             "tool_messages": [],  # reset after final reply
+            "tokens_in":  state.get("tokens_in",  0) + tokens_in,
+            "tokens_out": state.get("tokens_out", 0) + tokens_out,
         }
 
     return specialist_node

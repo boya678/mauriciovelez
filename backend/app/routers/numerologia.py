@@ -57,6 +57,7 @@ def get_mis_numeros(
     result: dict = {
         "nombre": current_user.nombre,
         "es_vip": current_user.vip,
+        "enabled": current_user.enabled,
         "numero_libre": _serialize(free_row) if free_row else None,
     }
 

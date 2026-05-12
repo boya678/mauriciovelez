@@ -4,7 +4,6 @@ Usado por: auth.py (primer número free), admin_clientes.py (primer número vip)
            scheduler.py (cron nocturno de reasignación).
 """
 import logging
-import random
 import uuid
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -127,8 +126,8 @@ def assign_number(db: Session, id_user: uuid.UUID, num_type: str) -> NumberUser:
     Asigna un número del pool al usuario para el tipo dado respetando ciclos fijos.
     - El valid_until es siempre el fin del ciclo global (epoch + N*vigencia).
     - Borra la asignación anterior del mismo tipo.
-    - Si el pool está vacío, resetea todos a disponibles.
-    - Prefija un dígito aleatorio 0-9 al número de 3 cifras del pool.
+    - Selecciona el siguiente número disponible en orden secuencial (order_index ASC).
+    - Si el pool está vacío, resetea todos a disponibles y vuelve desde el inicio.
     - Registra en numbers_historic.
     - Hace flush pero NO commit (responsabilidad del llamador).
     """
@@ -145,25 +144,28 @@ def assign_number(db: Session, id_user: uuid.UUID, num_type: str) -> NumberUser:
     )
     db.flush()
 
-    # Obtener números disponibles
-    available = db.execute(
-        select(Number).where(Number.assigned.is_(False))
-    ).scalars().all()
+    # Obtener el siguiente número disponible en orden secuencial
+    selected = db.execute(
+        select(Number)
+        .where(Number.assigned.is_(False))
+        .order_by(Number.order_index.asc())
+        .limit(1)
+    ).scalar_one_or_none()
 
-    if not available:
-        # Resetear pool completo
+    if selected is None:
+        # Resetear pool completo y volver desde el inicio
         db.execute(update(Number).values(assigned=False))
         db.flush()
-        available = db.execute(
-            select(Number).where(Number.assigned.is_(False))
-        ).scalars().all()
-
-    selected = random.choice(available)
-    prefix = str(random.randint(0, 9))
-    final_number = prefix + selected.number  # 4 dígitos: x + 3 cifras
+        selected = db.execute(
+            select(Number)
+            .where(Number.assigned.is_(False))
+            .order_by(Number.order_index.asc())
+            .limit(1)
+        ).scalar_one_or_none()
 
     # Marcar el número del pool como ocupado
     selected.assigned = True
+    final_number = selected.number  # ya son 4 dígitos directamente del Excel
 
     assignment = NumberUser(
         number=final_number,

@@ -15,6 +15,7 @@ export interface NumeroData {
 export interface MisNumerosResponse {
   nombre: string;
   es_vip: boolean;
+  enabled: boolean;
   numero_libre: NumeroData;
   numero_vip?: NumeroData;
 }
@@ -72,10 +73,10 @@ export class NumerologiaComponent implements OnInit {
 
   tipoLabel(tipo: string): string {
     const map: Record<string, string> = {
-      exacto: 'Exacto',
-      directo_devuelto: 'Directo devuelto',
-      tres_orden: '3 en orden',
-      tres_desorden: '3 devuelto',
+      directo: 'Directo',
+      directo_metodo: 'Directo Método',
+      tres_directo: 'Tres Directo',
+      tres_metodo: 'Tres Método',
     };
     return map[tipo] ?? tipo;
   }

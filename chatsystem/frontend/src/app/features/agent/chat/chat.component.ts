@@ -35,6 +35,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   loading = signal(false);
   sending = signal(false);
   loadError = signal<string | null>(null);
+  sendError = signal<string | null>(null);
   newMessage = '';
   showReopenConfirm = signal(false);
   reopening = signal(false);
@@ -117,13 +118,20 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (!content || !id || this.sending()) return;
 
     this.sending.set(true);
+    this.sendError.set(null);
     this.conversationsService.sendMessage(id, content).subscribe({
       next: () => {
         this.newMessage = '';
         this.sending.set(false);
         this.load(id);
       },
-      error: () => this.sending.set(false),
+      error: (err) => {
+        this.sending.set(false);
+        const detail = err?.error?.detail;
+        this.sendError.set(
+          typeof detail === 'string' ? detail : 'Error al enviar el mensaje. Intenta de nuevo.'
+        );
+      },
     });
   }
 
@@ -156,6 +164,20 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   get isClosed(): boolean {
     return this.conversation()?.status === 'closed';
+  }
+
+  get windowOpen(): boolean {
+    return this.conversation()?.window_open ?? true;
+  }
+
+  windowTimeLeft(): string {
+    const ts = this.conversation()?.last_user_message_at;
+    if (!ts) return '';
+    const remainingMs = 24 * 3600 * 1000 - (Date.now() - new Date(ts).getTime());
+    if (remainingMs <= 0) return '';
+    const h = Math.floor(remainingMs / 3600000);
+    const m = Math.floor((remainingMs % 3600000) / 60000);
+    return h > 0 ? `${h} h ${m} min restantes` : `${m} min restantes`;
   }
 
   reopen(): void {

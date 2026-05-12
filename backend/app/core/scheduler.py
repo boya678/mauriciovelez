@@ -17,6 +17,7 @@ from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
 from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
+from app.core.live_events import publish_event
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
 LOTERIAS_API = "https://api-resultadosloterias.com/api/results"
@@ -29,10 +30,10 @@ _scheduler = BackgroundScheduler(timezone="UTC")
 def _clasificar(numero: str, resultado: str) -> list[str]:
     """
     Devuelve los tipos de acierto (máximo uno, el de mayor jerarquía):
-    - exacto:           los 4 dígitos coinciden exactamente
-    - directo_devuelto: primer dígito igual + últimos 3 en orden inverso (3267 vs 3762)
-    - tres_orden:       últimos 3 dígitos iguales en orden (sin importar el primero)
-    - tres_desorden:    últimos 3 dígitos en orden inverso (sin importar el primero)
+    - directo:        los 4 dígitos coinciden exactamente
+    - directo_metodo: primer dígito igual + últimos 3 en orden inverso (3267 vs 3762)
+    - tres_directo:   últimos 3 dígitos iguales en orden (sin importar el primero)
+    - tres_metodo:    últimos 3 dígitos en orden inverso (sin importar el primero)
     """
     n4 = numero.zfill(4)[-4:]
     r4 = resultado.zfill(4)[-4:]
@@ -41,13 +42,13 @@ def _clasificar(numero: str, resultado: str) -> list[str]:
     r3_rev = r3[::-1]
 
     if n4 == r4:
-        return ["exacto"]
+        return ["directo"]
     if n4[0] == r4[0] and n3 == r3_rev:
-        return ["directo_devuelto"]
+        return ["directo_metodo"]
     if n3 == r3:
-        return ["tres_orden"]
+        return ["tres_directo"]
     if n3 == r3_rev:
-        return ["tres_desorden"]
+        return ["tres_metodo"]
     return []
 
 
@@ -234,11 +235,22 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                             and cliente_h.id not in _notificados_esta_corrida
                         ):
                             _notificados_esta_corrida.add(cliente_h.id)
+                            # ── Publicar evento live ────────────────────────────
+                            veces_gano = db.query(NumeroAcierto).join(
+                                NumberHistoric, NumeroAcierto.historic_id == NumberHistoric.id,
+                            ).filter(NumberHistoric.id_user == h.id_user).count()
+                            publish_event("ganador", {
+                                "nombre": cliente_h.nombre,
+                                "numero": h.number,
+                                "loteria": resultado.loteria,
+                                "tipo_acierto": tipo,
+                                "veces_gano": veces_gano,
+                            })
                             tipo_legible = {
-                                "exacto": "Exacto",
-                                "directo_devuelto": "Directo Devuelto",
-                                "tres_orden": "Tres en Orden",
-                                "tres_desorden": "Tres en Desorden",
+                                "directo": "Directo",
+                                "directo_metodo": "Directo Método",
+                                "tres_directo": "Tres Directo",
+                                "tres_metodo": "Tres Método",
                             }.get(tipo, tipo)
                             if cliente_h.vip:
                                 _notificar_ganador_vip(

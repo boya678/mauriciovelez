@@ -1,0 +1,65 @@
+<div class="live-shell">
+  <!-- Header bar -->
+  <header class="live-header">
+    <div class="live-brand">
+      <span class="material-icons-round live-icon">live_tv</span>
+      <span class="live-title">EN VIVO</span>
+      <span class="dot" [class.dot-on]="connected()"></span>
+    </div>
+    <div class="live-controls">
+      <button class="mute-btn" (click)="toggleMute()" [title]="muted() ? 'Activar sonido' : 'Silenciar'">
+        <span class="material-icons-round">{{ muted() ? 'volume_off' : 'volume_up' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Feed -->
+  <main class="live-feed">
+    @if (events().length === 0) {
+      <div class="empty-state">
+        <span class="material-icons-round">hourglass_empty</span>
+        <p>Esperando eventos en vivo…</p>
+      </div>
+    }
+
+    @for (ev of events(); track ev.id) {
+      <div class="event-card" [class]="'card-' + ev.tipo">
+
+        @if (ev.tipo === 'ganador') {
+          <div class="card-icon">🏆</div>
+          <div class="card-body">
+            <div class="card-nombre">{{ ev.nombre }}</div>
+            <div class="card-sub">
+              <span class="numero-badge">{{ ev.numero }}</span>
+              <span class="loteria-label">{{ ev.loteria }}</span>
+              <span class="tipo-badge">{{ ev.tipo_acierto ?? '' }}</span>
+            </div>
+            @if (ev.veces_gano && ev.veces_gano > 1) {
+              <div class="veces-label">¡{{ ev.veces_gano }} veces ganador!</div>
+            } @else {
+              <div class="veces-label">¡Primer premio!</div>
+            }
+          </div>
+        }
+
+        @if (ev.tipo === 'nuevo_cliente') {
+          <div class="card-icon">👋</div>
+          <div class="card-body">
+            <div class="card-nombre">{{ ev.nombre }}</div>
+            <div class="card-msg">¡Bienvenido a Numerología Mauricio Vélez!</div>
+          </div>
+        }
+
+        @if (ev.tipo === 'nuevo_vip') {
+          <div class="card-icon">⭐</div>
+          <div class="card-body">
+            <div class="card-nombre">{{ ev.nombre }}</div>
+            <div class="card-msg">¡Nuevo miembro VIP!</div>
+          </div>
+        }
+
+        <div class="card-time">{{ ev.timestamp | date:'HH:mm:ss' }}</div>
+      </div>
+    }
+  </main>
+</div>

@@ -6,14 +6,13 @@ Lifespan:
   shutdown → stop workers, close Redis
 """
 import logging
+import traceback
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-from alembic.config import Config
-from alembic import command
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.webhook import router as webhook_router
@@ -23,6 +22,9 @@ from app.api.ws import router as ws_router
 from app.api.tenants import router as tenants_router
 from app.api.tools import router as tools_router
 from app.api.superadmin import router as superadmin_router
+from app.api.knowledge import router as knowledge_router
+from app.api.token_usage import router as token_usage_router
+from app.api.message_stats import router as message_stats_router
 from app.redis.client import init_redis, close_redis
 from app.workers.runner import start_workers, stop_workers
 from app.websocket.manager import manager
@@ -31,6 +33,9 @@ logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
+# Make sure uvicorn loggers propagate to root so we see everything
+for _uvicorn_logger in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+    logging.getLogger(_uvicorn_logger).propagate = True
 logger = logging.getLogger(__name__)
 
 
@@ -38,14 +43,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Startup
     logger.info("Starting ChatsSystem backend…")
-
-    # Run Alembic migrations
-    try:
-        alembic_cfg = Config("/app/alembic.ini")
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Alembic migrations applied")
-    except Exception as exc:
-        logger.warning("Alembic migration failed (continuing): %s", exc)
 
     redis = await init_redis()
     manager.set_redis(redis)
@@ -74,11 +71,27 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # tighten in production via env var
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Global exception handler (logs 500s before they go silent) ────────────────
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(
+        "Unhandled exception on %s %s\n%s",
+        request.method,
+        request.url.path,
+        "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +101,9 @@ app.include_router(agents_router, prefix="/api/v1")
 app.include_router(tenants_router, prefix="/api/v1")
 app.include_router(tools_router, prefix="/api/v1")
 app.include_router(superadmin_router, prefix="/api/v1")
+app.include_router(knowledge_router, prefix="/api/v1")
+app.include_router(token_usage_router, prefix="/api/v1")
+app.include_router(message_stats_router, prefix="/api/v1")
 app.include_router(ws_router)  # WebSocket has its own path prefix
 
 

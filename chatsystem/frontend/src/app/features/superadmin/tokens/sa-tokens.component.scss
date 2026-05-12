@@ -1,0 +1,230 @@
+.sa-tokens {
+  padding: 24px;
+  max-width: 1100px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0;
+  .material-icons { font-size: 1.5rem; color: #6c63ff; }
+}
+
+.filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  label {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 500;
+  }
+  select {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    &:focus { outline: none; border-color: #6c63ff; }
+  }
+}
+
+/* ── Loading / Error ── */
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #666;
+  padding: 40px 0;
+}
+.spinner {
+  width: 24px; height: 24px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #6c63ff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e53935;
+  background: #fff3f3;
+  border-radius: 8px;
+  padding: 12px 16px;
+  .material-icons { font-size: 1.2rem; }
+}
+
+/* ── Summary cards ── */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+
+  &.highlight {
+    background: #f3f0ff;
+    border-color: #c5b8ff;
+  }
+}
+
+.card-label {
+  font-size: 0.72rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.card-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #222;
+}
+
+/* ── Table ── */
+.tenant-table {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+.tenant-row {
+  display: grid;
+  grid-template-columns: 1fr 150px 150px 150px 40px;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 8px;
+  font-size: 0.88rem;
+  border-bottom: 1px solid #f0f0f0;
+  &:last-child { border-bottom: none; }
+}
+
+.table-header {
+  background: #f8f8fb;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  cursor: default !important;
+}
+
+.summary-row {
+  cursor: pointer;
+  transition: background .15s;
+  &:hover { background: #fafafa; }
+}
+
+.tenant-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.badge {
+  background: #ede9ff;
+  color: #6c63ff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.col-in    { color: #1976d2; }
+.col-out   { color: #388e3c; }
+.col-total { font-weight: 600; color: #333; }
+
+.col-icon {
+  display: flex;
+  justify-content: center;
+}
+
+.expand-icon {
+  font-size: 1.1rem;
+  color: #aaa;
+  transition: transform .2s;
+  &.expanded { transform: rotate(180deg); }
+}
+
+/* ── Detail rows ── */
+.detail-rows {
+  background: #fafbff;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 1fr 150px 150px 150px 40px;
+  align-items: center;
+  padding: 8px 16px 8px 32px;
+  gap: 8px;
+  font-size: 0.84rem;
+  border-top: 1px solid #f0f0f0;
+  color: #555;
+}
+
+.month-label {
+  font-weight: 400;
+  color: #666;
+}
+
+/* ── Total row ── */
+.total-row {
+  background: #f3f0ff;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: default;
+}
+
+/* ── Empty ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px;
+  color: #aaa;
+  gap: 8px;
+  .material-icons { font-size: 2.5rem; }
+  p { margin: 0; font-size: 0.9rem; }
+}

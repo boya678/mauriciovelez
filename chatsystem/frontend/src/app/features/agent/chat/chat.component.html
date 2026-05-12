@@ -24,6 +24,21 @@
       </div>
     </div>
 
+    <!-- Window status banner -->
+    @if (conv.status === 'human_active' || conv.status === 'waiting_human') {
+      @if (conv.window_open) {
+        <div class="window-banner window-open">
+          <span class="material-icons">check_circle</span>
+          Ventana abierta &middot; {{ windowTimeLeft() }}
+        </div>
+      } @else {
+        <div class="window-banner window-closed">
+          <span class="material-icons">schedule</span>
+          Ventana cerrada &middot; El próximo mensaje usará la plantilla de WhatsApp &middot; Esperando respuesta del usuario
+        </div>
+      }
+    }
+
     <!-- Messages -->
     <div class="messages" #msgContainer>
       @for (msg of conv.messages; track msg.id) {
@@ -87,6 +102,13 @@
 
     <!-- Input -->
     @if (canSend) {
+      @if (sendError()) {
+        <div class="send-error">
+          <span class="material-icons" style="font-size:1rem;vertical-align:middle">error_outline</span>
+          {{ sendError() }}
+          <button class="send-error-close" (click)="sendError.set(null)" title="Cerrar">✕</button>
+        </div>
+      }
       <div class="chat-input-area">
         <textarea
           class="form-control chat-textarea"
@@ -116,7 +138,11 @@
         <h2 class="modal-title">Reabrir conversación</h2>
         <p class="modal-desc">
           ¿Deseas reabrir la conversación con <strong>{{ conversation()?.phone }}</strong>?<br>
-          Se enviará un mensaje de texto si fue cerrada hace menos de 24 h, o la plantilla de WhatsApp si pasó más tiempo.
+          @if (conversation()?.window_open) {
+            La ventana de 24 h sigue abierta &mdash; se enviará un mensaje de texto normal.
+          } @else {
+            La ventana de 24 h expiró &mdash; se enviará la plantilla de WhatsApp para iniciar la conversación.
+          }
         </p>
         <div class="modal-actions">
           <button class="btn btn-secondary" (click)="showReopenConfirm.set(false)" [disabled]="reopening()">Cancelar</button>

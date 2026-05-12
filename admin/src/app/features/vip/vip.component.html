@@ -1,0 +1,84 @@
+<div class="page-header">
+  <h2>Clientes VIP</h2>
+  <span class="total-badge">{{ total() | number }} registros</span>
+</div>
+
+<div class="toolbar">
+  <label class="check-label">
+    <input type="checkbox" [(ngModel)]="soloGanadores" />
+    Solo ganadores
+  </label>
+  <label class="check-label">
+    <input type="checkbox" [(ngModel)]="soloActivos" />
+    Solo suscripción activa
+  </label>
+  <label class="check-label">
+    <input type="checkbox" [(ngModel)]="soloInactivos" />
+    Solo suscripción inactiva
+  </label>
+  <button class="btn-primary btn-sm" (click)="filtrar()">Filtrar</button>
+  <button class="btn-export" (click)="downloadExcel()">
+    <span class="material-icons-round" style="font-size:1rem;vertical-align:middle">download</span>
+    Exportar
+  </button>
+</div>
+
+<div class="card table-card">
+  @if (loading()) {
+    <div class="empty-state">Cargando…</div>
+  } @else if (items().length === 0) {
+    <div class="empty-state">Sin clientes VIP con los filtros seleccionados</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Celular</th>
+            <th>Código VIP</th>
+            <th class="center">Suscripciones</th>
+            <th class="center">Veces ganó</th>
+            <th class="center">Suscripción</th>
+            <th class="center">Cliente</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of items(); track r.id) {
+            <tr>
+              <td>{{ r.nombre }}</td>
+              <td class="mono">{{ r.celular }}</td>
+              <td>{{ r.codigo_vip || '—' }}</td>
+              <td class="center">{{ r.total_suscripciones }}</td>
+              <td class="center">
+                @if (r.veces_gano > 0) {
+                  <span class="badge-ganador">🏆 {{ r.veces_gano }}</span>
+                } @else {
+                  <span class="text-muted">0</span>
+                }
+              </td>
+              <td class="center">
+                @if (r.suscripcion_activa) {
+                  <span class="badge-activa">Activa</span>
+                } @else {
+                  <span class="badge-vencida">Vencida</span>
+                }
+              </td>
+              <td class="center">
+                @if (r.cliente_habilitado) {
+                  <span class="badge-habilitado">Habilitado</span>
+                } @else {
+                  <span class="badge-bloqueado">Bloqueado</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span>Página {{ page() }} / {{ totalPages }} &nbsp;·&nbsp; {{ total() }} registros</span>
+      <button class="btn-ghost btn-sm" (click)="prev()" [disabled]="page() === 1">‹</button>
+      <button class="btn-ghost btn-sm" (click)="next()" [disabled]="page() === totalPages">›</button>
+    </div>
+  }
+</div>

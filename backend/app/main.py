@@ -15,6 +15,8 @@ from app.routers import admin_loterias
 from app.routers import admin_dashboard
 from app.routers import admin_banners
 from app.routers import admin_contactos
+from app.routers import admin_vip
+from app.routers import admin_live
 from app.routers import banners
 from app.core import scheduler
 
@@ -48,6 +50,8 @@ app.include_router(admin_loterias.router)
 app.include_router(admin_dashboard.router)
 app.include_router(admin_banners.router)
 app.include_router(admin_contactos.router)
+app.include_router(admin_vip.router)
+app.include_router(admin_live.router)
 app.include_router(banners.router)
 
 

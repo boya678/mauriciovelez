@@ -129,22 +129,22 @@
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
 
-  &.tipo-exacto {
+  &.tipo-directo {
     background: rgba(16, 185, 129, 0.18);
     color: #10b981;
     border: 1px solid rgba(16, 185, 129, 0.3);
   }
-  &.tipo-directo_devuelto {
+  &.tipo-directo_metodo {
     background: rgba(20, 184, 166, 0.18);
     color: #2dd4bf;
     border: 1px solid rgba(20, 184, 166, 0.3);
   }
-  &.tipo-tres_orden {
+  &.tipo-tres_directo {
     background: rgba(59, 130, 246, 0.18);
     color: #93c5fd;
     border: 1px solid rgba(59, 130, 246, 0.3);
   }
-  &.tipo-tres_desorden {
+  &.tipo-tres_metodo {
     background: rgba(168, 85, 247, 0.18);
     color: #d8b4fe;
     border: 1px solid rgba(168, 85, 247, 0.3);
@@ -376,6 +376,41 @@
 }
 
 .vigencia-icon { font-size: 1.1rem; line-height: 1; }
+
+// ── ESTADOS VENCIDO ───────────────────────────────────────────────
+.estado-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.75rem 1.5rem;
+  border-radius: var(--radius-lg);
+  text-align: center;
+
+  .material-icons-round {
+    font-size: 2.2rem;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    strong { color: var(--text-primary); }
+  }
+
+  &.renovacion {
+    background: rgba(255, 215, 0, 0.06);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    .material-icons-round { color: #ffd700; }
+  }
+
+  &.bloqueado {
+    background: rgba(220, 38, 38, 0.07);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    .material-icons-round { color: #ef4444; }
+  }
+}
 
 // ── KEYFRAME VIP PULSE ───────────────────────────────────────────
 @keyframes vip-pulse {
