@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: www
+  namespace: mauriciovelez
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Rate limit: 20 req/min por IP (evita scraping)
+    nginx.ingress.kubernetes.io/limit-rpm: "20"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    # Compresión en el ingress
+    nginx.ingress.kubernetes.io/enable-compression: "true"
+    # Headers de seguridad
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+spec:
+  tls:
+    - hosts:
+        - www.mauricioveleznumerologo.com
+      secretName: www-mauricioveleznumerologo-tls
+  rules:
+    - host: www.mauricioveleznumerologo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: www
+                port:
+                  number: 80

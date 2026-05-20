@@ -1,0 +1,274 @@
+<!-- ════════════════════════════════════════════════════
+     NAVBAR
+════════════════════════════════════════════════════ -->
+<nav class="nav" [class.nav--scrolled]="navScrolled()">
+  <div class="container nav__inner">
+
+    <a class="nav__logo" routerLink="/" (click)="closeMenu()">
+      <span class="nav__logo-symbol">✦</span>
+      <span>Mauricio Vélez</span>
+    </a>
+
+    <ul class="nav__links" [class.nav__links--open]="menuOpen()">
+      <li><a href="#quien-soy"  (click)="closeMenu()">Quién soy</a></li>
+      <li><a href="#loterias"   (click)="closeMenu()">Loterías</a></li>
+      <li><a href="#contacto"   (click)="closeMenu()">Contacto</a></li>
+      <li><a href="https://portal.mauricioveleznumerologo.com" target="_blank" rel="noopener" class="nav__portal" (click)="closeMenu()">Portal Numerología</a></li>
+    </ul>
+
+    <button class="nav__burger" (click)="toggleMenu()" [attr.aria-expanded]="menuOpen()" aria-label="Abrir menú">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════
+     HERO con PARALLAX
+════════════════════════════════════════════════════ -->
+<header class="hero">
+  <div class="hero__bg" #heroBg></div>
+  <div class="hero__overlay"></div>
+
+  <div class="container hero__content">
+    <p class="section-eyebrow light reveal">Numerología · Guía Espiritual · Loterías</p>
+    <h1 class="hero__title reveal">
+      El universo habla<br>
+      <em>a través de los números</em>
+    </h1>
+    <p class="hero__sub reveal">
+      Descifra el lenguaje oculto del cosmos. Mauricio Vélez te acompaña
+      en la lectura numerológica de tu camino de vida y en el análisis
+      de las loterías de Colombia.
+    </p>
+    <div class="hero__actions reveal">
+      <a href="#loterias" class="btn btn--primary">Ver resultados</a>
+      <a href="#quien-soy" class="btn btn--ghost">Conóceme</a>
+    </div>
+  </div>
+
+  <div class="hero__scroll-hint">
+    <span></span>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════════════
+     NÚMEROS DECORATIVOS
+════════════════════════════════════════════════════ -->
+<section class="numbers-strip">
+  <div class="container">
+    @for (n of [1,2,3,4,5,6,7,8,9]; track n) {
+      <span class="numbers-strip__digit reveal">{{ n }}</span>
+    }
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     QUIÉN SOY
+════════════════════════════════════════════════════ -->
+<section class="who" id="quien-soy">
+  <div class="container who__inner">
+
+    <div class="who__img-wrap reveal">
+      <div class="who__frame">
+        <img
+          src="mauricio.jpeg"
+          alt="Mauricio Vélez — Numerólogo"
+          class="who__img"
+          loading="lazy"
+        />
+        <div class="who__frame-deco"></div>
+      </div>
+    </div>
+
+    <div class="who__text">
+      <p class="section-eyebrow reveal">Quién soy</p>
+      <h2 class="section-title reveal">Mauricio Vélez,<br><em>numerólogo</em></h2>
+
+      <p class="who__body reveal">
+        Desde hace más de quince años me dedico a descifrar los mensajes que el universo
+        inscribe en los números. Mi trabajo integra la numerología pitagórica, la cabalística
+        y un profundo análisis de los patrones que rigen las loterías colombianas.
+      </p>
+
+      <p class="who__body reveal">
+        Cada número en tu nombre o fecha de nacimiento es una puerta. Te invito a cruzarla
+        y descubrir tu propósito de vida, tus talentos ocultos y los ciclos que moldean tu
+        destino.
+      </p>
+
+      <div class="who__chips reveal">
+        <span class="chip">Numerología Pitagórica</span>
+        <span class="chip">Numerología Cabalística</span>
+        <span class="chip">Loterías Colombia</span>
+        <span class="chip">Guía Espiritual</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     BANNER INTERCAMBIABLE
+════════════════════════════════════════════════════ -->
+<section class="banner">
+  <div class="banner__bg"></div>
+  <div class="container banner__content">
+    <p class="section-eyebrow light reveal">Software Numerológico</p>
+    <h2 class="banner__title reveal">Tu camino de vida,<br><em>ahora en tu pantalla</em></h2>
+    <p class="banner__sub reveal">
+      Accede al <strong>Portal Numerología</strong> y descubre tu número de camino de vida,
+      año personal, compatibilidades y más — todo calculado con la metodología de Mauricio Vélez.
+      Sin complicaciones, en segundos.
+    </p>
+    <div class="banner__actions reveal">
+      <a href="https://portal.mauricioveleznumerologo.com" target="_blank" rel="noopener" class="btn btn--primary">
+        Haz tu prueba gratis ahora
+      </a>
+      <a href="#quien-soy" class="btn btn--ghost">Conocer la metodología</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     RESULTADOS DE LOTERÍAS
+════════════════════════════════════════════════════ -->
+<section class="loterias" id="loterias">
+  <div class="container">
+    <div class="loterias__header">
+      <p class="section-eyebrow reveal">Gratis · Sin registro</p>
+      <h2 class="section-title reveal">Resultados de Loterías</h2>
+      <p class="section-sub reveal">
+        Selecciona una fecha y consulta todos los resultados de las loterías de Colombia.
+        Analiza tus números con visión numerológica.
+      </p>
+    </div>
+
+    <!-- Buscador -->
+    <div class="loterias__form reveal">
+      <label class="loterias__label" for="fecha-loteria">Selecciona la fecha</label>
+      <div class="loterias__controls">
+        <input
+          id="fecha-loteria"
+          type="date"
+          class="loterias__input"
+          [(ngModel)]="selectedDate"
+          [max]="hoy()"
+        />
+        <button
+          class="btn btn--primary"
+          (click)="buscar()"
+          [disabled]="cargando"
+        >
+          @if (cargando) {
+            <span class="spinner"></span>
+            Buscando…
+          } @else {
+            Consultar
+          }
+        </button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    @if (error) {
+      <div class="loterias__error">{{ error }}</div>
+    }
+
+    <!-- Resultados -->
+    @if (buscado && !cargando) {
+      @if (resultados.length > 0) {
+        <p class="loterias__found">
+          {{ resultados.length }} resultado{{ resultados.length === 1 ? '' : 's' }}
+          para el {{ formatFecha(selectedDate) }}
+        </p>
+        <div class="loterias__grid">
+          @for (r of resultados; track r.slug) {
+            <div class="loteria-card">
+              <div class="loteria-card__top">
+                <span class="loteria-card__name">{{ r.loteria }}</span>
+              </div>
+              <div class="loteria-card__number">{{ r.resultado }}</div>
+              <div class="loteria-card__serie">
+                <span class="loteria-card__serie-label">Serie</span>
+                <span class="loteria-card__serie-val">{{ r.serie }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="loterias__empty">
+          <span class="loterias__empty-icon">✦</span>
+          <p>No hay resultados para esta fecha.</p>
+          <small>Las loterías se publican a medida que oficializan sus resultados.</small>
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     SERVICIOS / PILARES
+════════════════════════════════════════════════════ -->
+<section class="pillars">
+  <div class="container">
+    <p class="section-eyebrow reveal">Lo que ofrezco</p>
+    <h2 class="section-title reveal">Un camino con propósito</h2>
+
+    <div class="pillars__grid">
+      @for (p of pillars; track p.title) {
+        <div class="pillar-card reveal">
+          <div class="pillar-card__icon"><span class="material-icons-round">{{ p.icon }}</span></div>
+          <h3 class="pillar-card__title">{{ p.title }}</h3>
+          <p class="pillar-card__desc">{{ p.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     CONTACTO (CTA)
+════════════════════════════════════════════════════ -->
+<section class="contacto" id="contacto">
+  <div class="container contacto__inner">
+    <p class="section-eyebrow light reveal">¿Listo para descubrir tu número?</p>
+    <h2 class="contacto__title reveal">Conecta con<br><em>el universo</em></h2>
+    <p class="contacto__sub reveal">
+      Escríbeme y agenda tu consulta numerológica personalizada.
+      Juntos leeremos los números que definen tu camino.
+    </p>
+    <a
+      href="https://wa.me/573225556333?text=Hola%20Mauricio%2C%20quiero%20una%20consulta%20numerol%C3%B3gica"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn btn--primary reveal"
+    >
+      Escribir por WhatsApp
+    </a>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="container footer__inner">
+    <div class="footer__brand">
+      <span class="footer__symbol">✦</span>
+      Mauricio Vélez Numerólogo
+    </div>
+
+    <nav class="footer__nav" aria-label="Pie de página">
+      <a href="#quien-soy">Quién soy</a>
+      <a href="#loterias">Loterías</a>
+      <a href="#contacto">Contacto</a>
+      <a href="https://portal.mauricioveleznumerologo.com" target="_blank" rel="noopener">Portal Numerología</a>
+      <a routerLink="/politica-de-privacidad">Privacidad</a>
+      <a routerLink="/terminos-y-condiciones">Términos</a>
+    </nav>
+
+    <p class="footer__legal">
+      © {{ currentYear }} Mauricio Vélez Numerólogo · Todos los derechos reservados<br>
+      Los resultados de loterías son informativos. Verifique siempre con las fuentes oficiales.
+    </p>
+  </div>
+</footer>

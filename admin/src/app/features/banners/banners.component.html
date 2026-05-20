@@ -47,8 +47,8 @@
                 }
               </td>
               <td><span class="audiencia-badge">{{ audienciaLabel(b.audiencia) }}</span></td>
-              <td class="mono">{{ b.inicio | date:'dd/MM/yy HH:mm' }}</td>
-              <td class="mono">{{ b.fin | date:'dd/MM/yy HH:mm' }}</td>
+              <td class="mono">{{ b.inicio | date:'dd/MM/yy HH:mm':'America/Bogota' }}</td>
+              <td class="mono">{{ b.fin | date:'dd/MM/yy HH:mm':'America/Bogota' }}</td>
               <td class="center actions-cell">
                 <button class="btn-ghost btn-xs" (click)="toggle(b)" [title]="b.activo ? 'Desactivar' : 'Activar'">
                   <span class="material-icons-round" style="font-size:1rem">{{ b.activo ? 'toggle_on' : 'toggle_off' }}</span>

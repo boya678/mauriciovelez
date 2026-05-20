@@ -163,13 +163,14 @@ def create_cliente(
         valid_until_vip = nueva_vip.valid_until
         number_vip = nueva_vip.number
         db.flush()
-        notificar_nuevo_numero_vip(celular_wp, number_vip, valid_until_vip)
 
     _audit(db, user, "CREATE", str(nuevo.id), {"nombre": nuevo.nombre, "celular": nuevo.celular, "tipo_cliente": nuevo.tipo_cliente})
     try:
         db.commit()
         if free_number:
             notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
+        if payload.vip and payload.tipo_cliente == 1:
+            notificar_nuevo_numero_vip(celular_wp, number_vip, valid_until_vip)
         from app.core.live_events import publish_event
         publish_event("nuevo_cliente", {"nombre": nuevo.nombre})
     except IntegrityError as e:
@@ -280,6 +281,17 @@ def update_cliente(
     vip_antes = obj.vip
     changes = payload.model_dump(exclude_none=True)
     try:
+        # Bloquear reactivación VIP manual si el cliente ya tuvo suscripción alguna vez
+        if changes.get("vip") is True and not vip_antes:
+            tiene_historial = db.query(Suscripcion).filter(
+                Suscripcion.cliente_id == obj.id
+            ).first()
+            if tiene_historial:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Este cliente ya fue VIP anteriormente. La reactivación debe realizarse a través de suscripciones.",
+                )
+
         for key, val in changes.items():
             setattr(obj, key, val)
 
@@ -315,7 +327,6 @@ def update_cliente(
                 valid_until = nueva.valid_until
                 number = nueva.number
                 db.flush()
-                notificar_nuevo_numero_vip(celular_wp, number, valid_until)
 
         # Si se desactiva VIP, desactivar todas sus suscripciones activas
         if vip_antes and not obj.vip:
@@ -326,6 +337,8 @@ def update_cliente(
 
         _audit(db, user, "UPDATE", str(cliente_id), changes)
         db.commit()
+        if obj.vip and not vip_antes and obj.celular:
+            notificar_nuevo_numero_vip(celular_wp, number, valid_until)
     except IntegrityError as e:
         db.rollback()
         orig = str(e.orig)

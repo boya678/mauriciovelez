@@ -59,8 +59,8 @@
             <tr [class.row-vencida]="estadoBadge(s) === 'vencida'">
               <td class="bold">{{ s.nombre }}</td>
               <td class="mono">{{ s.celular }}</td>
-              <td class="center">{{ s.inicio | date:'dd/MM/yyyy' }}</td>
-              <td class="center">{{ s.fin | date:'dd/MM/yyyy' }}</td>
+              <td class="center">{{ s.inicio | date:'dd/MM/yyyy':'America/Bogota' }}</td>
+              <td class="center">{{ s.fin | date:'dd/MM/yyyy':'America/Bogota' }}</td>
               <td class="center">
                 @if (estadoBadge(s) === 'activa') {
                   <span class="dias">{{ diasRestantes(s) }}</span>

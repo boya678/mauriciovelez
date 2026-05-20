@@ -41,7 +41,7 @@ class PaginatedHistorico(BaseModel):
 
 # ── Helper query (join historic + clientes) ───────────────────────────────────────
 
-def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = False, filtro_vip: Optional[str] = None):
+def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = False, filtro_vip: Optional[str] = None, celular: Optional[str] = None):
     q = (
         db.query(
             NumberHistoric.id,
@@ -56,6 +56,8 @@ def _build_query(db: Session, desde: date, hasta: date, solo_ganadores: bool = F
         .filter(NumberHistoric.date >= desde, NumberHistoric.date <= hasta)
         .order_by(NumberHistoric.date.desc(), Cliente.nombre)
     )
+    if celular:
+        q = q.filter(Cliente.celular.ilike(f"%{celular.strip()}%"))
     if solo_ganadores:
         q = q.filter(
             db.query(NumeroAcierto)
@@ -84,11 +86,12 @@ def list_historico(
     size: int = Query(20, ge=1, le=100),
     solo_ganadores: bool = Query(False),
     filtro_vip: Optional[str] = Query(None),
+    celular: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
     _desde, _hasta = _defaults(desde, hasta)
-    q = _build_query(db, _desde, _hasta, solo_ganadores, filtro_vip)
+    q = _build_query(db, _desde, _hasta, solo_ganadores, filtro_vip, celular)
     total = q.count()
     rows = q.offset((page - 1) * size).limit(size).all()
     items = [
@@ -109,6 +112,7 @@ def export_historico(
     hasta: Optional[date] = Query(None),
     solo_ganadores: bool = Query(False),
     filtro_vip: Optional[str] = Query(None),
+    celular: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
@@ -137,6 +141,8 @@ def export_historico(
         .filter(NumberHistoric.date >= _desde, NumberHistoric.date <= _hasta)
         .order_by(NumberHistoric.date.desc(), Cliente.nombre)
     )
+    if celular:
+        base_q = base_q.filter(Cliente.celular.ilike(f"%{celular.strip()}%"))
     if solo_ganadores:
         base_q = base_q.filter(
             db.query(NumeroAcierto)

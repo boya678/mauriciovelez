@@ -10,7 +10,7 @@
 #   .\build-deploy.ps1 -SkipDeploy      # solo build y push (sin kubectl)
 # ============================================================
 param(
-    [ValidateSet("backend", "frontend", "admin", "all")]
+    [ValidateSet("backend", "frontend", "admin", "www", "all")]
     [string]$Target = "all",
     [switch]$SkipDeploy,
     [string]$Tag = "latest"
@@ -24,6 +24,7 @@ $NAMESPACE      = "mauriciovelez"
 $BACKEND_IMAGE  = "$REGISTRY/mauriciovelez-backend:$Tag"
 $FRONTEND_IMAGE = "$REGISTRY/mauriciovelez-frontend:$Tag"
 $ADMIN_IMAGE    = "$REGISTRY/mauriciovelez-admin:$Tag"
+$WWW_IMAGE      = "$REGISTRY/mauriciovelez-www:$Tag"
 $PLATFORMS      = "linux/amd64,linux/arm64"
 $BUILDER_NAME   = "multiarch"
 $ROOT = $PSScriptRoot
@@ -70,6 +71,14 @@ if ($Target -in "admin", "all") {
     docker buildx use $BUILDER_NAME
     docker buildx build --platform $PLATFORMS --push -t $ADMIN_IMAGE "$ROOT\admin"
     Write-OK "Admin image publicada"
+}
+
+# ── 5b. Build + Push WWW ─────────────────────────────────────
+if ($Target -in "www", "all") {
+    Write-Step "Build + Push www  →  $WWW_IMAGE  [$PLATFORMS]"
+    docker buildx use $BUILDER_NAME
+    docker buildx build --platform $PLATFORMS --push -t $WWW_IMAGE "$ROOT\www"
+    Write-OK "WWW image publicada"
 }
 
 if ($SkipDeploy) {
@@ -123,6 +132,13 @@ if ($Target -in "admin", "all") {
     kubectl apply -f "$ROOT\admin\k8s\" --namespace $NAMESPACE
     kubectl rollout restart deployment/admin --namespace $NAMESPACE
     Write-OK "Admin desplegado"
+}
+
+if ($Target -in "www", "all") {
+    Write-Step "Aplicando manifests www..."
+    kubectl apply -f "$ROOT\www\k8s\" --namespace $NAMESPACE
+    kubectl rollout restart deployment/www --namespace $NAMESPACE
+    Write-OK "WWW desplegado"
 }
 
 # ── 9. Verificar estado ───────────────────────────────────────

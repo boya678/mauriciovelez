@@ -1,0 +1,415 @@
+CHATSYSTEM — CAPACIDADES DEL SISTEMA
+=====================================
+Version: 1.0  |  Actualizado: 2026-05-14
+Stack: FastAPI · Angular · PostgreSQL · Redis Streams · Azure OpenAI · LangGraph · WhatsApp Cloud API
+
+
+=======================================================================
+DESCRIPCION GENERAL
+=======================================================================
+ChatsSystem es una plataforma multi-tenant de atencion al cliente por
+WhatsApp con chatbots impulsados por IA, traspaso a agentes humanos,
+mensajeria en tiempo real y herramientas extensibles (HTTP, SQL, STATIC).
+
+
+=======================================================================
+1. API REST — ENDPOINTS
+=======================================================================
+
+--- Webhook (WhatsApp) ---
+GET  /api/v1/webhook                  Verificacion Meta (challenge HMAC)
+POST /api/v1/webhook                  Recibe mensajes entrantes y updates de estado de WhatsApp
+
+--- Conversaciones ---
+GET  /api/v1/conversations            Lista paginada (filtro por status)
+GET  /api/v1/conversations/{id}       Detalle con historial completo de mensajes
+POST /api/v1/conversations            Agente inicia conversacion saliente (nueva o reabre dentro de 24h)
+POST /api/v1/conversations/{id}/take  Agente toma manualmente una conv. en espera
+POST /api/v1/conversations/{id}/send  Agente envia mensaje al usuario
+POST /api/v1/conversations/{id}/close Cierra conversacion
+POST /api/v1/conversations/{id}/reopen Reabre una conversacion cerrada
+
+--- Agentes ---
+POST /api/v1/agents/login             Login agente (email+password → JWT)
+GET  /api/v1/agents/me                Perfil del agente actual
+PUT  /api/v1/agents/me/status         Cambiar estado ONLINE/OFFLINE
+GET  /api/v1/agents                   Listar agentes (admin)
+POST /api/v1/agents                   Crear agente (admin)
+PUT  /api/v1/agents/{id}              Actualizar agente (admin)
+DELETE /api/v1/agents/{id}            Desactivar agente (admin)
+POST /api/v1/agents/heartbeat         Renovar presencia en Redis
+
+--- Herramientas (Tools) ---
+GET  /api/v1/tools                    Listar tools
+POST /api/v1/tools                    Crear tool (HTTP / SQL / STATIC)
+GET  /api/v1/tools/{id}              Obtener tool
+PUT  /api/v1/tools/{id}              Actualizar tool
+DELETE /api/v1/tools/{id}            Eliminar tool
+POST /api/v1/tools/{id}/test         Probar tool con params de ejemplo
+
+--- Base de Conocimiento (RAG) ---
+POST /api/v1/knowledge/my/upload      Subir texto y generar chunks+embeddings (admin)
+DELETE /api/v1/knowledge/my           Eliminar knowledge propio (admin)
+GET  /api/v1/knowledge/my/status      Ver cantidad de chunks indexados (admin)
+POST /api/v1/knowledge/{tid}/upload   Superadmin: subir knowledge de un tenant
+DELETE /api/v1/knowledge/{tid}        Superadmin: eliminar knowledge de un tenant
+GET  /api/v1/knowledge/{tid}/status   Superadmin: estado de knowledge
+
+--- Tenants (Multi-tenancy) ---
+POST /api/v1/tenants                  Crear tenant (auto-provisiona schema) (superadmin)
+GET  /api/v1/tenants                  Listar tenants (superadmin)
+GET  /api/v1/tenants/{id}             Detalle tenant (superadmin)
+PUT  /api/v1/tenants/{id}             Actualizar config (superadmin)
+DELETE /api/v1/tenants/{id}           Soft-delete tenant (superadmin)
+
+--- SuperAdmin ---
+POST /api/v1/superadmin/login         Login superadmin → JWT
+POST /api/v1/superadmin/bootstrap     Crear primer superadmin (solo si tabla vacia)
+GET  /api/v1/superadmin/me            Perfil superadmin actual
+GET  /api/v1/superadmin/users         Listar superadmins
+POST /api/v1/superadmin/users         Crear superadmin
+DELETE /api/v1/superadmin/users/{id}  Desactivar superadmin
+
+--- Estadisticas ---
+GET /api/v1/token-usage/my            Uso de tokens del tenant propio (ultimos 6 meses)
+GET /api/v1/token-usage/all           Todos los tenants (superadmin)
+GET /api/v1/token-usage/{tid}         Un tenant especifico (superadmin)
+GET /api/v1/message-stats/my          Estadisticas de mensajes del tenant propio
+GET /api/v1/message-stats/all         Todos los tenants (superadmin)
+GET /api/v1/message-stats/{tid}       Un tenant especifico (superadmin)
+
+--- WebSocket ---
+ws://{host}/ws/{tenant_slug}/{agent_id}?token=JWT
+  Recibe eventos en tiempo real: new_message, conversation_assigned,
+  conversation_closed, conversation_waiting, agent_typing
+
+--- Health ---
+GET /health                           Verificacion de salud del servicio
+
+
+=======================================================================
+2. WORKERS ASINCRONOS (Redis Streams)
+=======================================================================
+
+WORKER 1 — Message Ingestion (message_ingestion.py)
+  Consume: messages_stream
+  Publica: ai_processing_stream | human_assign_stream
+  - Parsea webhooks WhatsApp (text, image, document, interactive)
+  - Deduplicacion por external_id (wamid)
+  - Upsert Conversation + Insert Message
+  - Descarga media (base64)
+  - Enruta a IA (sin agente) o a asignacion (con agente asignado)
+  - Registra estadisticas de mensajes
+  - Emite eventos WebSocket
+
+WORKER 2 — AI Worker (ai_worker.py)
+  Consume: ai_processing_stream
+  Publica: outgoing_stream | human_assign_stream
+  - Carga historial de conversacion desde DB
+  - Carga system prompt + tools del tenant
+  - Ejecuta grafo LangGraph (clasificador → especialista → tool_node loop → escalacion)
+  - Maneja imagenes pendientes (FIFO Redis, extrae descripcion via tag [IMG_CTX:...])
+  - Si necesita_escalacion: actualiza conv a WAITING_HUMAN
+  - Si respuesta bot: inserta Message, publica a outgoing_stream
+  - Registra uso de tokens y estadisticas
+
+WORKER 3 — Assignment Worker (assignment_worker.py)
+  Consume: human_assign_stream
+  - Round-robin de agentes disponibles (ONLINE + capacidad)
+  - Verifica max_concurrent_chats por agente
+  - Bloqueo de conv para evitar condicion de carrera
+  - Crea registro Assignment en DB, actualiza conv → HUMAN_ACTIVE
+  - Emite evento WebSocket al agente asignado
+  - Hasta 5 reintentos; si no hay agentes, deja en WAITING_HUMAN
+
+WORKER 4 — Outgoing Worker (outgoing_worker.py)
+  Consume: outgoing_stream
+  - Envia mensaje de texto (standard)
+  - Envia template (cuando ventana 24h expirada)
+  - Envia mensajes interactivos (buttons / lists)
+  - Actualiza Message.status → PROCESSED | ERROR
+
+Mecanica de consumer groups:
+  - XREADGROUP: prioridad a mensajes pendientes
+  - XAUTOCLAIM: recupera entradas "pegadas" (idle timeout configurable)
+  - XACK: confirma procesado
+  - Contador de reintentos: dead-letter despues de MAX=5 intentos
+
+
+=======================================================================
+3. INTEGRACION WHATSAPP
+=======================================================================
+
+Flujo de entrada:
+  Meta → POST /webhook?tenant=slug (validacion firma HMAC)
+  → Parseo tipo de mensaje (text, image, document, interactive reply)
+  → Descarga media si aplica
+  → Escribe a messages_stream
+
+Ventana de 24 horas:
+  - Dentro de 24h del ultimo mensaje → texto libre permitido
+  - Despues de 24h → obligatorio usar plantilla aprobada
+
+Tipos de mensajes salientes:
+  1. Texto plano
+  2. Template (cuando el bot/agente inicia o recontacta fuera de ventana)
+  3. Interactivo Botones (1-3 botones con IDs de respuesta)
+  4. Interactivo Lista (4-10 opciones agrupadas en secciones)
+
+Formato JSON que el LLM puede emitir para menus interactivos:
+  Botones: {"menu_type":"buttons","body":"...","buttons":[{"id":"opt1","title":"..."}]}
+  Lista:   {"menu_type":"list","body":"...","button_text":"Ver","sections":[...]}
+
+Reapertura de conversacion:
+  - Cerrada dentro de 24h: reabrir + enviar texto de contacto
+  - Cerrada fuera de 24h: enviar template como primer mensaje
+
+Configuracion por tenant:
+  - whatsapp_phone_id, whatsapp_token, webhook_secret
+  - whatsapp_template_name, whatsapp_template_language (default: es)
+
+
+=======================================================================
+4. AGENTE DE IA — LANGGRAPH
+=======================================================================
+
+Grafo:
+  START
+   → classifier (clasificacion de intencion)
+   → route_intent (enrutamiento condicional)
+      → specialist (manejador especifico por intencion)
+         → [tool_node] (si LLM llama herramientas)
+            → tool_executor
+            → specialist (vuelve con resultados)
+         → should_escalate
+            → escalate_node → END
+            → END (respuesta del bot)
+
+Clasificacion de intencion (temperature=0.0):
+  faq / sales / support / escalate
+  "escalate" solo si el usuario PIDE EXPLICITAMENTE un agente humano
+
+Nodos especialistas (uno por intencion):
+  FAQ:     Responde basado en KB, admite no saber
+  Sales:   Asesor comercial (productos, precios, promociones)
+  Support: Soporte tecnico con empatia y opcion de escalar
+
+Logica de escalacion (should_escalate):
+  - Intent == escalate                            → escalar
+  - Turno 1 (primera respuesta)                   → nunca escalar
+  - Confianza < umbral (default 0.3)              → escalar
+  - Turnos >= maximo (default 5)                  → escalar
+  - Resto                                         → responder
+
+RAG (Retrieval Augmented Generation):
+  - Embeber ultimo mensaje del usuario
+  - Busqueda coseno en pgvector, top-3 chunks
+  - Inyectar chunks al system prompt del especialista
+
+Procesamiento de imagenes:
+  1. Usuario envia imagen → base64 en Message.media_content
+  2. ID del mensaje en FIFO Redis: pending_images:{conversation_id}
+  3. IA pide descripcion al usuario; LLM extrae [IMG_CTX:descripcion]
+  4. Descripcion guardada en Message.imagen_descripcion
+
+Seguimiento de tokens y confianza:
+  - usage_metadata acumulado en loops multi-tool
+  - Confianza default: 0.9; reduce a 0.4 si detecta frases de duda
+  - Resumen mensual en tabla token_usage (tokens_in, tokens_out)
+
+
+=======================================================================
+5. WEBSOCKET — TIEMPO REAL
+=======================================================================
+
+Conexion: ws://host/ws/{tenant_slug}/{agent_id}?token=JWT
+  - JWT validado (tenant + agent_id coinciden)
+  - Agente marcado ONLINE en Redis + DB
+  - Heartbeat: cliente envia ping cada 10s, servidor responde pong
+
+Eventos emitidos a los agentes:
+  new_message           Nuevo mensaje en una conversacion
+  conversation_assigned Conversacion asignada al agente (incluye telefono)
+  conversation_closed   Conversacion cerrada
+  conversation_waiting  Bot escalo, esperando agente humano
+  agent_typing          Indicador de escritura
+
+Broadcasting: canal por tenant_slug; todos los agentes conectados reciben
+
+
+=======================================================================
+6. MULTI-TENANCY
+=======================================================================
+
+Arquitectura de schemas:
+  public            → tenants, superadmins, agent_tools, knowledge_chunks,
+                       token_usage, message_stats
+  t_{slug}          → conversations, messages, agents, assignments (aislado por tenant)
+
+Aprovisionamiento automatico:
+  POST /api/v1/tenants
+    1. Crea fila en public.tenants
+    2. CREATE SCHEMA t_{slug}
+    3. Crea tablas + indices en el schema del tenant
+
+Aislamiento:
+  - SQLAlchemy session con search_path dinamico
+  - Claves Redis incluyen tenant_id / tenant_slug
+  - Canal WebSocket por tenant_slug
+  - Workers leen tenant_id del stream y fijan el schema
+
+
+=======================================================================
+7. AUTENTICACION Y AUTORIZACION
+=======================================================================
+
+Agentes:
+  - Login: POST /api/v1/agents/login → JWT {sub, tenant_id, tenant_slug, role}
+  - Roles: agent | admin
+  - Token en localStorage como cs_token
+
+SuperAdmins:
+  - Login: POST /api/v1/superadmin/login → JWT {sub, role: superadmin, email}
+  - Bootstrap: primer superadmin si tabla vacia (sin auth requerida)
+
+Guards del frontend:
+  authGuard    Redirige no autenticados a /login
+  adminGuard   Redirige no-admin a /inbox
+  saAuthGuard  Redirige no-superadmin a /sa/login
+
+Middleware del backend:
+  require_agent   JWT valido + agente activo en DB
+  require_admin   role == admin
+  verify_super_admin  role == superadmin
+
+
+=======================================================================
+8. HERRAMIENTAS DEL AGENTE IA (TOOLS)
+=======================================================================
+
+Tipo HTTP:
+  - Llamadas REST externas (GET, POST, PUT, DELETE)
+  - Variables de plantilla: {phone}, {conversation_id}, {tenant_slug}, {env:VAR}
+  - Body template opcional (JSON)
+  - Timeout configurable (default 10s)
+  - Ejemplo: GET https://api.example.com/balance?phone={phone}
+
+Tipo SQL:
+  - Consultas a bases de datos internas (solo SELECT, validado)
+  - Sustitucion segura de parametros del LLM
+  - search_path al schema del tenant
+  - Devuelve resultados multi-fila formateados
+  - Ejemplo: SELECT numero FROM user_numbers WHERE phone = {phone}
+
+Tipo STATIC:
+  - Texto fijo, sin parametros
+  - Ejemplo: "Horario: Lunes-Viernes 9-18h"
+
+Integracion LangChain:
+  - Tools convertidos a StructuredTool con schema Pydantic dinamico
+  - LLM emite tool_calls estructuradas
+  - Soporte de llamadas multiples secuenciales (loop back al especialista)
+
+
+=======================================================================
+9. BASE DE CONOCIMIENTO (RAG)
+=======================================================================
+
+Pipeline de indexacion:
+  1. Admin sube texto libre via POST /api/v1/knowledge/my/upload
+  2. Chunking: ventanas de 500 palabras con solapamiento de 50
+  3. Embedding: Azure text-embedding-3-large (1536 dims)
+  4. Almacenamiento en knowledge_chunks con indice HNSW (pgvector)
+
+Pipeline de recuperacion (en cada turno del especialista):
+  1. Embeber el ultimo mensaje del usuario
+  2. Busqueda por similitud coseno, top-3 chunks
+  3. Chunks inyectados en el system prompt del especialista
+
+Casos de uso: FAQ, informacion de productos, politicas internas
+
+
+=======================================================================
+10. FRONTEND ANGULAR — FUNCIONALIDADES
+=======================================================================
+
+Rutas principales:
+  /login               Login de agentes (por tenant)
+  /inbox               Bandeja principal del agente
+  /admin/dashboard     Dashboard + analiticas
+  /admin/agents        Gestion de agentes (CRUD)
+  /admin/settings      Config WhatsApp, plantillas, system prompt, KB
+  /admin/tools         Editor de herramientas (HTTP, SQL, STATIC)
+  /sa/login            Login superadmin
+  /sa/tenants          Gestion de tenants
+  /sa/users            Gestion de superadmins
+  /sa/tokens           Analiticas de uso de tokens
+
+Bandeja de entrada (inbox):
+  Tabs: Esperando humano | Mis conversaciones | Bot activo | Cerradas
+  - Sincronizacion en tiempo real via WebSocket
+  - Busqueda por numero de telefono
+  - Modal para nueva conversacion saliente
+  - Deteccion de conflictos (conv abierta → 409)
+  - Formateo de fechas (hoy→hora, otro→fecha)
+
+Chat:
+  - Hilo de mensajes con tipo de remitente (usuario, bot, agente)
+  - Auto-scroll al ultimo mensaje
+  - Actualizacion en tiempo real via WebSocket
+  - Enviar mensaje con enter o boton
+  - Banner rojo de error si el envio falla (sendError signal)
+  - Boton Cerrar / Reabrir conversacion
+
+Admin — Configuracion del tenant:
+  - Credenciales WhatsApp (phone_id, token, webhook_secret)
+  - Nombre + idioma de la plantilla de template
+  - Editor del system prompt del agente IA
+  - Subir / eliminar base de conocimiento
+
+Admin — Herramientas:
+  - CRUD completo de tools
+  - Selector de tipo (HTTP / SQL / STATIC)
+  - Probar tool con inputs de ejemplo
+
+Dashboard:
+  - Graficos de uso de tokens por mes
+  - Estadisticas de mensajes (bot / agente / usuario)
+  - Estado online/offline de agentes
+
+
+=======================================================================
+11. MODELOS DE BASE DE DATOS (RESUMEN)
+=======================================================================
+
+Schema t_{slug} (por tenant):
+  conversations  id, tenant_id, phone, status, assigned_agent_id,
+                 last_user_message_at, created_at, updated_at, closed_at
+  messages       id, conversation_id, sender_type, content, message_type,
+                 status, media_content, media_mime_type, external_id,
+                 imagen_descripcion, created_at
+  agents         id, tenant_id, email, name, password_hash, role, status,
+                 max_concurrent_chats, last_assigned_at, active, created_at
+  assignments    id, conversation_id, agent_id, assigned_at, released_at
+
+Schema public (compartido):
+  tenants          id, name, slug, schema_name, whatsapp_phone_id,
+                   whatsapp_token, webhook_secret, ai_system_prompt,
+                   whatsapp_template_name, whatsapp_template_language, active
+  agent_tools      id, tenant_id, name, description, tool_type, enabled,
+                   http_url/method/headers/body_tpl/timeout,
+                   sql_dsn/query/params, static_text
+  knowledge_chunks id, tenant_id, chunk_index, content, embedding (vector 1536)
+  token_usage      tenant_id, year, month, tokens_in, tokens_out, tokens_total
+  message_stats    tenant_id, year, month, bot_messages, human_messages, user_messages
+  superadmins      id, email, name, password_hash, active, created_at
+
+Estados de conversacion: new | bot_active | waiting_human | human_active | closed
+Tipos de remitente: user | bot | human
+Tipos de mensaje: text | image | document | interactive | ...
+Estados de mensaje: pending | processing | processed | error
+
+
+=======================================================================
+FIN DEL DOCUMENTO
+=======================================================================

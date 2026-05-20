@@ -3,11 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HistoricoService, HistoricoRow, AciertoDetalle } from '../../core/services/historico.service';
 import { AuthService } from '../../core/services/auth.service';
+import { yesterdayCol } from '../../core/utils/col-date';
 
 function yesterday(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return yesterdayCol();
 }
 
 @Component({
@@ -29,6 +28,7 @@ export class HistoricoComponent implements OnInit {
   hasta = yesterday();
   soloGanadores = false;
   filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos';
+  celular = '';
 
   // Modal aciertos
   showModal = signal(false);
@@ -42,7 +42,7 @@ export class HistoricoComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.svc.list(this.desde, this.hasta, this.page(), this.size, this.soloGanadores, this.filtroVip).subscribe(res => {
+    this.svc.list(this.desde, this.hasta, this.page(), this.size, this.soloGanadores, this.filtroVip, this.celular).subscribe(res => {
       this.items.set(res.items);
       this.total.set(res.total);
       this.loading.set(false);
@@ -58,7 +58,7 @@ export class HistoricoComponent implements OnInit {
   downloadExcel() {
     if (this.exporting()) return;
     this.exporting.set(true);
-    this.svc.export(this.desde, this.hasta, this.soloGanadores, this.filtroVip).subscribe({
+    this.svc.export(this.desde, this.hasta, this.soloGanadores, this.filtroVip, this.celular).subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

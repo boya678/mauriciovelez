@@ -17,10 +17,11 @@ from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
 from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
+from app.services.notification_queue import push
 from app.core.live_events import publish_event
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
-LOTERIAS_API = "https://api-resultadosloterias.com/api/results"
+LOTERIAS_API = "https://portal.supergirosnortedelvalle.com/api/resultados"
 
 logger = logging.getLogger(__name__)
 
@@ -53,75 +54,11 @@ def _clasificar(numero: str, resultado: str) -> list[str]:
 
 
 def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_num: str) -> None:
-    """Envía WhatsApp al cliente free ganador usando la template configurada."""
-    numero_dest = celular if celular.startswith('57') else f'57{celular}'
-    devuelto = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero
-    numero_texto = f'{numero} {devuelto}'
-    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
-    headers = {
-        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
-        'Content-Type': 'application/json',
-    }
-    body = {
-        'messaging_product': 'whatsapp',
-        'to': numero_dest,
-        'type': 'template',
-        'template': {
-            'name': settings.WHATSAPP_TEMPLATE_GANADOR_FREE,
-            'language': {'code': 'es_CO'},
-            'components': [
-                {
-                    'type': 'body',
-                    'parameters': [
-                        {'type': 'text', 'text': numero_texto},
-                        {'type': 'text', 'text': f'{loteria} {resultado_num}'},
-                    ],
-                },
-            ],
-        },
-    }
-    try:
-        resp = httpx.post(url, json=body, headers=headers, timeout=10)
-        if resp.status_code >= 400:
-            logger.warning("WhatsApp ganador_free falló (%s): %s", resp.status_code, resp.text)
-    except Exception:
-        logger.exception("Error al enviar WhatsApp ganador_free a %s", celular)
+    push("ganador_free", celular, {"numero": numero, "loteria": loteria, "resultado_num": resultado_num})
 
 
 def _notificar_ganador_vip(celular: str, numero: str, loteria: str, resultado_num: str) -> None:
-    """Envía WhatsApp al cliente VIP ganador (sin deshabilitar la cuenta)."""
-    numero_dest = celular if celular.startswith('57') else f'57{celular}'
-    devuelto = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero
-    numero_texto = f'{numero} {devuelto}'
-    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
-    headers = {
-        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
-        'Content-Type': 'application/json',
-    }
-    body = {
-        'messaging_product': 'whatsapp',
-        'to': numero_dest,
-        'type': 'template',
-        'template': {
-            'name': settings.WHATSAPP_TEMPLATE_GANADOR_VIP,
-            'language': {'code': 'es_CO'},
-            'components': [
-                {
-                    'type': 'body',
-                    'parameters': [
-                        {'type': 'text', 'text': numero_texto},
-                        {'type': 'text', 'text': f'{loteria} {resultado_num}'},
-                    ],
-                },
-            ],
-        },
-    }
-    try:
-        resp = httpx.post(url, json=body, headers=headers, timeout=10)
-        if resp.status_code >= 400:
-            logger.warning("WhatsApp ganador_vip falló (%s): %s", resp.status_code, resp.text)
-    except Exception:
-        logger.exception("Error al enviar WhatsApp ganador_vip a %s", celular)
+    push("ganador_vip", celular, {"numero": numero, "loteria": loteria, "resultado_num": resultado_num})
 
 
 def _procesar_loterias(fecha: date | None = None) -> None:
@@ -132,15 +69,17 @@ def _procesar_loterias(fecha: date | None = None) -> None:
     """
     hoy_col = fecha or datetime.now(COLOMBIA_TZ).date()
     fecha_str = hoy_col.strftime("%Y-%m-%d")
+    print(f"[CRON loterias] Inicio — {fecha_str}")
     logger.info("Procesando loterias para %s", fecha_str)
 
     db = SessionLocal()
     try:
         # ── 1. Fetch API externa ──────────────────────────────────────────────
         try:
-            resp = httpx.get(f"{LOTERIAS_API}/{fecha_str}", timeout=15)
+            fecha_param = hoy_col.strftime("%d/%m/%Y")
+            resp = httpx.get(LOTERIAS_API, params={"fecha": fecha_param}, timeout=15)
             resp.raise_for_status()
-            data = resp.json().get("data", [])
+            data = resp.json().get("resultados", [])
         except Exception:
             logger.exception("Error al consultar API loterias para %s", fecha_str)
             return
@@ -153,15 +92,18 @@ def _procesar_loterias(fecha: date | None = None) -> None:
         resultados_map: dict[str, LoteriaResultado] = {}
         seen_slugs: set[str] = set()
         for item in data:
-            slug = item.get("slug", "")
-            if "5ta-" in slug:
+            lottery = item.get("lottery", {})
+            slug = lottery.get("name", "")
+            if not slug:
                 continue
             if slug in seen_slugs:
                 continue
             seen_slugs.add(slug)
-            raw_result = item.get("result", "")
-            # Si el resultado trae 5 dígitos el último es la serie — lo descartamos
-            resultado_limpio = raw_result[:-1] if len(raw_result) == 5 and raw_result.isdigit() else raw_result
+            raw_result = item.get("number", "")
+            # La nueva API ya devuelve 4 dígitos directamente
+            resultado_limpio = raw_result.zfill(4) if raw_result.isdigit() else raw_result
+            serie_raw = item.get("zodiac_sign") or ""
+            # zodiac_sign puede ser "serie: 179" o un signo zodiacal — guardamos tal cual
             existing = (
                 db.query(LoteriaResultado)
                 .filter(LoteriaResultado.fecha == hoy_col, LoteriaResultado.slug == slug)
@@ -175,10 +117,10 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                 nuevo = LoteriaResultado(
                     id=uuid.uuid4(),
                     fecha=hoy_col,
-                    loteria=item.get("lottery", slug),
+                    loteria=lottery.get("display_name", slug),
                     slug=slug,
                     resultado=resultado_limpio,
-                    serie=item.get("series", ""),
+                    serie=serie_raw,
                     fetched_at=datetime.now(timezone.utc),
                 )
                 db.add(nuevo)
@@ -205,7 +147,6 @@ def _procesar_loterias(fecha: date | None = None) -> None:
         )
 
         nuevos_aciertos = 0
-        _notificados_esta_corrida: set = set()
         for h in historicos:
             for resultado in resultados_map.values():
                 for tipo in _clasificar(h.number, resultado.resultado):
@@ -229,13 +170,9 @@ def _procesar_loterias(fecha: date | None = None) -> None:
 
                         # ── Notificar ganador ────────────────────────────────
                         cliente_h = db.query(Cliente).filter(Cliente.id == h.id_user).first()
-                        if (
-                            cliente_h
-                            and cliente_h.enabled
-                            and cliente_h.id not in _notificados_esta_corrida
-                        ):
-                            _notificados_esta_corrida.add(cliente_h.id)
-                            # ── Publicar evento live ────────────────────────────
+                        if cliente_h and cliente_h.enabled:
+                            celular_wp = f"{cliente_h.codigo_pais or '57'}{cliente_h.celular}" if cliente_h.celular else None
+                            # ── Publicar evento live ────────────────────────
                             veces_gano = db.query(NumeroAcierto).join(
                                 NumberHistoric, NumeroAcierto.historic_id == NumberHistoric.id,
                             ).filter(NumberHistoric.id_user == h.id_user).count()
@@ -253,24 +190,26 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                                 "tres_metodo": "Tres Método",
                             }.get(tipo, tipo)
                             if cliente_h.vip:
-                                _notificar_ganador_vip(
-                                    celular=cliente_h.celular,
-                                    numero=h.number,
-                                    loteria=resultado.loteria,
-                                    resultado_num=resultado.resultado,
-                                )
+                                if celular_wp:
+                                    _notificar_ganador_vip(
+                                        celular=celular_wp,
+                                        numero=h.number,
+                                        loteria=resultado.loteria,
+                                        resultado_num=resultado.resultado,
+                                    )
                                 logger.info(
                                     "Ganador VIP notificado: %s (%s) — %s %s %s",
                                     cliente_h.nombre, cliente_h.celular,
                                     resultado.loteria, resultado.resultado, tipo,
                                 )
                             else:
-                                _notificar_ganador_free(
-                                    celular=cliente_h.celular,
-                                    numero=h.number,
-                                    loteria=resultado.loteria,
-                                    resultado_num=resultado.resultado,
-                                )
+                                if celular_wp:
+                                    _notificar_ganador_free(
+                                        celular=celular_wp,
+                                        numero=h.number,
+                                        loteria=resultado.loteria,
+                                        resultado_num=resultado.resultado,
+                                    )
                                 cliente_h.enabled = False
                                 db.add(Contacto(
                                     id=uuid.uuid4(),
@@ -286,26 +225,56 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                                 )
 
         db.commit()
+        print(f"[CRON loterias] Fin — {fecha_str}: {len(data)} resultados, {nuevos_aciertos} nuevos aciertos")
         logger.info(
             "Loterias %s: %d resultados, %d historicos, %d nuevos aciertos",
             fecha_str, len(data), len(historicos), nuevos_aciertos,
         )
     except Exception:
         db.rollback()
+        print(f"[CRON loterias] ERROR — {fecha_str}")
         logger.exception("Error en _procesar_loterias para %s", fecha_str)
     finally:
         db.close()
 
 
+def _enviar_recordatorio_vencimiento(celular: str, nombre: str) -> None:
+    push("recordatorio_vencimiento", celular, {})
+
+
 def _desactivar_vip_vencidos() -> None:
     """
-    Marca como vip=False a todos los clientes cuya suscripción activa
-    haya vencido y que no tengan otra suscripción vigente.
+    1. Envía recordatorio a clientes VIP cuya suscripción vence en exactamente 3 días.
+    2. Marca como vip=False a todos los clientes cuya suscripción activa
+       haya vencido y que no tengan otra suscripción vigente.
     También marca activa=False las suscripciones vencidas.
     """
+    print("[CRON vip_check] Inicio")
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
+
+        # 0. Recordatorio: suscripciones activas que vencen en 3 días (+/- 1h de margen)
+        from datetime import timedelta
+        ventana_inicio = now + timedelta(days=3) - timedelta(hours=1)
+        ventana_fin    = now + timedelta(days=3) + timedelta(hours=1)
+        por_vencer = (
+            db.query(Suscripcion)
+            .filter(
+                Suscripcion.activa == True,
+                Suscripcion.fin >= ventana_inicio,
+                Suscripcion.fin <= ventana_fin,
+            )
+            .all()
+        )
+        recordatorios = 0
+        for s in por_vencer:
+            cliente = db.get(Cliente, s.cliente_id)
+            if cliente and cliente.celular:
+                celular_wp = f"{cliente.codigo_pais or '57'}{cliente.celular}"
+                _enviar_recordatorio_vencimiento(celular_wp, cliente.nombre or "")
+                recordatorios += 1
+        print(f"[CRON vip_check] Recordatorios enviados: {recordatorios}")
 
         # 1. Marcar suscripciones vencidas
         vencidas = (
@@ -333,13 +302,14 @@ def _desactivar_vip_vencidos() -> None:
             logger.info("VIP desactivado y cuenta inhabilitada: %s (%s)", c.nombre, c.celular)
 
         db.commit()
+        print(f"[CRON vip_check] Fin — {len(vencidas)} suscripciones vencidas, {len(expirados)} clientes desactivados")
         logger.info(
-            "Cron vip_check: %d suscripciones vencidas, %d clientes desactivados",
-            len(vencidas),
-            len(expirados),
+            "Cron vip_check: %d recordatorios, %d suscripciones vencidas, %d clientes desactivados",
+            recordatorios, len(vencidas), len(expirados),
         )
     except Exception:
         db.rollback()
+        print("[CRON vip_check] ERROR")
         logger.exception("Error en cron _desactivar_vip_vencidos")
     finally:
         db.close()
@@ -351,6 +321,7 @@ def _reasignar_numeros_vencidos() -> None:
     - Número free: a todos (si no tiene o venció).
     - Número vip: solo a clientes vip (si no tiene o venció).
     """
+    print("[CRON numeros] Inicio")
     from sqlalchemy import select as _select
 
     db = SessionLocal()
@@ -361,43 +332,52 @@ def _reasignar_numeros_vencidos() -> None:
             Cliente.tipo_cliente == 1,
         ).all()
         asignados = 0
-        print(f"   Procesando {len(clientes)} cliente(s)...")
+        print(f"[CRON numeros] Procesando {len(clientes)} cliente(s)...")
 
         for c in clientes:
-            # ── Número free ───────────────────────────────────────
-            free_row = db.execute(
-                _select(NumberUser).where(
-                    NumberUser.id_user == c.id,
-                    NumberUser.type == "free",
-                )
-            ).scalar_one_or_none()
-
-            if free_row is None or free_row.valid_until < today:
-                nueva_free = assign_number(db, c.id, "free")
-                asignados += 1
-                if c.celular:
-                    notificar_nuevo_numero_free(c.celular, nueva_free.number, nueva_free.valid_until)
-
-            # ── Número vip (solo si el cliente es VIP) ────────────
-            if c.vip:
-                vip_row = db.execute(
+            try:
+                # ── Número free ───────────────────────────────────
+                free_row = db.execute(
                     _select(NumberUser).where(
                         NumberUser.id_user == c.id,
-                        NumberUser.type == "vip",
+                        NumberUser.type == "free",
                     )
                 ).scalar_one_or_none()
 
-                if vip_row is None or vip_row.valid_until < today:
-                    nueva = assign_number(db, c.id, "vip")
+                if free_row is None or free_row.valid_until < today:
+                    nueva_free = assign_number(db, c.id, "free")
+                    db.commit()  # Persistir ANTES de notificar para evitar inconsistencias
                     asignados += 1
                     if c.celular:
-                        notificar_nuevo_numero_vip(c.celular, nueva.number, nueva.valid_until)
+                        celular_wp = f"{c.codigo_pais or '57'}{c.celular}"
+                        notificar_nuevo_numero_free(celular_wp, nueva_free.number, nueva_free.valid_until)
 
-        db.commit()
-        print(f"   Asignaciones realizadas: {asignados}")
+                # ── Número vip (solo si el cliente es VIP) ────────
+                if c.vip:
+                    vip_row = db.execute(
+                        _select(NumberUser).where(
+                            NumberUser.id_user == c.id,
+                            NumberUser.type == "vip",
+                        )
+                    ).scalar_one_or_none()
+
+                    if vip_row is None or vip_row.valid_until < today:
+                        nueva = assign_number(db, c.id, "vip")
+                        db.commit()  # Persistir ANTES de notificar para evitar inconsistencias
+                        asignados += 1
+                        if c.celular:
+                            celular_wp = f"{c.codigo_pais or '57'}{c.celular}"
+                            notificar_nuevo_numero_vip(celular_wp, nueva.number, nueva.valid_until)
+            except Exception:
+                db.rollback()
+                logger.exception("Error procesando cliente %s (%s) en reasignación", c.id, c.celular)
+                continue
+
+        print(f"[CRON numeros] Fin — {asignados} asignaciones realizadas sobre {len(clientes)} clientes")
         logger.info("Cron reasignacion numeros: %d asignaciones realizadas sobre %d clientes", asignados, len(clientes))
     except Exception:
         db.rollback()
+        print("[CRON numeros] ERROR")
         logger.exception("Error en cron _reasignar_numeros_vencidos")
     finally:
         db.close()

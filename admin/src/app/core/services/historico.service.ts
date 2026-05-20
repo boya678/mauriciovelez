@@ -36,7 +36,7 @@ export class HistoricoService {
 
   constructor(private http: HttpClient) {}
 
-  list(desde: string, hasta: string, page = 1, size = 20, soloGanadores = false, filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos') {
+  list(desde: string, hasta: string, page = 1, size = 20, soloGanadores = false, filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos', celular = '') {
     let params = new HttpParams()
       .set('desde', desde)
       .set('hasta', hasta)
@@ -44,13 +44,15 @@ export class HistoricoService {
       .set('size', size);
     if (soloGanadores) params = params.set('solo_ganadores', 'true');
     if (filtroVip !== 'todos') params = params.set('filtro_vip', filtroVip);
+    if (celular.trim()) params = params.set('celular', celular.trim());
     return this.http.get<PaginatedHistorico>(this.base, { params });
   }
 
-  export(desde: string, hasta: string, soloGanadores = false, filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos') {
+  export(desde: string, hasta: string, soloGanadores = false, filtroVip: 'todos' | 'vip' | 'no_vip' = 'todos', celular = '') {
     let params = new HttpParams().set('desde', desde).set('hasta', hasta);
     if (soloGanadores) params = params.set('solo_ganadores', 'true');
     if (filtroVip !== 'todos') params = params.set('filtro_vip', filtroVip);
+    if (celular.trim()) params = params.set('celular', celular.trim());
     return this.http.get(`${this.base}/export`, { params, responseType: 'blob' });
   }
 

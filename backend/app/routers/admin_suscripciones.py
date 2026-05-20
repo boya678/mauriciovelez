@@ -150,7 +150,8 @@ def renovar(
         if vip_row is None or vip_row.valid_until < today:
             nueva_vip = assign_number(db, cliente.id, "vip")
             if cliente.celular:
-                notificar_nuevo_numero_vip(cliente.celular, nueva_vip.number, nueva_vip.valid_until)
+                celular_wp = f"{cliente.codigo_pais or '57'}{cliente.celular}"
+                notificar_nuevo_numero_vip(celular_wp, nueva_vip.number, nueva_vip.valid_until)
 
     acumular_cuenta_vip(db)
 

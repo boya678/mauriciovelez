@@ -28,7 +28,7 @@
         <tbody>
           @for (c of items(); track c.id) {
             <tr>
-              <td class="small">{{ c.fecha | date:'dd/MM/yy HH:mm' }}</td>
+              <td class="small">{{ c.fecha | date:'dd/MM/yy HH:mm':'America/Bogota' }}</td>
               <td>{{ c.nombre }} @if (c.vip) { <span class="vip-badge">VIP</span> }</td>
               <td class="mono">{{ c.celular }}</td>
               <td class="mono bold">{{ c.numero }}</td>

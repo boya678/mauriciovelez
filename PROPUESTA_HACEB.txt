@@ -1,0 +1,489 @@
+=======================================================================
+PROPUESTA — REEMPLAZAR LA MESA DE SERVICIOS DE TI POR IA
+=======================================================================
+Cliente:        Industrias Haceb S.A. (NIT 890900148)
+Sector:         Manufacturas e insumos / Electrodomesticos
+Responsable:    Diego Armando Bedoya Mejia — Arquitecto de Infraestructura TI
+Proveedor:      T-Evolvers
+Fecha:          14 de mayo de 2026
+=======================================================================
+
+
+=======================================================================
+1. SOLUCION PROPUESTA
+=======================================================================
+
+NOMBRE DE LA SOLUCION
+ITSM-AI Hub — Mesa de Servicios de TI Cognitiva y Multicanal
+
+DESCRIPCION GENERAL
+ITSM-AI Hub es una plataforma de atencion de primer nivel de TI
+soportada en Inteligencia Artificial generativa, que reemplaza el modelo
+tradicional de mesa de ayuda con un agente cognitivo capaz de entender
+en lenguaje natural las solicitudes de los usuarios internos de Haceb,
+resolver autonomamente los casos repetitivos, ejecutar acciones reales
+sobre los sistemas corporativos (Active Directory, ServiceNow, Intune,
+SAP, etc.) y escalar de forma inteligente — con todo el contexto ya
+recopilado — a un especialista humano solo cuando es estrictamente
+necesario.
+
+La solucion se construye sobre nuestra plataforma propia ChatsSystem,
+ya operativa en produccion, extendida con conectores multicanal
+empresariales (Microsoft Teams, WhatsApp Business, correo, telefono via
+voicebot) y con un orquestador de herramientas que ejecuta acciones
+sobre los sistemas de Haceb mediante APIs seguras.
+
+
+COMO FUNCIONA — ARQUITECTURA DE FLUJO
+
+   [Usuario Haceb]
+        |
+        v
+   Canal de entrada
+   - Microsoft Teams (bot corporativo)
+   - WhatsApp Business
+   - Correo electronico (parseo)
+   - Telefono (voicebot con STT/TTS)
+   - Portal web embebido
+        |
+        v
+   Capa de Ingesta + Normalizacion
+   - Identifica usuario contra Azure AD
+   - Detecta intencion + entidades (LangGraph)
+   - Adjunta contexto del solicitante (cargo, sede, equipo, historial)
+        |
+        v
+   Agente Cognitivo (LangGraph + Azure OpenAI GPT-4)
+   - Clasificador: faq | acceso | hardware | software | red | escalar
+   - Especialistas por dominio con prompts curados
+   - Recuperacion aumentada (RAG) sobre base de conocimiento Haceb
+     (procedimientos, KEDB, manuales, politicas)
+   - Loop de herramientas hasta resolver o escalar
+        |
+        v
+   Orquestador de Herramientas (Tool Engine)
+   - Reset de password en Active Directory
+   - Desbloqueo de cuentas
+   - Consulta y modificacion de tickets en ServiceNow / Aranda / Jira
+   - Aprovisionamiento basico (membresia de grupos, licencias O365)
+   - Diagnostico remoto (Intune, SCCM)
+   - Consulta de activos asignados al usuario
+   - Apertura de cambios estandar pre-aprobados
+        |
+        v
+   Resolucion automatica (objetivo: 60-75% de los 23.000 casos)
+        |  (si no resuelve)
+        v
+   Escalacion inteligente al humano
+   - Pre-clasificado por dominio (remoto / sitio / activos)
+   - Con resumen ejecutivo del caso autogenerado por la IA
+   - Con todas las pruebas tecnicas ya ejecutadas adjuntas
+   - Con ticket ya creado en la herramienta ITSM
+   - Asignacion round-robin segun carga y especialidad
+
+
+CARACTERISTICAS PRINCIPALES
+
+(a) MULTICANAL NATIVO
+    - Microsoft Teams: bot conversacional integrado al tenant de Haceb,
+      con SSO via Azure AD. El usuario simplemente escribe "no puedo
+      entrar al ERP" sin abrir otra aplicacion.
+    - WhatsApp Business Cloud API: para usuarios en planta, sitio
+      remoto o sin acceso a Teams.
+    - Correo electronico: parseo automatico de correos a
+      soporte@haceb.com, conversion a conversacion contextualizada.
+    - Voicebot telefonico (opcional, fase 2): IVR sustituido por
+      conversacion natural con STT/TTS (Azure Speech).
+    - Portal web embebido para invitados / contratistas.
+
+    Toda conversacion converge a un mismo hilo unificado por usuario,
+    sin importar el canal de origen.
+
+(b) COMPRENSION DE CONTEXTO E IDENTIDAD
+    - Autenticacion contra Azure AD: el agente sabe QUIEN pregunta,
+      su cargo, sede, equipo asignado y politicas aplicables.
+    - Historial de tickets previos como contexto adicional.
+    - Conocimiento del catalogo de servicios autorizado para ese perfil.
+
+(c) RAG SOBRE LA BASE DE CONOCIMIENTO HACEB
+    - Ingesta de procedimientos, KEDB, manuales internos, FAQ.
+    - Chunking + embeddings con Azure text-embedding-3-large.
+    - Recuperacion semantica top-3 sobre pgvector.
+    - Respuestas siempre fundamentadas en documentacion oficial,
+      con cita de la fuente.
+
+(d) EJECUCION REAL DE ACCIONES (NO SOLO RESPUESTAS)
+    El motor de tools soporta 3 tipos:
+    - HTTP: integracion con APIs corporativas (ServiceNow, Microsoft
+      Graph, Intune, SAP, Aranda, etc.)
+    - SQL: consultas seguras (solo SELECT) a sistemas internos
+      (inventario de activos, asignaciones, garantias).
+    - STATIC: respuestas fijas para preguntas frecuentes simples.
+    Toda accion queda registrada con trazabilidad completa.
+
+(e) ESCALACION INTELIGENTE
+    Solo escala cuando:
+    - El usuario lo pide explicitamente.
+    - La confianza del modelo cae bajo el umbral configurado.
+    - Se superan N turnos sin resolver.
+    - El caso requiere intervencion fisica (en sitio).
+    El humano recibe el caso con resumen, evidencia y acciones ya
+    ejecutadas — el agente no parte de cero.
+
+(f) APRENDIZAJE CONTINUO
+    - Feedback loop: cada caso cerrado se etiqueta (resuelto por IA,
+      escalado, satisfaccion del usuario).
+    - Reentrenamiento periodico de la KB con nuevos procedimientos.
+    - Deteccion automatica de gaps (preguntas sin respuesta) para
+      alimentar la KB.
+
+(g) SEGURIDAD Y GOBIERNO
+    - SSO con Azure AD + MFA.
+    - Cifrado en transito (TLS 1.3) y en reposo (AES-256).
+    - Segregacion logica multi-tenant (Haceb aislado).
+    - Auditoria completa: quien hizo que, cuando y desde donde.
+    - Cumplimiento Ley 1581 (proteccion datos Colombia) y politicas
+      internas de Haceb.
+    - DLP: el agente no expone informacion fuera del perfil del
+      solicitante.
+    - Control de acciones criticas: ciertos cambios requieren
+      aprobacion del lider antes de ejecutarse.
+
+
+ALCANCE DE LA FASE 1 (PRIMEROS 4-6 MESES)
+
+INCLUIDO:
+- Canal Microsoft Teams + WhatsApp Business operativos.
+- Agente cognitivo en espanol para los 30 motivos de consulta mas
+  frecuentes (cubren ~70% del volumen segun analitica de tickets).
+- Ingesta de la KB existente de Haceb a la base RAG.
+- Integraciones core:
+   * Active Directory (reset password, desbloqueo)
+   * ServiceNow / herramienta ITSM actual (CRUD de tickets)
+   * Microsoft 365 / Intune (consulta de licencias y activos)
+- Tablero de operaciones para el lider de mesa.
+- Dashboards de KPIs (tasa de auto-resolucion, TMO, CSAT).
+
+NO INCLUIDO EN FASE 1 (POSIBLE FASE 2):
+- Voicebot telefonico.
+- Integracion con SAP / sistemas industriales.
+- Gestion fisica de activos (despachos, garantias).
+
+
+INDICADORES (KPIs) — METAS A 12 MESES
+
+  | Indicador                          | Base actual  | Meta A 12 meses |
+  |------------------------------------|--------------|-----------------|
+  | Casos auto-resueltos por IA        | 0%           | 60-75%          |
+  | Tiempo medio de primera respuesta  | 15-30 min    | < 30 segundos   |
+  | Tiempo medio de resolucion N1      | 4-8 horas    | < 15 minutos    |
+  | CSAT (satisfaccion 1-5)            | -            | >= 4.3          |
+  | Disponibilidad del servicio        | 8h x 5d      | 24 / 7          |
+  | Costo por caso atendido            | Linea base   | -50%            |
+  | Tickets repetidos (mismo usuario)  | Linea base   | -30%            |
+  | Casos escalados con contexto       | 0%           | 100%            |
+
+Calculo de impacto economico estimado:
+  Volumen anual: 23.000 casos.
+  Costo promedio caso N1 (segun benchmark): COP 35.000 - 50.000.
+  Liberacion estimada: ~14.000 casos/ano resueltos por IA.
+  Ahorro anual estimado: COP 490M - 700M.
+  Re-asignacion del equipo: 5-6 FTEs liberados para proyectos de
+  valor estrategico (automatizacion, ciberseguridad, transformacion).
+
+
+ELEMENTOS TECNICOS — STACK PROPUESTO
+
+  Capa                  Tecnologia
+  --------------------  --------------------------------------------
+  IA conversacional     Azure OpenAI (GPT-4 / GPT-4o), embeddings
+                        text-embedding-3-large
+  Orquestacion          LangGraph + LangChain
+  Backend               FastAPI (Python 3.12) async
+  Frontend de agentes   Angular 18 (SPA)
+  Base de datos         PostgreSQL 15 + pgvector
+  Cola / Streams        Redis Streams (consumer groups)
+  Mensajeria            WhatsApp Cloud API + Microsoft Bot Framework
+                        + Microsoft Graph (Teams) + IMAP/SMTP
+  Identidad             Azure AD (SSO + MFA)
+  Infraestructura       Kubernetes (AKS) en Azure
+  Observabilidad        Azure Monitor + App Insights + Grafana
+  IaC                   Bicep / Terraform
+  CI/CD                 Azure DevOps Pipelines
+
+Toda la solucion corre como contenedores en AKS con autoescalado
+horizontal, multi-zona, con DR a region secundaria.
+
+
+=======================================================================
+2. INFRAESTRUCTURA Y TECNOLOGIA DISPONIBLE
+=======================================================================
+
+PLATAFORMA PROPIA — CHATSSYSTEM
+T-Evolvers es titular de la propiedad intelectual de ChatsSystem,
+plataforma propietaria que ya opera en produccion y que constituye la
+base tecnologica de esta propuesta. Cuenta con:
+
+  - API REST completa (FastAPI) para gestion de conversaciones,
+    agentes, tools, base de conocimiento, tenants y analiticas.
+  - 4 workers asincronos (Redis Streams) para ingesta, IA,
+    asignacion y envio de mensajes.
+  - Agente cognitivo basado en LangGraph con clasificador,
+    especialistas, RAG y motor de herramientas (HTTP / SQL / STATIC).
+  - Frontend Angular para agentes humanos con bandeja unificada,
+    chat en tiempo real, panel de administracion y dashboards.
+  - WebSocket para eventos en tiempo real.
+  - Arquitectura multi-tenant con aislamiento por schema en
+    PostgreSQL.
+  - Integracion WhatsApp Cloud API con manejo de ventana 24h,
+    plantillas, mensajes interactivos (botones y listas) y media.
+  - Auditoria completa de tokens consumidos y mensajes procesados.
+
+CAPACIDADES EN AZURE
+T-Evolvers cuenta con:
+  - Suscripcion Azure activa con Azure OpenAI provisionado.
+  - Clusteres AKS productivos con CI/CD via Azure DevOps.
+  - Experiencia certificada en Azure Landing Zones, redes privadas,
+    Private Endpoints y arquitecturas Well-Architected.
+
+EXTENSIONES NECESARIAS PARA EL RETO
+A construir / configurar en el proyecto:
+  - Conector Microsoft Teams (Bot Framework + Graph API).
+  - Conector de correo electronico (IMAP/Graph).
+  - Voicebot (Azure Communication Services + Speech, fase 2).
+  - Conectores especificos a sistemas Haceb (ServiceNow / Aranda,
+    AD on-prem o Azure AD, Intune, SAP, etc.).
+
+PROPIEDAD INTELECTUAL
+T-Evolvers es titular pleno de:
+  - ChatsSystem (plataforma core).
+  - El motor de Tool Engine (HTTP/SQL/STATIC) propio.
+  - La logica de orquestacion del agente y el flujo de escalacion.
+Las extensiones e integraciones especificas para Haceb se entregan
+bajo licencia de uso de acuerdo al modelo comercial pactado.
+
+
+=======================================================================
+3. EQUIPO DE TRABAJO
+=======================================================================
+
+EQUIPO TOTAL DE T-EVOLVERS: ~30 personas
+
+PERFILES DISPONIBLES PARA EL PROYECTO
+
+  Rol                         Cantidad   Funcion
+  --------------------------  ---------  ------------------------------
+  Arquitecto de soluciones        1      Diseno end-to-end, gobierno
+                                         tecnico y validacion de
+                                         seguridad.
+  Arquitecto cloud / Azure        1      Disenio de infra AKS, redes,
+                                         IaC, observabilidad.
+  Tech Lead backend               1      Liderazgo de la extension de
+                                         ChatsSystem y de los
+                                         conectores.
+  Desarrolladores Python          3      FastAPI, LangGraph, workers,
+                                         tools, RAG.
+  Desarrolladores Angular         2      UI de agentes humanos,
+                                         dashboards, panel admin.
+  Especialista IA / LLMs          1      Diseno de prompts,
+                                         clasificadores, fine-tuning
+                                         de comportamiento, evaluacion
+                                         de calidad de respuestas.
+  Ingenieros DevOps               1      CI/CD, AKS, despliegues
+                                         azules/verdes, monitoreo.
+  QA + Test Automation            2      Pruebas funcionales, E2E,
+                                         pruebas de carga, pruebas
+                                         de regresion conversacional.
+  Gerente de proyecto             1      Plan, ceremonias agiles,
+                                         coordinacion con Haceb.
+
+EQUIPO BASE DEDICADO: 8-10 personas (segun fase).
+RESPALDO: ~20 personas adicionales en T-Evolvers (especialistas en
+testing, automatizacion, cloud, devops) disponibles para apoyo
+puntual y picos de demanda.
+
+POR QUE ESTE EQUIPO ES APTO
+
+  - Experiencia comprobada en proyectos de mision critica para
+    clientes regulados (banca, energia, fintech).
+  - Conocimiento profundo de la plataforma core (ChatsSystem) ya
+    en produccion — no partimos de cero, partimos del 70% del camino
+    construido.
+  - Especializacion previa en arquitecturas conversacionales con
+    LangGraph y Azure OpenAI.
+  - Cobertura completa del ciclo de vida: arquitectura, desarrollo,
+    QA, devops, soporte post-go-live.
+  - Modelo de trabajo agil (Scrum) con visibilidad continua para
+    Haceb (demos quincenales, tablero compartido).
+  - Capacidad de escalamiento: si la fase 2 requiere ampliar
+    canales o integraciones, T-Evolvers cuenta con bench tecnico
+    disponible.
+
+
+=======================================================================
+4. TRAYECTORIA DE T-EVOLVERS
+=======================================================================
+
+7 ANIOS EN EL MERCADO DE SERVICIOS ESPECIALIZADOS DE TI
+
+T-Evolvers fue fundada en 2019 con la mision de acelerar la
+transformacion digital de empresas medianas y grandes en Colombia y
+LATAM mediante servicios especializados y productos propios. Hoy
+contamos con un equipo multidisciplinario de aproximadamente 30
+personas distribuidas en desarrollo de software, aseguramiento de
+calidad, automatizacion de pruebas, devops, arquitectura cloud y
+analitica de datos.
+
+LINEAS DE SERVICIO
+  - Desarrollo de software a la medida (web, mobile, backend).
+  - Quality Assurance y Test Automation.
+  - DevOps y Cloud (Azure, AWS, GCP).
+  - Modernizacion de aplicaciones legadas.
+  - Soluciones de IA conversacional y agentes inteligentes.
+
+PRODUCTOS PROPIOS
+  - ChatsSystem: plataforma multi-tenant de atencion conversacional
+    con IA, motor de tools y orquestacion LangGraph.
+  - Bingo / loteria digital y plataformas de suscripcion (clientes
+    en sector entretenimiento).
+  - Otros productos verticales en evolucion continua.
+
+CLIENTES PRINCIPALES
+  - Bancolombia       Servicios de desarrollo y QA en proyectos
+                      de banca digital.
+  - Sistecredito      Soluciones de software, automatizacion de
+                      pruebas y devops.
+  - Renting Colombia  Desarrollo y modernizacion de aplicaciones
+                      de gestion de flota.
+  - Enerbit           Plataformas para el sector energetico.
+  - Celsia            Soluciones tecnologicas para utilities y
+                      energia.
+
+HITOS RELEVANTES
+  - 2019: Fundacion de T-Evolvers, primeros contratos con clientes
+          financieros.
+  - 2020: Expansion del area de QA y Test Automation con frameworks
+          propios.
+  - 2021: Consolidacion de la practica DevOps y certificaciones
+          cloud (Azure).
+  - 2022: Crecimiento del equipo a 20+ personas, ampliacion a sector
+          energetico (Celsia, Enerbit).
+  - 2023: Lanzamiento del primer producto propio en operacion
+          productiva.
+  - 2024: Inicio del desarrollo de ChatsSystem como plataforma
+          conversacional multi-tenant.
+  - 2025: ChatsSystem en produccion con clientes reales, integracion
+          con WhatsApp Cloud API, agente LangGraph operativo,
+          RAG con pgvector.
+  - 2026: Extension de la plataforma hacia escenarios B2B
+          corporativos (mesa de ayuda, soporte interno, atencion
+          ciudadana).
+
+INDICADORES DE TRACCION
+  - Equipo: 30 personas (crecimiento sostenido desde 2019).
+  - Cartera de clientes activos en sectores regulados (banca,
+    energia, fintech).
+  - Productos propios en operacion 24/7 procesando miles de
+    interacciones mensuales.
+  - Cero incidentes de seguridad reportables en los ultimos 3 anios.
+
+EXPERIENCIA PREVIA RELEVANTE PARA EL RETO
+  - Implementaciones de chatbots con IA generativa en produccion.
+  - Integraciones empresariales con Active Directory y Microsoft
+    365 para clientes corporativos.
+  - Arquitecturas en AKS con altos requisitos de disponibilidad
+    (SLA 99.9%).
+  - Conformidad con SARLAFT, Ley 1581 y politicas de seguridad
+    bancarias.
+
+
+=======================================================================
+5. OBSERVACIONES ADICIONALES
+=======================================================================
+
+ENFOQUE DE IMPLEMENTACION RECOMENDADO
+
+Proponemos un enfoque incremental por olas, asegurando valor desde
+la semana 6:
+
+  Ola 0 — Descubrimiento (4 semanas)
+    - Mineria de tickets historicos de Haceb para identificar los
+      30 motivos de consulta mas frecuentes.
+    - Inventario de integraciones tecnicas requeridas.
+    - Definicion de KPIs base y meta.
+    - Aprobacion del modelo de gobierno de IA.
+
+  Ola 1 — MVP en Teams (6 semanas)
+    - Bot en Microsoft Teams autenticado con Azure AD.
+    - Top 10 motivos automatizados con respuestas + KB.
+    - Escalacion a la mesa actual con contexto enriquecido.
+    - Inicio de medicion de KPIs.
+
+  Ola 2 — Acciones reales + WhatsApp (8 semanas)
+    - Integracion con Active Directory (reset, desbloqueo).
+    - Integracion con la herramienta ITSM (CRUD tickets).
+    - Lanzamiento del canal WhatsApp para usuarios en planta.
+    - Cobertura ampliada a 20 motivos.
+
+  Ola 3 — Optimizacion y escalado (continuo)
+    - Cobertura del 70%+ de los casos.
+    - Correo electronico como canal adicional.
+    - Aprendizaje continuo desde feedback.
+    - Eventual voicebot (fase 2).
+
+
+MODELO DE GOBIERNO DE IA
+  - Comite de calidad conversacional mensual con Haceb.
+  - Revision aleatoria de muestras de conversaciones.
+  - Pipeline de evaluacion automatica de respuestas (LLM-as-judge).
+  - Procedimiento formal de incorporacion de nueva KB y de
+    despliegue de cambios en prompts/tools.
+  - Plan de contingencia: si la IA baja de un umbral de calidad,
+    se activa modo "agente humano primero" automaticamente.
+
+
+GESTION DEL CAMBIO
+
+Reconocemos que reemplazar la mesa de ayuda requiere gestion del
+cambio con las personas. Incluimos:
+  - Plan de comunicacion a usuarios finales.
+  - Capacitacion al equipo actual de la mesa para que pasen a
+    roles de mayor valor (analistas de automatizacion, gestion de
+    cambios, ciberseguridad).
+  - El equipo de la mesa NO se reduce abruptamente — se
+    re-perfila durante el proyecto.
+  - Acompaniamiento al lider de la mesa en la transicion hacia
+    un rol de Service Owner del agente de IA.
+
+
+DIFERENCIACION FRENTE A SOLUCIONES TRADICIONALES
+
+Las propuestas tipicas del mercado ofrecen:
+  - Bots con arboles de decision estaticos (no entienden contexto).
+  - Chatbots conectados solo a un canal.
+  - Soluciones "low-code" sin capacidad real de ejecutar acciones.
+  - Modelos caja-negra sin gobierno ni explicabilidad.
+
+ITSM-AI Hub se diferencia por:
+  - IA generativa real (GPT-4) con RAG sobre la KB de Haceb.
+  - Multicanal nativo unificado (Teams + WhatsApp + correo + web).
+  - Motor de tools que ejecuta acciones reales con auditoria.
+  - Plataforma propia de T-Evolvers, no dependemos de proveedores
+    cerrados — Haceb tiene visibilidad total y control de evolucion.
+  - Despliegue en la propia tenencia Azure de Haceb si se desea
+    (modelo BYOC — Bring Your Own Cloud).
+
+
+COMPROMISO DE T-EVOLVERS
+  - SLA productivo 99.5% mensual.
+  - Soporte 8x5 con cobertura ampliada negociable.
+  - Reportes mensuales de impacto y KPIs.
+  - Hoja de ruta evolutiva consensuada con Haceb.
+
+
+CONTACTO
+T-Evolvers
+www.t-evolvers.com (referencial)
+=======================================================================
+FIN DEL DOCUMENTO
+=======================================================================

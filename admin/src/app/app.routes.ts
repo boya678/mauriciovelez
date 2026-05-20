@@ -49,6 +49,10 @@ export const routes: Routes = [
         path: 'vip',
         loadComponent: () => import('./features/vip/vip.component').then(m => m.VipComponent),
       },
+      {
+        path: 'loterias',
+        loadComponent: () => import('./features/loterias/loterias.component').then(m => m.LoteriasComponent),
+      },
     ],
   },
   {

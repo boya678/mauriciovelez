@@ -57,6 +57,65 @@ async def _assert_tenant_exists(tenant_id: uuid.UUID, db: AsyncSession) -> None:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+#
+# NOTE: Literal `/my/*` routes MUST be declared BEFORE the parametrized
+# `/{tenant_id}/*` routes. Otherwise FastAPI tries to parse the string "my"
+# as a UUID for tenant_id, fails validation with 422, and never falls through
+# to the tenant-admin route.
+
+
+# ── Tenant-admin routes (tenant resolved from JWT / X-Tenant-ID header) ───────
+
+@router.post("/my/upload", response_model=KnowledgeUploadOut)
+async def my_upload_knowledge(
+    body: KnowledgeUpload,
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Replace the knowledge base for the calling admin's own tenant."""
+    if not body.text or not body.text.strip():
+        raise HTTPException(status_code=422, detail="Text cannot be empty")
+
+    try:
+        n = await upsert_knowledge(tenant.id, body.text.strip(), db)
+    except Exception as exc:
+        logger.error("Knowledge upsert failed for tenant %s: %s", tenant.id, exc)
+        raise HTTPException(status_code=500, detail="Error processing knowledge base") from exc
+
+    return KnowledgeUploadOut(tenant_id=str(tenant.id), chunks=n)
+
+
+@router.delete("/my", status_code=204)
+async def my_delete_knowledge(
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Delete all knowledge chunks for the calling admin's own tenant."""
+    await db.execute(
+        text("DELETE FROM public.knowledge_chunks WHERE tenant_id = :tid"),
+        {"tid": tenant.id},
+    )
+    await db.commit()
+
+
+@router.get("/my/status", response_model=KnowledgeStatusOut)
+async def my_knowledge_status(
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Return the number of chunks stored for the calling admin's own tenant."""
+    n = await knowledge_status(tenant.id, db)
+    return KnowledgeStatusOut(
+        tenant_id=str(tenant.id),
+        chunks=n,
+        has_knowledge=n > 0,
+    )
+
+
+# ── Superadmin routes (explicit tenant_id in URL) ─────────────────────────────
 
 @router.post("/{tenant_id}/upload", response_model=KnowledgeUploadOut)
 async def upload_knowledge(
@@ -110,57 +169,6 @@ async def get_knowledge_status(
     n = await knowledge_status(tenant_id, db)
     return KnowledgeStatusOut(
         tenant_id=str(tenant_id),
-        chunks=n,
-        has_knowledge=n > 0,
-    )
-
-
-# ── Tenant-admin routes (tenant resolved from JWT / X-Tenant-ID header) ───────
-
-@router.post("/my/upload", response_model=KnowledgeUploadOut)
-async def my_upload_knowledge(
-    body: KnowledgeUpload,
-    tenant: TenantContext = Depends(resolve_tenant),
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
-):
-    """Replace the knowledge base for the calling admin's own tenant."""
-    if not body.text or not body.text.strip():
-        raise HTTPException(status_code=422, detail="Text cannot be empty")
-
-    try:
-        n = await upsert_knowledge(tenant.id, body.text.strip(), db)
-    except Exception as exc:
-        logger.error("Knowledge upsert failed for tenant %s: %s", tenant.id, exc)
-        raise HTTPException(status_code=500, detail="Error processing knowledge base") from exc
-
-    return KnowledgeUploadOut(tenant_id=str(tenant.id), chunks=n)
-
-
-@router.delete("/my", status_code=204)
-async def my_delete_knowledge(
-    tenant: TenantContext = Depends(resolve_tenant),
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
-):
-    """Delete all knowledge chunks for the calling admin's own tenant."""
-    await db.execute(
-        text("DELETE FROM public.knowledge_chunks WHERE tenant_id = :tid"),
-        {"tid": tenant.id},
-    )
-    await db.commit()
-
-
-@router.get("/my/status", response_model=KnowledgeStatusOut)
-async def my_knowledge_status(
-    tenant: TenantContext = Depends(resolve_tenant),
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
-):
-    """Return the number of chunks stored for the calling admin's own tenant."""
-    n = await knowledge_status(tenant.id, db)
-    return KnowledgeStatusOut(
-        tenant_id=str(tenant.id),
         chunks=n,
         has_knowledge=n > 0,
     )

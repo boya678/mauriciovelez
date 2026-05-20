@@ -35,7 +35,7 @@
         <tbody>
           @for (e of items(); track e.id) {
             <tr>
-              <td class="mono small">{{ e.created_at | date:'dd/MM/yy HH:mm:ss' }}</td>
+              <td class="mono small">{{ e.created_at | date:'dd/MM/yy HH:mm:ss':'America/Bogota' }}</td>
               <td>{{ e.usuario }}</td>
               <td class="center">
                 <span class="action-badge {{ actionClass(e.action) }}">{{ e.action }}</span>

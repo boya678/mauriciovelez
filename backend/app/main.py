@@ -18,14 +18,18 @@ from app.routers import admin_contactos
 from app.routers import admin_vip
 from app.routers import admin_live
 from app.routers import banners
+from app.routers import public_loterias
 from app.core import scheduler
+from app.core import notification_worker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
+    notification_worker.start()
     yield
     scheduler.stop()
+    notification_worker.stop()
 
 
 app = FastAPI(title="Mauricio Velez API", version="1.0.0", lifespan=lifespan)
@@ -53,6 +57,7 @@ app.include_router(admin_contactos.router)
 app.include_router(admin_vip.router)
 app.include_router(admin_live.router)
 app.include_router(banners.router)
+app.include_router(public_loterias.router)
 
 
 @app.get("/health")

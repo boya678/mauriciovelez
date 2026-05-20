@@ -13,6 +13,10 @@
     <label>Hasta</label>
     <input type="date" [(ngModel)]="hasta" />
   </div>
+  <div class="filter-group">
+    <label>Celular</label>
+    <input type="text" [(ngModel)]="celular" placeholder="Buscar por celular…" (keydown.enter)="filtrar()" />
+  </div>
   <div class="filter-group filter-check">
     <label>
       <input type="checkbox" [(ngModel)]="soloGanadores" />

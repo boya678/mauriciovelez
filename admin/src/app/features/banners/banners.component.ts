@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BannersAdminService, BannerItem } from '../../core/services/banners-admin.service';
+import { utcToColLocal, colLocalToUtc } from '../../core/utils/col-date';
 
 @Component({
   selector: 'app-banners',
@@ -61,8 +62,8 @@ export class BannersComponent implements OnInit {
     this.fTipo = b.tipo;
     this.fTexto = b.texto ?? '';
     this.fAudiencia = b.audiencia;
-    this.fInicio = b.inicio.slice(0, 16);
-    this.fFin = b.fin.slice(0, 16);
+    this.fInicio = utcToColLocal(b.inicio);
+    this.fFin = utcToColLocal(b.fin);
     this.fFile = null;
     this.fPreview = null;
     this.fFileError = '';
@@ -123,8 +124,8 @@ export class BannersComponent implements OnInit {
     const form = new FormData();
     form.append('tipo', this.fTipo);
     form.append('audiencia', this.fAudiencia);
-    form.append('inicio', new Date(this.fInicio).toISOString());
-    form.append('fin', new Date(this.fFin).toISOString());
+    form.append('inicio', colLocalToUtc(this.fInicio));
+    form.append('fin', colLocalToUtc(this.fFin));
     if (this.fTipo === 'texto') form.append('texto', this.fTexto);
     if (this.fTipo === 'imagen' && this.fFile) form.append('imagen', this.fFile);
 

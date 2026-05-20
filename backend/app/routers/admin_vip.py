@@ -1,6 +1,7 @@
 import io
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import openpyxl
 from fastapi import APIRouter, Depends, Query
@@ -15,6 +16,8 @@ from app.models.cliente import Cliente
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 from app.models.suscripcion import Suscripcion
+
+COLOMBIA_TZ = ZoneInfo("America/Bogota")
 
 router = APIRouter(prefix="/admin/vip", tags=["Admin VIP"])
 
@@ -79,7 +82,7 @@ def _base_query(db: Session):
 
 
 def _apply_filters(q, db: Session, solo_ganadores: bool, solo_activos: bool, solo_inactivos: bool):
-    hoy = datetime.now(timezone.utc).date()
+    hoy = datetime.now(COLOMBIA_TZ).date()
 
     if solo_ganadores:
         sq_gan = (

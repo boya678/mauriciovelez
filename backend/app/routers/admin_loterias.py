@@ -1,12 +1,11 @@
 from datetime import date
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.admin_security import get_current_platform_user, require_admin
-from app.core import scheduler as _scheduler_module
+from app.core.admin_security import get_current_platform_user
 from app.database import get_db
 from app.models.loteria_resultado import LoteriaResultado
 from app.models.numero_acierto import NumeroAcierto
@@ -24,6 +23,7 @@ class ResultadoOut(BaseModel):
     slug: str
     resultado: str
     serie: str
+    total_aciertos: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -42,16 +42,6 @@ class AciertoOut(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────────
 
-@router.post("/run", status_code=200)
-def run_manual(
-    fecha: Optional[date] = Query(None, description="Fecha YYYY-MM-DD (default: hoy Colombia)"),
-    _user=Depends(require_admin),
-):
-    """Ejecuta manualmente el proceso de loterias para una fecha."""
-    _scheduler_module._procesar_loterias(fecha)
-    return {"ok": True, "mensaje": f"Procesado para {fecha or 'hoy (Colombia)'}"}
-
-
 @router.get("/resultados", response_model=list[ResultadoOut])
 def get_resultados(
     fecha: date = Query(..., description="Fecha YYYY-MM-DD"),
@@ -64,9 +54,18 @@ def get_resultados(
         .order_by(LoteriaResultado.loteria)
         .all()
     )
+    # Contar aciertos por resultado
+    counts = dict(
+        db.query(NumeroAcierto.resultado_id, func.count(NumeroAcierto.id))
+        .join(LoteriaResultado, NumeroAcierto.resultado_id == LoteriaResultado.id)
+        .filter(LoteriaResultado.fecha == fecha)
+        .group_by(NumeroAcierto.resultado_id)
+        .all()
+    )
     return [ResultadoOut(
         id=str(r.id), fecha=r.fecha, loteria=r.loteria,
         slug=r.slug, resultado=r.resultado, serie=r.serie,
+        total_aciertos=counts.get(r.id, 0),
     ) for r in rows]
 
 

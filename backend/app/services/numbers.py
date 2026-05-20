@@ -8,11 +8,9 @@ import uuid
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-import httpx
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.models.numbers import Number
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
@@ -48,77 +46,15 @@ def calc_valid_until(vigencia: int, epoch: date, today: date) -> date:
 
 
 def notificar_nuevo_numero_vip(celular: str, numero: str, valid_until: date) -> None:
-    """Envía WhatsApp al cliente VIP cuando se le asigna un número nuevo."""
-    metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
-    param_numero = f"{numero} y con el metodo {metodo}"
-
-    numero_dest = celular.lstrip('+')
-    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
-    headers = {
-        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
-        'Content-Type': 'application/json',
-    }
-    body = {
-        'messaging_product': 'whatsapp',
-        'to': numero_dest,
-        'type': 'template',
-        'template': {
-            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP,
-            'language': {'code': 'es_CO'},
-            'components': [
-                {
-                    'type': 'body',
-                    'parameters': [
-                        {'type': 'text', 'text': param_numero},
-                        {'type': 'text', 'text': valid_until.strftime('%d/%m/%Y')},
-                    ],
-                },
-            ],
-        },
-    }
-    try:
-        resp = httpx.post(url, json=body, headers=headers, timeout=10)
-        if resp.status_code >= 400:
-            logger.warning("WhatsApp nuevo_numero_vip falló (%s): %s", resp.status_code, resp.text)
-    except Exception:
-        logger.exception("Error al enviar WhatsApp nuevo_numero_vip a %s", celular)
+    """Encola notificación WhatsApp VIP de nuevo número."""
+    from app.services.notification_queue import push
+    push("nuevo_numero_vip", celular, {"numero": numero, "valid_until": valid_until})
 
 
 def notificar_nuevo_numero_free(celular: str, numero: str, valid_until: date) -> None:
-    """Envía WhatsApp al cliente cuando se le asigna un número free nuevo."""
-    metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
-    param_numero = f"{numero} y con el metodo {metodo}"
-
-    numero_dest = celular.lstrip('+')
-    url = f'https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages'
-    headers = {
-        'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}',
-        'Content-Type': 'application/json',
-    }
-    body = {
-        'messaging_product': 'whatsapp',
-        'to': numero_dest,
-        'type': 'template',
-        'template': {
-            'name': settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE,
-            'language': {'code': 'es_CO'},
-            'components': [
-                {
-                    'type': 'body',
-                    'parameters': [
-                        {'type': 'text', 'text': param_numero},
-                        {'type': 'text', 'text': valid_until.strftime('%d/%m/%Y')},
-                    ],
-                },
-            ],
-        },
-    }
-    try:
-        resp = httpx.post(url, json=body, headers=headers, timeout=10)
-        if resp.status_code >= 400:
-            logger.warning("WhatsApp nuevo_numero_free falló (%s): %s", resp.status_code, resp.text)
-    except Exception:
-        logger.exception("Error al enviar WhatsApp nuevo_numero_free a %s", celular)
+    """Encola notificación WhatsApp free de nuevo número."""
+    from app.services.notification_queue import push
+    push("nuevo_numero_free", celular, {"numero": numero, "valid_until": valid_until})
 
 
 def assign_number(db: Session, id_user: uuid.UUID, num_type: str) -> NumberUser:

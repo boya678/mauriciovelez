@@ -113,14 +113,17 @@ async def upsert_knowledge(
     # Embed all chunks in one batch call
     vectors = await embed_texts(chunks)
 
-    # Bulk insert using raw SQL with pgvector cast
+    # Bulk insert using raw SQL with pgvector cast.
+    # NOTE: asyncpg uses $1/$2/... placeholders internally; SQLAlchemy translates
+    # :param → $N.  The ::vector cast must wrap the placeholder, not be part of
+    # the param name, so we embed it as a SQL expression around the bind param.
     for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
         vector_str = "[" + ",".join(str(v) for v in vector) + "]"
         await db.execute(
             text(
                 "INSERT INTO public.knowledge_chunks "
                 "(id, tenant_id, chunk_index, content, embedding, created_at) "
-                "VALUES (gen_random_uuid(), :tid, :idx, :content, :vec::vector, NOW())"
+                "VALUES (gen_random_uuid(), :tid, :idx, :content, cast(:vec as vector), NOW())"
             ),
             {"tid": tenant_id, "idx": idx, "content": chunk, "vec": vector_str},
         )
@@ -163,7 +166,7 @@ async def search_knowledge(
             "SELECT content "
             "FROM public.knowledge_chunks "
             "WHERE tenant_id = :tid "
-            "ORDER BY embedding <=> :vec::vector "
+            "ORDER BY embedding <=> cast(:vec as vector) "
             "LIMIT :k"
         ),
         {"tid": tenant_id, "vec": vector_str, "k": top_k},
