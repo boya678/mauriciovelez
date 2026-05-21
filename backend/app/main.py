@@ -19,6 +19,7 @@ from app.routers import admin_vip
 from app.routers import admin_live
 from app.routers import banners
 from app.routers import public_loterias
+from app.routers import aliados
 from app.core import scheduler
 from app.core import notification_worker
 
@@ -58,6 +59,7 @@ app.include_router(admin_vip.router)
 app.include_router(admin_live.router)
 app.include_router(banners.router)
 app.include_router(public_loterias.router)
+app.include_router(aliados.router)
 
 
 @app.get("/health")

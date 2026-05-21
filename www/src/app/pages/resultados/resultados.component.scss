@@ -1,0 +1,149 @@
+:host { display: block; }
+
+.page-head { margin-bottom: 1.5rem; }
+
+/* ─── Controles ─── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+
+  &__group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+
+    &--right { flex: 1; justify-content: flex-end; min-width: 240px; }
+  }
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .35rem .65rem;
+  transition: border-color .2s var(--ease);
+
+  &:focus-within { border-color: var(--gold-dim); }
+
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    color: var(--text-mute);
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    .material-icons-round { font-size: 16px; color: var(--gold); }
+  }
+
+  &__input {
+    background: transparent;
+    border: 0;
+    outline: none;
+    color: var(--text);
+    font: inherit;
+    padding: .35rem .25rem;
+    min-width: 140px;
+
+    &::-webkit-calendar-picker-indicator {
+      filter: invert(0.7) sepia(1) saturate(4) hue-rotate(5deg);
+      cursor: pointer;
+    }
+  }
+
+  &--search {
+    flex: 1;
+    max-width: 420px;
+    .material-icons-round { color: var(--text-mute); font-size: 18px; }
+    .control__input { min-width: 0; flex: 1; }
+  }
+
+  &__clear {
+    border: 0;
+    background: transparent;
+    color: var(--text-mute);
+    cursor: pointer;
+    display: inline-flex;
+    .material-icons-round { font-size: 16px; }
+    &:hover { color: var(--text); }
+  }
+}
+
+.quick { display: inline-flex; gap: .4rem; }
+
+/* ─── Cabecera de resultados ─── */
+.results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 .85rem;
+
+  &__date {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--text-mid);
+    font-size: .9rem;
+    text-transform: capitalize;
+    .material-icons-round { font-size: 18px; color: var(--blue); }
+  }
+
+  &__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+
+    .err { color: var(--red); border-color: var(--red); }
+  }
+}
+
+.spin {
+  display: inline-block;
+  animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Tabla loterías ─── */
+.cell-loteria {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  .material-icons-round { color: var(--gold); font-size: 18px; }
+}
+
+/* ─── Estado vacío ─── */
+.empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-mute);
+  .material-icons-round { font-size: 36px; color: var(--text-dim); display: block; margin-bottom: .5rem; }
+  .err-icon { color: var(--red); }
+  p { margin: 0; }
+}
+
+.footnote {
+  margin-top: 1.5rem;
+  font-size: .78rem;
+  color: var(--text-mute);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .controls { flex-direction: column; align-items: stretch; }
+  .controls__group--right { justify-content: stretch; }
+  .control--search { max-width: none; }
+  .results-head { flex-direction: column; align-items: flex-start; }
+}

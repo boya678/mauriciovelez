@@ -10,7 +10,7 @@
 #   .\build-deploy.ps1 -SkipDeploy      # solo build y push (sin kubectl)
 # ============================================================
 param(
-    [ValidateSet("backend", "frontend", "admin", "www", "all")]
+    [ValidateSet("backend", "frontend", "admin", "www", "aliados", "all")]
     [string]$Target = "all",
     [switch]$SkipDeploy,
     [string]$Tag = "latest"
@@ -25,6 +25,7 @@ $BACKEND_IMAGE  = "$REGISTRY/mauriciovelez-backend:$Tag"
 $FRONTEND_IMAGE = "$REGISTRY/mauriciovelez-frontend:$Tag"
 $ADMIN_IMAGE    = "$REGISTRY/mauriciovelez-admin:$Tag"
 $WWW_IMAGE      = "$REGISTRY/mauriciovelez-www:$Tag"
+$ALIADOS_IMAGE  = "$REGISTRY/mauriciovelez-aliados:$Tag"
 $PLATFORMS      = "linux/amd64,linux/arm64"
 $BUILDER_NAME   = "multiarch"
 $ROOT = $PSScriptRoot
@@ -79,6 +80,14 @@ if ($Target -in "www", "all") {
     docker buildx use $BUILDER_NAME
     docker buildx build --platform $PLATFORMS --push -t $WWW_IMAGE "$ROOT\www"
     Write-OK "WWW image publicada"
+}
+
+# ── 5c. Build + Push Aliados ──────────────────────────────────
+if ($Target -in "aliados", "all") {
+    Write-Step "Build + Push aliados  →  $ALIADOS_IMAGE  [$PLATFORMS]"
+    docker buildx use $BUILDER_NAME
+    docker buildx build --platform $PLATFORMS --push -t $ALIADOS_IMAGE "$ROOT\aliados"
+    Write-OK "Aliados image publicada"
 }
 
 if ($SkipDeploy) {
@@ -139,6 +148,13 @@ if ($Target -in "www", "all") {
     kubectl apply -f "$ROOT\www\k8s\" --namespace $NAMESPACE
     kubectl rollout restart deployment/www --namespace $NAMESPACE
     Write-OK "WWW desplegado"
+}
+
+if ($Target -in "aliados", "all") {
+    Write-Step "Aplicando manifests aliados..."
+    kubectl apply -f "$ROOT\aliados\k8s\" --namespace $NAMESPACE
+    kubectl rollout restart deployment/aliados --namespace $NAMESPACE
+    Write-OK "Aliados desplegado"
 }
 
 # ── 9. Verificar estado ───────────────────────────────────────

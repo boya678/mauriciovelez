@@ -1,0 +1,94 @@
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow"><span class="dot"></span> Mi método</span>
+    <h1 class="page-hero__title">
+      Método Numerológico <span class="grad">Mauricio Vélez</span>
+    </h1>
+    <p class="page-hero__sub">
+      Más de 20 años analizando números, tendencias y comportamiento estadístico de loterías y
+      chances de Colombia. Mi trabajo no se basa en promesas: se basa en estadística, matemática
+      y tendencia numérica. <strong>Entrego certeza, no suerte.</strong>
+    </p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="block__head">
+      <div>
+        <span class="eyebrow">Los tres pilares</span>
+        <h2 class="section-title">Cómo construyo cada lectura</h2>
+      </div>
+    </div>
+
+    <div class="pilares-grid">
+      @for (p of pilares; track p.titulo) {
+        <article class="card card--elev pilar">
+          <header class="pilar__head">
+            <span class="pilar__n mono">{{ p.n }}</span>
+            <span class="pilar__icon">
+              <span class="material-icons-round">{{ p.icon }}</span>
+            </span>
+          </header>
+          <h3 class="pilar__title">{{ p.titulo }}</h3>
+          <p class="pilar__desc">{{ p.desc }}</p>
+          <ul class="pilar__bullets">
+            @for (b of p.bullets; track b) {
+              <li><span class="material-icons-round">check_circle</span> {{ b }}</li>
+            }
+          </ul>
+        </article>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="block__head">
+      <div>
+        <span class="eyebrow">Cómo trabajo</span>
+        <h2 class="section-title">Mis principios</h2>
+      </div>
+    </div>
+
+    <div class="principios-grid">
+      @for (pr of principios; track pr.titulo) {
+        <article class="card card--hover principio">
+          <span class="principio__icon">
+            <span class="material-icons-round">{{ pr.icon }}</span>
+          </span>
+          <div>
+            <h3 class="principio__title">{{ pr.titulo }}</h3>
+            <p class="principio__desc">{{ pr.desc }}</p>
+          </div>
+        </article>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="card metodo-cta">
+      <div>
+        <span class="eyebrow">Aplica el método</span>
+        <h3 class="section-title">¿Quieres usar mi método día a día?</h3>
+        <p>
+          Aplica el método día a día con mi <strong>{{ softwareName }}</strong>:
+          <strong>la primera victoria es gratis</strong>. O escríbeme por WhatsApp y te guío paso a paso.
+        </p>
+      </div>
+      <div class="metodo-cta__btns">
+        <a [href]="softwareUrl" target="_blank" rel="noopener" class="btn btn--primary">
+          <span class="material-icons-round">rocket_launch</span>
+          Probar gratis el software
+        </a>
+        <a [href]="whatsappUrl" target="_blank" rel="noopener" class="btn btn--ghost">
+          <span class="material-icons-round">chat</span>
+          WhatsApp 322 555 6333
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

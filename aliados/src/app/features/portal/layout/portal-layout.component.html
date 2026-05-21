@@ -1,0 +1,76 @@
+<div class="portal-shell" [class.sidebar-collapsed]="!sidebarOpen()">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" [class.mobile-open]="mobileMenuOpen()">
+
+    <div class="sidebar-brand">
+      <span class="brand-gem">♦</span>
+      @if (sidebarOpen()) {
+        <span class="brand-name gold-text">ALIADOS</span>
+      }
+    </div>
+
+    <div class="sidebar-user">
+      <div class="avatar">{{ inicial }}</div>
+      @if (sidebarOpen()) {
+        <div class="user-info">
+          <span class="user-name">{{ aliado()?.nombre }}</span>
+          <span class="user-role">{{ roleLabel }}</span>
+        </div>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      @for (item of navItems; track item.route) {
+        <a
+          class="nav-item"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          (click)="mobileMenuOpen.set(false)"
+          [title]="item.label"
+        >
+          <span class="material-icons-round nav-icon">{{ item.icon }}</span>
+          @if (sidebarOpen()) {
+            <span class="nav-label">{{ item.label }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <button class="btn-logout" (click)="logout()" [title]="sidebarOpen() ? '' : 'Cerrar sesión'">
+      <span class="material-icons-round">logout</span>
+      @if (sidebarOpen()) {
+        <span>Cerrar sesión</span>
+      }
+    </button>
+
+  </aside>
+
+  <!-- Mobile overlay -->
+  @if (mobileMenuOpen()) {
+    <div class="mobile-overlay" (click)="mobileMenuOpen.set(false)"></div>
+  }
+
+  <!-- Main content -->
+  <div class="portal-main">
+
+    <header class="portal-header">
+      <button class="btn-toggle" (click)="toggleSidebar()" title="Menú">
+        <span class="material-icons-round">menu</span>
+      </button>
+
+      <span class="header-title">Portal Aliados</span>
+
+      <div class="header-balance">
+        <span class="material-icons-round">account_balance_wallet</span>
+        <span class="balance-val">{{ saldoFmt }}</span>
+      </div>
+    </header>
+
+    <main class="portal-content">
+      <router-outlet />
+    </main>
+
+  </div>
+
+</div>

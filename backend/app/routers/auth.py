@@ -252,6 +252,15 @@ def guardar_referido(
     current_user.referente = payload.codigo
     db.commit()
 
+    # Registrar en tabla histórica (best-effort, no bloqueante)
+    from app.models.referido import Referido as ReferidoModel
+    try:
+        ref = ReferidoModel(referente_id=referente.id, referido_id=current_user.id)
+        db.add(ref)
+        db.commit()
+    except Exception:
+        db.rollback()
+
     # TODO: confirmar con el usuario los dos parámetros del template WHATSAPP_TEMPLATE_NOTIFICACION_REFERIDO
     # Actualmente: param1 = nombre del nuevo usuario, param2 = celular del nuevo usuario
     _enviar_whatsapp_referido(referente.celular, current_user.nombre, current_user.celular)

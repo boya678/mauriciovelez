@@ -1,0 +1,49 @@
+<div class="login-page">
+
+  <div class="login-card">
+
+    <div class="brand">
+      <span class="brand-icon">♦</span>
+      <span class="brand-title gold-text">PORTAL ALIADOS</span>
+      <span class="brand-sub">Mauricio Vélez · Numerólogo</span>
+    </div>
+
+    <div class="field">
+      <label for="celular">Celular</label>
+      <input
+        id="celular"
+        type="tel"
+        [(ngModel)]="celular"
+        placeholder="Ej: 3001234567"
+        autocomplete="username"
+        (keyup.enter)="submit()"
+      />
+    </div>
+
+    <div class="field">
+      <label for="codigo">Código de aliado</label>
+      <input
+        id="codigo"
+        type="text"
+        [(ngModel)]="codigoVip"
+        placeholder="Tu código de aliado"
+        autocomplete="current-password"
+        (keyup.enter)="submit()"
+      />
+    </div>
+
+    @if (errorMsg()) {
+      <div class="error-msg" role="alert">{{ errorMsg() }}</div>
+    }
+
+    <button class="btn-login" (click)="submit()" [disabled]="loading()">
+      @if (loading()) {
+        <span class="spinner"></span>
+      } @else {
+        Ingresar
+      }
+    </button>
+
+  </div>
+
+</div>

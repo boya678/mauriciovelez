@@ -1,0 +1,82 @@
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow"><span class="dot"></span> Estudios numerológicos</span>
+    <h1 class="page-hero__title">
+      Mis estudios sobre <span class="grad">loterías y chances</span>
+    </h1>
+    <p class="page-hero__sub">
+      Publicaciones, análisis y notas de trabajo que recogen más de 20 años observando el
+      comportamiento numérico de loterías y chances de Colombia. Estudio serio, sin promesas.
+    </p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="block__head">
+      <div>
+        <span class="eyebrow">Publicaciones</span>
+        <h2 class="section-title">Estudios recientes</h2>
+      </div>
+    </div>
+
+    <div class="estudios-grid">
+      @for (e of estudios; track e.titulo) {
+        <article class="card card--hover estudio">
+          <header class="estudio__head">
+            <span class="badge badge--gold">{{ e.categoria }}</span>
+            <span class="estudio__meta mono">
+              <span class="material-icons-round">schedule</span>
+              {{ e.minutosLectura }} min
+            </span>
+          </header>
+          <h3 class="estudio__title">{{ e.titulo }}</h3>
+          <p class="estudio__resumen">{{ e.resumen }}</p>
+          <footer class="estudio__foot">
+            <time class="mono">{{ e.fecha | date:'dd MMM yyyy' }}</time>
+            <span class="estudio__author">Mauricio Vélez</span>
+          </footer>
+        </article>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <article class="card card--elev metodologia">
+      <header>
+        <span class="eyebrow">Mi metodología</span>
+        <h2 class="section-title">Cómo trabajo, en primera persona</h2>
+      </header>
+      <p>
+        Soy <strong>Mauricio Vélez</strong>, numerólogo con más de 20 años analizando el
+        comportamiento numérico de loterías y chances en Colombia. Mi trabajo combina tres pilares:
+        análisis estadístico sobre resultados oficiales, identificación de patrones matemáticos
+        recurrentes y seguimiento de la tendencia numérica.
+      </p>
+      <p>
+        <strong>Entrego certeza, no suerte.</strong> No prometo resultados ni vendo predicciones:
+        ofrezco un método de estudio serio que cualquier persona puede comprender, validar y
+        aplicar con criterio.
+      </p>
+      <p>
+        Cuando publico un estudio en esta sección, lo hago para mostrar mi forma de mirar los
+        números, no como recomendación de apuesta. Si quieres aplicar el método día a día, lo
+        hacemos juntos por WhatsApp o directamente desde mi <strong>{{ softwareName }}</strong>
+        —<strong>la primera victoria es gratis</strong>—.
+      </p>
+
+      <div class="metodologia__cta">
+        <a [href]="softwareUrl" target="_blank" rel="noopener" class="btn btn--primary">
+          <span class="material-icons-round">rocket_launch</span>
+          Probar gratis el software
+        </a>
+        <a [href]="whatsappUrl" target="_blank" rel="noopener" class="btn btn--ghost">
+          <span class="material-icons-round">chat</span>
+          Hablar con Mauricio
+        </a>
+      </div>
+    </article>
+  </div>
+</section>

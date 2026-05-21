@@ -1,0 +1,99 @@
+<header class="topbar" [class.is-scrolled]="scrolled()">
+  <div class="container topbar__inner">
+    <a class="brand" routerLink="/" (click)="closeMenu()">
+      <span class="brand__mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3v18h18"/>
+          <path d="M7 14l3-3 4 4 5-6"/>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <span class="brand__name">MAURICIO<span>VÉLEZ</span></span>
+        <span class="brand__tag">Numerólogo · Certeza, no suerte</span>
+      </span>
+    </a>
+
+    <nav class="nav" [class.is-open]="menuOpen()">
+      @for (item of navItems; track item.path) {
+        <a class="nav__link"
+           [routerLink]="item.path"
+           [routerLinkActive]="'is-active'"
+           [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+           (click)="closeMenu()">
+          <span class="material-icons-round">{{ item.icon }}</span>
+          {{ item.label }}
+        </a>
+      }
+      <a class="nav__link nav__link--software"
+         [href]="softwareUrl" target="_blank" rel="noopener"
+         (click)="closeMenu()">
+        <span class="material-icons-round">rocket_launch</span>
+        {{ softwareName }}
+        <span class="nav__badge">Gratis</span>
+      </a>
+      <a class="nav__cta" [href]="whatsappUrl" target="_blank" rel="noopener" (click)="closeMenu()">
+        <span class="material-icons-round">chat</span>
+        WhatsApp
+      </a>
+    </nav>
+
+    <button class="menu-toggle" (click)="toggleMenu()" [attr.aria-label]="menuOpen() ? 'Cerrar menú' : 'Abrir menú'">
+      <span class="material-icons-round">{{ menuOpen() ? 'close' : 'menu' }}</span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <router-outlet />
+</main>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <div class="footer__col footer__col--brand">
+      <div class="brand brand--footer">
+        <span class="brand__mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18"/>
+            <path d="M7 14l3-3 4 4 5-6"/>
+          </svg>
+        </span>
+        <span class="brand__text">
+          <span class="brand__name">MAURICIO<span>VÉLEZ</span></span>
+        </span>
+      </div>
+      <p class="footer__about">
+        Mauricio Vélez · Numerólogo con más de 20 años analizando números, tendencias y comportamiento
+        estadístico de loterías y chances de Colombia. Método propio. Entrega certeza, no suerte.
+      </p>
+    </div>
+
+    <div class="footer__col">
+      <h4 class="footer__title">Navegación</h4>
+      <ul>
+        <li><a routerLink="/">Inicio</a></li>
+        <li><a routerLink="/resultados">Resultados oficiales</a></li>
+        <li><a routerLink="/metodo-numerologico">Mi Método</a></li>
+        <li><a routerLink="/estudios-numerologicos">Estudios</a></li>
+      </ul>
+    </div>
+
+    <div class="footer__col">
+      <h4 class="footer__title">Contacto</h4>
+      <ul>
+        <li>
+          <a [href]="whatsappUrl" target="_blank" rel="noopener">
+            WhatsApp · {{ whatsappNumber }}
+          </a>
+        </li>
+        <li><a [href]="softwareUrl" target="_blank" rel="noopener">{{ softwareName }} · {{ softwarePromo }}</a></li>
+        <li><a routerLink="/politica-de-privacidad">Privacidad</a></li>
+        <li><a routerLink="/terminos-y-condiciones">Términos</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="container footer__legal">
+    <div>© {{ year }} Mauricio Vélez · Numerología aplicada · Colombia</div>
+    <div class="footer__signature">Más de 20 años entregando certeza, no suerte</div>
+  </div>
+</footer>

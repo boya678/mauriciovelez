@@ -1,0 +1,88 @@
+<div class="mis-datos-page">
+
+  @if (loading()) {
+    <div class="state-center">
+      <span class="spinner"></span>
+      <span>Cargando datos...</span>
+    </div>
+  } @else {
+
+    <!-- Info de solo lectura -->
+    <div class="info-grid">
+      <div class="info-card">
+        <span class="material-icons-round card-icon">phone_iphone</span>
+        <div class="card-body">
+          <span class="card-label">Celular</span>
+          <span class="card-value">{{ aliado()?.celular }}</span>
+        </div>
+      </div>
+      <div class="info-card">
+        <span class="material-icons-round card-icon">account_balance_wallet</span>
+        <div class="card-body">
+          <span class="card-label">Saldo</span>
+          <span class="card-value gold-text">{{ saldoFmt }}</span>
+        </div>
+      </div>
+      <div class="info-card">
+        <span class="material-icons-round card-icon">confirmation_number</span>
+        <div class="card-body">
+          <span class="card-label">Código de aliado</span>
+          <span class="card-value codigo">{{ aliado()?.codigo_vip ?? '—' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulario editable -->
+    <div class="form-card">
+      <h2 class="form-title">
+        <span class="material-icons-round">edit</span>
+        Editar mis datos
+      </h2>
+
+      <div class="form-grid">
+
+        <div class="field">
+          <label for="nombre">Nombre completo *</label>
+          <input id="nombre" type="text" [(ngModel)]="nombre" placeholder="Tu nombre" />
+        </div>
+
+        <div class="field">
+          <label for="correo">Correo electrónico</label>
+          <input id="correo" type="email" [(ngModel)]="correo" placeholder="correo@ejemplo.com" />
+        </div>
+
+        <div class="field">
+          <label for="cc">Cédula / CC</label>
+          <input id="cc" type="text" [(ngModel)]="cc" placeholder="Número de cédula" />
+        </div>
+
+      </div>
+
+      @if (successMsg()) {
+        <div class="alert alert-success">
+          <span class="material-icons-round">check_circle</span>
+          {{ successMsg() }}
+        </div>
+      }
+
+      @if (errorMsg()) {
+        <div class="alert alert-error">
+          <span class="material-icons-round">error</span>
+          {{ errorMsg() }}
+        </div>
+      }
+
+      <button class="btn-save" (click)="save()" [disabled]="saving()">
+        @if (saving()) {
+          <span class="spinner"></span>
+        } @else {
+          <span class="material-icons-round">save</span>
+        }
+        {{ saving() ? 'Guardando...' : 'Guardar cambios' }}
+      </button>
+
+    </div>
+
+  }
+
+</div>
