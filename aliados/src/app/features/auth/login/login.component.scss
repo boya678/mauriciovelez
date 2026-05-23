@@ -119,3 +119,17 @@
     cursor: not-allowed;
   }
 }
+
+.registro-link {
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+
+  a {
+    color: var(--gold-bright);
+    text-decoration: none;
+    font-weight: 600;
+    &:hover { text-decoration: underline; }
+  }
+}

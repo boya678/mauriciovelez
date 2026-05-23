@@ -14,6 +14,9 @@ export interface Cliente {
   enabled: boolean;
   tipo_cliente: number;
   fecha_nacimiento: string | null;
+  departamento: string | null;
+  ciudad: string | null;
+  barrio: string | null;
 }
 
 export interface PaginatedClientes {

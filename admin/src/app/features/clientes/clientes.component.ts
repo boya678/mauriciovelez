@@ -91,7 +91,7 @@ export class ClientesComponent implements OnInit {
 
   openEdit(c: Cliente) {
     this.editTarget = c;
-    this.editForm = { nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled, tipo_cliente: c.tipo_cliente };
+    this.editForm = { nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', cc: c.cc ?? '', saldo: c.saldo, vip: c.vip, codigo_vip: c.codigo_vip ?? '', enabled: c.enabled, tipo_cliente: c.tipo_cliente, departamento: c.departamento ?? '', ciudad: c.ciudad ?? '', barrio: c.barrio ?? '' };
     if (c.fecha_nacimiento) {
       const [ay, am, ad] = c.fecha_nacimiento.split('-').map(Number);
       this.editBdAnio = ay; this.editBdMes = am; this.editBdDia = ad;
@@ -102,7 +102,7 @@ export class ClientesComponent implements OnInit {
   }
 
   openCreate() {
-    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true, tipo_cliente: 1 };
+    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true, tipo_cliente: 1, departamento: '', ciudad: '', barrio: '' };
     this.createBdDia = 0; this.createBdMes = 0; this.createBdAnio = 0;
     this.createError.set(null);
     this.showCreate = true;

@@ -9,7 +9,12 @@ export interface LoteriaResultado {
   loteria: string;
   slug: string;
   resultado: string;
-  serie: string;
+  total_aciertos: number;
+}
+
+export interface GanadoresSemana {
+  total_ganadores: number;
+  dias: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,6 +27,12 @@ export class LoteriasService {
     return this.http.get<LoteriaResultado[]>(
       `${this.api}/public/loterias/resultados`,
       { params: { fecha } }
+    );
+  }
+
+  getGanadoresSemana(): Observable<GanadoresSemana> {
+    return this.http.get<GanadoresSemana>(
+      `${this.api}/public/loterias/stats/semana`
     );
   }
 }

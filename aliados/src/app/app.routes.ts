@@ -33,5 +33,10 @@ export const routes: Routes = [
       },
     ],
   },
+  {
+    path: 'registro',
+    loadComponent: () =>
+      import('./features/auth/registro/registro.component').then(m => m.RegistroComponent),
+  },
   { path: '**', redirectTo: 'login' },
 ];

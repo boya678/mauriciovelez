@@ -21,8 +21,19 @@ spec:
   tls:
     - hosts:
         - www.mauricioveleznumerologo.com
+        - mauricioveleznumerologo.com
       secretName: www-mauricioveleznumerologo-tls
   rules:
+    - host: mauricioveleznumerologo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: www
+                port:
+                  number: 80
     - host: www.mauricioveleznumerologo.com
       http:
         paths:

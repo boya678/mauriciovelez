@@ -56,6 +56,31 @@
           <input id="cc" type="text" [(ngModel)]="cc" placeholder="Número de cédula" />
         </div>
 
+        <div class="field">
+          <label for="departamento">Departamento</label>
+          <select id="departamento" [(ngModel)]="departamento" (ngModelChange)="onDepartamentoChange()">
+            <option value="">-- Selecciona --</option>
+            @for (dep of departamentos; track dep) {
+              <option [value]="dep">{{ dep }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="ciudad">Ciudad / Municipio</label>
+          <select id="ciudad" [(ngModel)]="ciudad" [disabled]="!departamento">
+            <option value="">-- Selecciona --</option>
+            @for (c of ciudadesDisponibles(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="barrio">Barrio / Vereda</label>
+          <input id="barrio" type="text" [(ngModel)]="barrio" placeholder="Ej: El Poblado" />
+        </div>
+
       </div>
 
       @if (successMsg()) {

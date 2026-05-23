@@ -1,4 +1,5 @@
 import logging
+import unicodedata
 import uuid
 from datetime import date, datetime, timezone
 
@@ -24,6 +25,21 @@ COLOMBIA_TZ = ZoneInfo("America/Bogota")
 LOTERIAS_API = "https://portal.supergirosnortedelvalle.com/api/resultados"
 
 logger = logging.getLogger(__name__)
+
+
+def _normalizar(texto: str) -> str:
+    """Convierte a mayúsculas y elimina tildes/diacríticos."""
+    nfkd = unicodedata.normalize("NFKD", texto)
+    sin_tildes = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return sin_tildes.upper()
+
+
+def _loterias_evitar() -> set[str]:
+    """Devuelve el conjunto de nombres normalizados a evitar."""
+    raw = settings.LOTERIAS_EVITAR
+    if not raw:
+        return set()
+    return {_normalizar(n.strip()) for n in raw.split(",") if n.strip()}
 
 _scheduler = BackgroundScheduler(timezone="UTC")
 
@@ -91,12 +107,17 @@ def _procesar_loterias(fecha: date | None = None) -> None:
         # ── 2. Upsert resultados ──────────────────────────────────────────────
         resultados_map: dict[str, LoteriaResultado] = {}
         seen_slugs: set[str] = set()
+        evitar = _loterias_evitar()
         for item in data:
             lottery = item.get("lottery", {})
             slug = lottery.get("name", "")
             if not slug:
                 continue
             if slug in seen_slugs:
+                continue
+            display_name = lottery.get("display_name", slug)
+            if evitar and _normalizar(display_name) in evitar:
+                logger.debug("Loteria ignorada por LOTERIAS_EVITAR: %s", display_name)
                 continue
             seen_slugs.add(slug)
             raw_result = item.get("number", "")
@@ -117,7 +138,7 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                 nuevo = LoteriaResultado(
                     id=uuid.uuid4(),
                     fecha=hoy_col,
-                    loteria=lottery.get("display_name", slug),
+                    loteria=display_name,
                     slug=slug,
                     resultado=resultado_limpio,
                     serie=serie_raw,

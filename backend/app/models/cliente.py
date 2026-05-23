@@ -1,9 +1,9 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -23,8 +23,17 @@ class Cliente(Base):
     vip: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     codigo_vip: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, default=None)
     referente: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
+    departamento: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
+    ciudad: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
+    barrio: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    tipo_cliente: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    tipo_cliente: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey('tipos_cliente.id', onupdate='CASCADE'),
+        nullable=False,
+        default=1,
+    )
+    tipo_cliente_rel: Mapped["TipoCliente"] = relationship("TipoCliente", lazy="select", foreign_keys=[tipo_cliente])
     fecha_nacimiento: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

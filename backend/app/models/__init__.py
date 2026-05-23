@@ -1,3 +1,4 @@
+from app.models.tipo_cliente import TipoCliente  # noqa: F401
 from app.models.cliente import Cliente  # noqa: F401
 from app.models.numbers import Number  # noqa: F401
 from app.models.numbers_historic import NumberHistoric  # noqa: F401

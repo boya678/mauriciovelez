@@ -1,7 +1,8 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, Aliado } from '../../../core/services/auth.service';
+import { COLOMBIA_DATA } from '../../../core/data/colombia.data';
 
 @Component({
   selector: 'app-mis-datos',
@@ -21,6 +22,21 @@ export class MisDatosComponent implements OnInit {
   nombre = '';
   correo = '';
   cc = '';
+  departamento = '';
+  ciudad = '';
+  barrio = '';
+
+  // ── Datos Colombia ───────────────────────────────────────────
+  readonly departamentos = COLOMBIA_DATA.map(d => d.dep);
+  private departamentoSig = signal('');
+  ciudadesDisponibles = computed(() =>
+    COLOMBIA_DATA.find(d => d.dep === this.departamentoSig())?.ciudades ?? []
+  );
+
+  onDepartamentoChange(): void {
+    this.departamentoSig.set(this.departamento);
+    this.ciudad = '';
+  }
 
   constructor(private auth: AuthService) {}
 
@@ -36,6 +52,10 @@ export class MisDatosComponent implements OnInit {
         this.nombre = a.nombre ?? '';
         this.correo = a.correo ?? '';
         this.cc = a.cc ?? '';
+        this.departamento = a.departamento ?? '';
+        this.departamentoSig.set(this.departamento);
+        this.ciudad = a.ciudad ?? '';
+        this.barrio = a.barrio ?? '';
         this.loading.set(false);
       },
       error: () => {
@@ -45,6 +65,10 @@ export class MisDatosComponent implements OnInit {
           this.nombre = a.nombre ?? '';
           this.correo = a.correo ?? '';
           this.cc = a.cc ?? '';
+          this.departamento = a.departamento ?? '';
+          this.departamentoSig.set(this.departamento);
+          this.ciudad = a.ciudad ?? '';
+          this.barrio = a.barrio ?? '';
         }
         this.loading.set(false);
       },
@@ -62,6 +86,9 @@ export class MisDatosComponent implements OnInit {
       nombre: n,
       correo: this.correo.trim() || null,
       cc: this.cc.trim() || null,
+      departamento: this.departamento || null,
+      ciudad: this.ciudad || null,
+      barrio: this.barrio.trim() || null,
     }).subscribe({
       next: a => {
         this.aliado.set(a);

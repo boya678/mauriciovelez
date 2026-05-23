@@ -1,0 +1,376 @@
+:host {
+  --radius-md: 12px;
+  --transition: all 0.2s ease;
+}
+
+.registro-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 0%, #2e0870 0%, var(--bg-dark) 65%);
+  padding: 24px;
+}
+
+.registro-card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-card);
+  border: var(--border-gold);
+  border-radius: var(--radius-lg);
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
+}
+
+// ── Marca ────────────────────────────────────────────────────
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  margin-bottom: 4px;
+
+  .brand-icon {
+    font-size: 2.4rem;
+    color: var(--gold-bright);
+    text-shadow: 0 0 18px var(--gold-bright);
+    animation: pulse-glow 2.5s ease-in-out infinite;
+  }
+
+  .brand-title {
+    font-family: 'Cinzel', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .brand-sub {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+}
+
+// ── Stepper ──────────────────────────────────────────────────
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  justify-content: center;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+
+  .step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: var(--transition);
+  }
+
+  .step-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  &.active {
+    .step-num {
+      background: linear-gradient(135deg, var(--gold-dark), var(--gold-bright));
+      border-color: var(--gold-bright);
+      color: #060010;
+      box-shadow: 0 0 14px rgba(255, 215, 0, 0.5);
+    }
+    .step-label { color: var(--gold-bright); }
+  }
+
+  &.done {
+    .step-num {
+      background: rgba(255, 215, 0, 0.15);
+      border-color: var(--gold-mid);
+      color: var(--gold-mid);
+    }
+  }
+}
+
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 215, 0, 0.2);
+  margin: 0 12px;
+  margin-bottom: 20px;
+  max-width: 60px;
+}
+
+// ── Campos ───────────────────────────────────────────────────
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  input,
+  select {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    border-radius: var(--radius-md);
+    padding: 11px 14px;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.97rem;
+    outline: none;
+    transition: var(--transition);
+    width: 100%;
+    box-sizing: border-box;
+
+    &::placeholder { color: var(--text-muted); }
+
+    &:focus {
+      border-color: var(--gold-mid);
+      box-shadow: 0 0 12px rgba(255, 165, 0, 0.25);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+
+  select {
+    cursor: pointer;
+    option { background: #23065a; color: var(--text-primary); }
+  }
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.field-pais { flex: 0 0 80px; }
+.field-cel  { flex: 1; }
+.field-half { flex: 1; }
+
+// ── Mensajes ─────────────────────────────────────────────────
+.error-msg {
+  background: rgba(255, 23, 68, 0.12);
+  border: 1px solid rgba(255, 23, 68, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ff6b81;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.success-msg {
+  background: rgba(0, 200, 100, 0.1);
+  border: 1px solid rgba(0, 200, 100, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #4ade80;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+// ── OTP ──────────────────────────────────────────────────────
+.otp-hint {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: -4px 0;
+  line-height: 1.5;
+}
+
+.otp-input {
+  text-align: center;
+  font-size: 1.6rem !important;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+}
+
+// ── Botones ──────────────────────────────────────────────────
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-bright) 50%, var(--gold-mid) 100%);
+  color: #060010;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 13px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 0 22px rgba(255, 215, 0, 0.55);
+    transform: translateY(-1px);
+  }
+
+  &:disabled { opacity: 0.65; cursor: not-allowed; }
+}
+
+.btn-back {
+  background: transparent;
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  color: var(--text-muted);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: var(--transition);
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    border-color: rgba(255, 215, 0, 0.5);
+    color: var(--text-secondary);
+  }
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+// ── Footer ───────────────────────────────────────────────────
+.footer-link {
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin-top: -4px;
+
+  a {
+    color: var(--gold-bright);
+    text-decoration: none;
+    font-weight: 600;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+// ── Spinner ──────────────────────────────────────────────────
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(6, 0, 16, 0.3);
+  border-top-color: #060010;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// ── Bienvenida (paso 3) ─────────────────────────────────────
+.bienvenida {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 8px 0;
+
+  .bienvenida-icon {
+    font-size: 3rem;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .bienvenida-title {
+    font-family: 'Cinzel', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gold-bright);
+    margin: 0;
+  }
+
+  .bienvenida-sub {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .bienvenida-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: -4px 0;
+  }
+}
+
+.codigo-badge {
+  background: linear-gradient(135deg, rgba(255,215,0,0.12) 0%, rgba(184,134,11,0.18) 100%);
+  border: 2px solid var(--gold-bright);
+  border-radius: var(--radius-lg);
+  padding: 20px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 0 28px rgba(255,215,0,0.25);
+  width: 100%;
+  box-sizing: border-box;
+
+  .codigo-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .codigo-valor {
+    font-family: 'Cinzel', serif;
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: var(--gold-bright);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 20px rgba(255,215,0,0.7);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { text-shadow: 0 0 8px rgba(255,215,0,0.4); }
+  50% { text-shadow: 0 0 24px rgba(255,215,0,0.9); }
+}
+
+// ── Responsive ───────────────────────────────────────────────
+@media (max-width: 480px) {
+  .registro-card {
+    padding: 28px 20px;
+  }
+
+  .field-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .field-pais { flex: unset; }
+}

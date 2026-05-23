@@ -13,6 +13,9 @@ export interface Aliado {
   fecha_nacimiento: string | null;
   correo: string | null;
   cc: string | null;
+  departamento: string | null;
+  ciudad: string | null;
+  barrio: string | null;
 }
 
 export interface LoginResponse {
@@ -26,6 +29,23 @@ export interface LoginRequest {
   codigo_vip: string;
 }
 
+export interface RegistroOtpRequest {
+  celular: string;
+  codigo_pais?: string;
+}
+
+export interface RegistroRequest {
+  nombre: string;
+  celular: string;
+  codigo_pais?: string;
+  correo?: string | null;
+  cc?: string | null;
+  departamento?: string | null;
+  ciudad?: string | null;
+  barrio?: string | null;
+  otp_code: string;
+}
+
 export interface ReferidoItem {
   nombre: string;
   celular: string;
@@ -37,6 +57,9 @@ export interface UpdatePerfilRequest {
   correo?: string | null;
   cc?: string | null;
   fecha_nacimiento?: string | null;
+  departamento?: string | null;
+  ciudad?: string | null;
+  barrio?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -49,6 +72,24 @@ export class AuthService {
   login(payload: LoginRequest): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${environment.apiUrl}/aliados/login`, payload)
+      .pipe(
+        tap(res => {
+          localStorage.setItem(this.TOKEN_KEY, res.access_token);
+          localStorage.setItem(this.ALIADO_KEY, JSON.stringify(res.aliado));
+        })
+      );
+  }
+
+  sendRegistroOtp(payload: RegistroOtpRequest): Observable<{ ok: boolean; expira_en: number }> {
+    return this.http.post<{ ok: boolean; expira_en: number }>(
+      `${environment.apiUrl}/aliados/registro/send-otp`,
+      payload
+    );
+  }
+
+  registro(payload: RegistroRequest): Observable<LoginResponse> {
+    return this.http
+      .post<LoginResponse>(`${environment.apiUrl}/aliados/registro`, payload)
       .pipe(
         tap(res => {
           localStorage.setItem(this.TOKEN_KEY, res.access_token);

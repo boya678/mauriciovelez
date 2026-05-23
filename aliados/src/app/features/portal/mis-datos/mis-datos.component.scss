@@ -107,7 +107,8 @@
     letter-spacing: 0.06em;
   }
 
-  input {
+  input,
+  select {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 215, 0, 0.2);
     border-radius: var(--radius-md);
@@ -117,11 +118,23 @@
     font-size: 0.97rem;
     outline: none;
     transition: all 0.25s;
+    width: 100%;
+    box-sizing: border-box;
 
     &::placeholder { color: var(--text-muted); }
     &:focus {
       border-color: var(--gold-mid);
       box-shadow: 0 0 12px rgba(255, 165, 0, 0.2);
+    }
+
+    option {
+      background: var(--bg-card, #1a0a2e);
+      color: var(--text-primary);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
   }
 }

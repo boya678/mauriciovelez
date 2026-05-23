@@ -104,6 +104,14 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
     elif type == "recordatorio_vencimiento":
         _send_template(numero_dest, settings.WHATSAPP_VENCIMIENTO_VIP, [])
 
+    elif type == "codigo_cliente":
+        texto = f"{params['tipo_cliente']} codigo asignado {params['codigo_vip']}"
+        _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_CODIGO, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": texto},
+            ]},
+        ])
+
     else:
         logger.warning("Tipo de notificación desconocido: %s", type)
 

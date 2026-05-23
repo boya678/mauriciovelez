@@ -12,30 +12,14 @@ export const routes: Routes = [
           import('./pages/home/home.component').then((m) => m.HomeComponent),
         title: 'Mauricio Vélez · Numerólogo — +20 años de Certeza, no Suerte',
       },
-      {
-        path: 'resultados',
-        loadComponent: () =>
-          import('./pages/resultados/resultados.component').then((m) => m.ResultadosComponent),
-        title: 'Resultados Oficiales — Loterías y Chances de Colombia | Mauricio Vélez',
-      },
       // Compatibilidad con URLs anteriores
-      { path: 'loterias', redirectTo: 'resultados', pathMatch: 'full' },
-      { path: 'chances',  redirectTo: 'resultados', pathMatch: 'full' },
-      {
-        path: 'metodo-numerologico',
-        loadComponent: () =>
-          import('./pages/estadisticas/estadisticas.component').then((m) => m.EstadisticasComponent),
-        title: 'Método Numerológico — Estadística, Matemática y Tendencia Numérica | Mauricio Vélez',
-      },
-      {
-        path: 'estudios-numerologicos',
-        loadComponent: () =>
-          import('./pages/analisis/analisis.component').then((m) => m.AnalisisComponent),
-        title: 'Estudios Numerológicos — Análisis de Loterías y Chances | Mauricio Vélez',
-      },
-      // Compatibilidad con URLs anteriores
-      { path: 'estadisticas', redirectTo: 'metodo-numerologico',    pathMatch: 'full' },
-      { path: 'analisis',     redirectTo: 'estudios-numerologicos', pathMatch: 'full' },
+      { path: 'resultados',             redirectTo: '', pathMatch: 'full' },
+      { path: 'loterias',               redirectTo: '', pathMatch: 'full' },
+      { path: 'chances',                redirectTo: '', pathMatch: 'full' },
+      { path: 'estadisticas',           redirectTo: '', pathMatch: 'full' },
+      { path: 'analisis',               redirectTo: '', pathMatch: 'full' },
+      { path: 'metodo-numerologico',    redirectTo: '', pathMatch: 'full' },
+      { path: 'estudios-numerologicos', redirectTo: '', pathMatch: 'full' },
       {
         path: 'politica-de-privacidad',
         loadComponent: () =>

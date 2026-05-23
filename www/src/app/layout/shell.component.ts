@@ -23,10 +23,7 @@ export class ShellComponent {
     '?text=' + encodeURIComponent('Hola Mauricio, me interesa tu método numerológico.');
 
   readonly navItems = [
-    { path: '/',                       label: 'Inicio',     icon: 'home' },
-    { path: '/resultados',             label: 'Resultados', icon: 'casino' },
-    { path: '/metodo-numerologico',    label: 'Mi Método',  icon: 'workspaces' },
-    { path: '/estudios-numerologicos', label: 'Estudios',   icon: 'menu_book' },
+    { path: '/', label: 'Inicio', icon: 'home' },
   ];
 
   @HostListener('window:scroll')

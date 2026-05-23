@@ -85,7 +85,8 @@ async def receive_webhook(
             row = await db.execute(
                 sa_text(
                     f"SELECT id, slug, whatsapp_phone_id, whatsapp_token, "
-                    f"webhook_secret, ai_system_prompt "
+                    f"webhook_secret, ai_system_prompt, "
+                    f"whatsapp_template_name, whatsapp_template_language "
                     f"FROM public.tenants WHERE {col} = :val AND active = true"
                 ),
                 {"val": header},
@@ -100,6 +101,8 @@ async def receive_webhook(
             whatsapp_token=row_data.whatsapp_token or "",
             webhook_secret=row_data.webhook_secret,
             ai_system_prompt=row_data.ai_system_prompt,
+            whatsapp_template_name=row_data.whatsapp_template_name,
+            whatsapp_template_language=row_data.whatsapp_template_language,
         )
         _tenant_cache[header] = tenant
 

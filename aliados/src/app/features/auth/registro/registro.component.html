@@ -1,0 +1,159 @@
+<div class="registro-page">
+  <div class="registro-card">
+
+    <!-- Encabezado -->
+    <div class="brand">
+      <span class="brand-icon">♦</span>
+      <span class="brand-title gold-text">EMBAJADORES DE ORO</span>
+      <span class="brand-sub">Mauricio Vélez · Numerólogo</span>
+    </div>
+
+    <!-- Stepper indicator -->
+    @if (step() !== 3) {
+      <div class="stepper">
+        <div class="step-item" [class.active]="step() === 1" [class.done]="step() > 1">
+          <span class="step-num">1</span>
+          <span class="step-label">Tus datos</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item" [class.active]="step() === 2" [class.done]="step() > 2">
+          <span class="step-num">2</span>
+          <span class="step-label">Verificación</span>
+        </div>
+      </div>
+    }
+
+    <!-- ── PASO 1: Datos personales ── -->
+    @if (step() === 1) {
+      <div class="field">
+        <label for="nombre">Nombre completo *</label>
+        <input id="nombre" type="text" [(ngModel)]="nombre" placeholder="Ej: María Pérez" />
+      </div>
+
+      <div class="field-row">
+        <div class="field field-pais">
+          <label for="pais">País</label>
+          <input id="pais" type="text" [(ngModel)]="codigoPais" placeholder="57" maxlength="4" />
+        </div>
+        <div class="field field-cel">
+          <label for="celular">Celular (WhatsApp) *</label>
+          <input id="celular" type="tel" [(ngModel)]="celular" placeholder="3001234567" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="correo">Correo electrónico</label>
+        <input id="correo" type="email" [(ngModel)]="correo" placeholder="correo@ejemplo.com" />
+      </div>
+
+      <div class="field">
+        <label for="cc">Cédula / Documento</label>
+        <input id="cc" type="text" [(ngModel)]="cc" placeholder="Número de documento" />
+      </div>
+
+      <div class="field-row">
+        <div class="field field-half">
+          <label for="departamento">Departamento</label>
+          <select id="departamento" [(ngModel)]="departamento" (ngModelChange)="onDepartamentoChange()">
+            <option value="">Selecciona...</option>
+            @for (dep of departamentos; track dep) {
+              <option [value]="dep">{{ dep }}</option>
+            }
+          </select>
+        </div>
+        <div class="field field-half">
+          <label for="ciudad">Ciudad / Municipio</label>
+          <select id="ciudad" [(ngModel)]="ciudad" [disabled]="!departamento">
+            <option value="">Selecciona...</option>
+            @for (c of ciudadesDisponibles(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="barrio">Barrio / Vereda</label>
+        <input id="barrio" type="text" [(ngModel)]="barrio" placeholder="Ej: El Poblado" />
+      </div>
+
+      @if (errorMsg()) {
+        <div class="error-msg" role="alert">{{ errorMsg() }}</div>
+      }
+
+      <button class="btn-primary" (click)="enviarCodigo()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner"></span>
+        } @else {
+          Enviar código de verificación
+        }
+      </button>
+
+      <p class="footer-link">
+        ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
+      </p>
+    }
+
+    <!-- ── PASO 2: OTP ── -->
+    @if (step() === 2) {
+      @if (successMsg()) {
+        <div class="success-msg">{{ successMsg() }}</div>
+      }
+
+      <p class="otp-hint">
+        Ingresa el código de 6 dígitos que recibiste por WhatsApp.
+      </p>
+
+      <div class="field">
+        <label for="otp">Código de verificación</label>
+        <input
+          id="otp"
+          type="text"
+          inputmode="numeric"
+          [(ngModel)]="otpCode"
+          placeholder="000000"
+          maxlength="6"
+          class="otp-input"
+          (keyup.enter)="confirmar()"
+        />
+      </div>
+
+      @if (errorMsg()) {
+        <div class="error-msg" role="alert">{{ errorMsg() }}</div>
+      }
+
+      <button class="btn-primary" (click)="confirmar()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner"></span>
+        } @else {
+          Confirmar y crear cuenta
+        }
+      </button>
+
+      <button class="btn-back" (click)="volverPaso1()" [disabled]="loading()">
+        ← Volver
+      </button>
+    }
+
+    <!-- ── PASO 3: Bienvenida con código asignado ── -->
+    @if (step() === 3) {
+      <div class="bienvenida">
+        <div class="bienvenida-icon">🏆</div>
+        <h2 class="bienvenida-title">¡Ya eres Embajador de Oro!</h2>
+        <p class="bienvenida-sub">Este es tu código personal. Guárdalo — lo necesitas para iniciar sesión.</p>
+
+        <div class="codigo-badge">
+          <span class="codigo-label">Tu código de aliado</span>
+          <span class="codigo-valor">{{ codigoAsignado() }}</span>
+        </div>
+
+        <p class="bienvenida-hint">También puedes consultarlo en cualquier momento en tu perfil del portal.</p>
+
+        <button class="btn-primary" (click)="router.navigate(['/portal/referidos'])">
+          Entrar al portal →
+        </button>
+      </div>
+    }
+
+  </div>
+</div>

@@ -1,59 +1,141 @@
 <section class="hero">
   <div class="container">
-    <div class="hero__grid">
-      <div class="hero__copy">
-        <span class="eyebrow"><span class="dot"></span> Numerólogo · +20 años de experiencia</span>
-        <h1 class="hero__title">
-          Certeza, no <span class="grad">suerte</span>.
-        </h1>
-        <p class="hero__sub">
-          Soy <strong>Mauricio Vélez</strong>. Llevo más de 20 años analizando números, tendencias
-          y el comportamiento estadístico de las loterías y chances de Colombia. Mi método combina
-          <strong>estadística</strong>, <strong>matemática</strong> y <strong>tendencia numérica</strong>.
-        </p>
+    <div class="hero__copy">
 
-        <div class="hero__cta">
-          <a [href]="softwareUrl" target="_blank" rel="noopener" class="btn btn--primary">
-            <span class="material-icons-round">rocket_launch</span>
-            Probar gratis el software
-          </a>
-          <a [href]="whatsappUrl" target="_blank" rel="noopener" class="btn btn--ghost">
-            <span class="material-icons-round">chat</span>
-            Hablar por WhatsApp
-          </a>
-          <a routerLink="/resultados" class="btn btn--ghost">
-            <span class="material-icons-round">casino</span>
-            Resultados de hoy
-          </a>
+      @if (ganadoresSemana().total_ganadores > 0) {
+        <div class="hero__proof">
+          <span class="material-icons-round">emoji_events</span>
+          <strong>{{ ganadoresSemana().total_ganadores | number }}</strong>
+          ganadores con el software en los últimos 7 días
         </div>
+      }
 
-        <div class="hero__kpis">
-          <div>
-            <span class="kpi-num mono">+20</span>
-            <span class="kpi-label">Años de experiencia</span>
-          </div>
-          <div>
-            <span class="kpi-num mono">3</span>
-            <span class="kpi-label">Pilares del método</span>
-          </div>
-          <div>
-            <span class="kpi-num mono">100%</span>
-            <span class="kpi-label">Resultados oficiales</span>
-          </div>
+      <span class="eyebrow"><span class="dot"></span> Loterías y Chances · Colombia</span>
+      <h1 class="hero__title">
+        Resultados oficiales de <span class="grad">loterías y chances</span>
+      </h1>
+      <p class="hero__sub">
+        Consulta los resultados del día, busca por fecha y ve cuántos usuarios del
+        <strong>{{ softwareName }}</strong> de <strong>Mauricio Vélez</strong> acertaron hoy.
+      </p>
+      <div class="hero__cta">
+        <a [href]="softwareUrl" target="_blank" rel="noopener" class="btn btn--primary">
+          <span class="material-icons-round">rocket_launch</span>
+          Probar gratis el software
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESULTADOS EMBEBIDOS -->
+<section class="block">
+  <div class="container">
+
+    <!-- Controles -->
+    <div class="card controls">
+      <div class="controls__group">
+        <label class="control">
+          <span class="control__label">
+            <span class="material-icons-round">event</span>
+            Fecha
+          </span>
+          <input
+            type="date"
+            class="control__input"
+            [ngModel]="fecha()"
+            (ngModelChange)="fecha.set($event)"
+          />
+        </label>
+        <div class="quick">
+          <button class="btn btn--sm" [class.btn--primary]="esHoy()" [class.btn--ghost]="!esHoy()" (click)="hoy()">
+            Hoy
+          </button>
+          <button class="btn btn--sm btn--ghost" (click)="ayer()">Ayer</button>
         </div>
       </div>
 
-      <aside class="hero__panel card card--elev hero__panel--photo">
-        <div class="hero__photo">
-          <img src="mauricio_foto.jpeg" alt="Mauricio Vélez, numerólogo" loading="eager" />
-        </div>
-        <div class="hero__photo-foot">
-          <div class="hero__photo-name">Mauricio Vélez</div>
-          <div class="hero__photo-role">Numerólogo · Colombia</div>
-          <div class="hero__photo-tag mono">{{ horaFmt() }} · {{ fechaFmt() }}</div>
-        </div>
-      </aside>
+      <div class="controls__group controls__group--right">
+        <label class="control control--search">
+          <span class="material-icons-round">search</span>
+          <input
+            type="text"
+            class="control__input"
+            placeholder="Buscar lotería o número…"
+            [ngModel]="q()"
+            (ngModelChange)="q.set($event)"
+          />
+          @if (q()) {
+            <button class="control__clear" (click)="clearQ()" aria-label="Limpiar">
+              <span class="material-icons-round">close</span>
+            </button>
+          }
+        </label>
+      </div>
     </div>
+
+
+
+    <!-- Ganadores hoy — stat prominente -->
+    @if (state() === 'ok' && esHoy() && totalGanadores() > 0) {
+      <div class="stat-hoy">
+        <span class="material-icons-round">emoji_events</span>
+        <div class="stat-hoy__center">
+          <span class="stat-hoy__num">{{ totalGanadores() }}</span>
+          <span class="stat-hoy__label">ganador{{ totalGanadores() === 1 ? '' : 'es' }} con el software hoy</span>
+        </div>
+      </div>
+    }
+
+    <!-- Tabla de resultados -->
+    <div class="card">
+      @if (state() === 'ok' && filtrados().length > 0) {
+        <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Lotería</th>
+              <th>Número</th>
+              <th>Ganadores software</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of filtrados(); track r.slug + r.fecha) {
+              <tr>
+                <td>
+                  <span class="cell-loteria">
+                    <span class="material-icons-round">emoji_events</span>
+                    {{ r.loteria }}
+                  </span>
+                </td>
+                <td class="num num-big">{{ r.resultado }}</td>
+                <td>
+                  @if (r.total_aciertos > 0) {
+                    <span class="badge badge--gold">{{ r.total_aciertos }}</span>
+                  } @else {
+                    <span class="mono dim">—</span>
+                  }
+                </td>
+                <td class="mono">{{ r.fecha | date:'dd/MM/yyyy' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        </div>
+      } @else if (state() === 'ok') {
+        <div class="empty">
+          <span class="material-icons-round">inbox</span>
+          <p>No hay resultados registrados para esta fecha.</p>
+        </div>
+      } @else if (state() === 'loading') {
+        <div class="empty">
+          <span class="material-icons-round spin">progress_activity</span>
+          <p>Cargando resultados…</p>
+        </div>
+      }
+    </div>
+
   </div>
 </section>
 
@@ -66,9 +148,9 @@
       </div>
       <div class="software-banner__body">
         <span class="software-banner__tag">Software Numerológico · Mauricio Vélez</span>
-        <h3 class="software-banner__title">
+        <h2 class="software-banner__title">
           Aplica mi método hoy. <span class="grad">Tu primera victoria es gratis.</span>
-        </h3>
+        </h2>
         <p class="software-banner__sub">
           Accede al software donde aplico estadística, matemática y tendencia numérica sobre los
           resultados oficiales de loterías y chances. Pruébalo sin pagar.
@@ -84,134 +166,19 @@
   </div>
 </section>
 
-<!-- MÉTODO: 3 PILARES -->
-<section class="block">
+<!-- ENLACES INTERNOS -->
+<section class="block block--tight">
   <div class="container">
-    <div class="block__head">
-      <div>
-        <span class="eyebrow">Mi método</span>
-        <h2 class="section-title">Tres pilares, una sola lectura</h2>
-      </div>
-      <a routerLink="/metodo-numerologico" class="btn btn--ghost btn--sm">
-        Conoce mi método
-        <span class="material-icons-round">arrow_forward</span>
+    <nav class="internal-links" aria-label="Secciones del sitio">
+      <a routerLink="/terminos-y-condiciones" class="internal-link">
+        <span class="material-icons-round">gavel</span>
+        Términos y Condiciones
       </a>
-    </div>
-
-    <div class="grid grid--3">
-      @for (p of pilares; track p.titulo) {
-        <article class="card card--hover pilar-card">
-          <div class="pilar-card__icon">
-            <span class="material-icons-round">{{ p.icon }}</span>
-          </div>
-          <h3 class="pilar-card__title">{{ p.titulo }}</h3>
-          <p class="pilar-card__desc">{{ p.desc }}</p>
-        </article>
-      }
-    </div>
-  </div>
-</section>
-
-<!-- GANADORES EN VIVO + SOBRE MÍ -->
-<section class="block">
-  <div class="container two-col">
-    <div class="card live-card">
-      <header class="live-head">
-        <div>
-          <span class="eyebrow">Ganadores en vivo</span>
-          <h3 class="live-title">Usuarios ganando con el software de Mauricio Vélez</h3>
-          <p class="live-sub">
-            Eventos reales del <a [href]="softwareUrl" target="_blank" rel="noopener">{{ softwareName }}</a>,
-            donde aplico mi método día tras día. <strong>Primera victoria gratis.</strong>
-          </p>
-        </div>
-        <span class="badge" [ngClass]="live.connected() ? 'badge--live' : 'badge--neutral'">
-          {{ live.connected() ? 'En vivo' : 'Reconectando' }}
-        </span>
-      </header>
-
-      <div class="live-list">
-        @if (live.events().length === 0) {
-          <div class="live-empty">
-            <span class="material-icons-round">hourglass_empty</span>
-            <p>Esperando próximos ganadores…</p>
-          </div>
-        }
-
-        @for (ev of live.events(); track ev.id) {
-          <article class="live-row" [attr.data-tipo]="ev.tipo">
-            <div class="live-row__icon">
-              @switch (ev.tipo) {
-                @case ('ganador')        { <span class="material-icons-round">emoji_events</span> }
-                @case ('nuevo_vip')      { <span class="material-icons-round">star</span> }
-                @default                  { <span class="material-icons-round">person_add</span> }
-              }
-            </div>
-            <div class="live-row__body">
-              <div class="live-row__top">
-                <strong>{{ ev.nombre }}</strong>
-                @switch (ev.tipo) {
-                  @case ('ganador')   { <span class="badge badge--gold">Acierto</span> }
-                  @case ('nuevo_vip') { <span class="badge badge--gold">Nuevo VIP</span> }
-                  @default            { <span class="badge badge--blue">Nuevo usuario</span> }
-                }
-              </div>
-              @if (ev.tipo === 'ganador') {
-                <div class="live-row__meta">
-                  <span class="mono num-pill">{{ ev.numero }}</span>
-                  <span>{{ ev.loteria }}</span>
-                  @if (ev.tipo_acierto) { <span class="badge badge--neutral">{{ ev.tipo_acierto }}</span> }
-                </div>
-              }
-            </div>
-            <time class="live-row__time mono">
-              {{ ev.timestamp | date:'HH:mm:ss':'America/Bogota' }}
-            </time>
-          </article>
-        }
-      </div>
-    </div>
-
-    <div class="card bio-card">
-      <header class="block__head block__head--inline">
-        <div>
-          <span class="eyebrow">Sobre mí</span>
-          <h3 class="trending-title">Mauricio Vélez · Numerólogo</h3>
-        </div>
-      </header>
-
-      <p class="bio-text">
-        Más de dos décadas estudiando el comportamiento numérico de loterías y chances. No vendo
-        suerte: entrego un método de estudio serio basado en datos oficiales, matemática y la
-        lectura de tendencias que solo se desarrolla con experiencia.
-      </p>
-
-      <ul class="bio-points">
-        <li>
-          <span class="material-icons-round">verified</span>
-          Estadística sobre resultados oficiales
-        </li>
-        <li>
-          <span class="material-icons-round">calculate</span>
-          Patrones matemáticos verificables
-        </li>
-        <li>
-          <span class="material-icons-round">insights</span>
-          Lectura de tendencia numérica
-        </li>
-      </ul>
-
-      <div class="bio-cta">
-        <a [href]="whatsappUrl" target="_blank" rel="noopener" class="btn btn--primary">
-          <span class="material-icons-round">chat</span>
-          Escríbeme por WhatsApp
-        </a>
-        <a routerLink="/estudios-numerologicos" class="btn btn--ghost">
-          <span class="material-icons-round">menu_book</span>
-          Ver mis estudios
-        </a>
-      </div>
-    </div>
+      <a routerLink="/politica-de-privacidad" class="internal-link">
+        <span class="material-icons-round">shield</span>
+        Política de Privacidad
+      </a>
+    </nav>
   </div>
 </section>
 
@@ -221,7 +188,7 @@
     <div class="card cta-final">
       <div class="cta-final__copy">
         <span class="eyebrow">Certeza, no suerte</span>
-        <h3 class="section-title">¿Quieres aplicar mi método?</h3>
+        <h2 class="section-title">¿Quieres aplicar mi método?</h2>
         <p>
           Hablemos. Te explico cómo trabajo y cómo puedes usar el {{ softwareName }}
           para aplicar el método día a día. <strong>Tu primera victoria es gratis.</strong>
@@ -232,11 +199,12 @@
           <span class="material-icons-round">rocket_launch</span>
           Probar gratis el software
         </a>
-        <a [href]="whatsappUrl" target="_blank" rel="noopener" class="btn btn--ghost">
-          <span class="material-icons-round">chat</span>
+        <a [href]="whatsappUrl" target="_blank" rel="noopener" class="btn btn--ghost btn--wa">
+          <svg class="wa-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
           WhatsApp 322 555 6333
         </a>
       </div>
     </div>
   </div>
 </section>
+

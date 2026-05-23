@@ -39,6 +39,9 @@ class ClienteOut(BaseModel):
     enabled: bool
     tipo_cliente: int = 1
     fecha_nacimiento: Optional[date] = None
+    departamento: Optional[str] = None
+    ciudad: Optional[str] = None
+    barrio: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -55,8 +58,11 @@ class ClienteUpdate(BaseModel):
     enabled: Optional[bool] = None
     tipo_cliente: Optional[int] = None
     fecha_nacimiento: Optional[date] = None
+    departamento: Optional[str] = None
+    ciudad: Optional[str] = None
+    barrio: Optional[str] = None
 
-    @field_validator('correo', 'cc', 'codigo_vip', mode='before')
+    @field_validator('correo', 'cc', 'codigo_vip', 'departamento', 'ciudad', 'barrio', mode='before')
     @classmethod
     def empty_to_none(cls, v):
         return None if v == '' else v
