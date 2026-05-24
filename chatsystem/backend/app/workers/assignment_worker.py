@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import AsyncSessionLocal, make_tenant_session
 from app.db.tenant import set_tenant_schema
 from app.models.conversation import Conversation, ConversationStatus
+from app.models.tenant import Tenant
 from app.redis.client import get_redis
 from app.redis.streams import (
     HUMAN_ASSIGN_STREAM,
@@ -38,6 +39,7 @@ BATCH = 10
 BLOCK_MS = 3000
 AUTOCLAIM_IDLE_MS = 45_000
 MAX_DELIVERY_COUNT = 5
+RESCUE_INTERVAL_S = 30  # seconds between proactive scans for WAITING_HUMAN
 
 
 async def _process_entry(redis, entry_id: str, data: dict, delivery_count: int) -> bool:
@@ -87,11 +89,78 @@ async def _process_entry(redis, entry_id: str, data: dict, delivery_count: int) 
         return True
 
 
+async def _rescue_waiting_conversations(redis) -> None:
+    """
+    Proactive scanner: finds all WAITING_HUMAN conversations across every
+    active tenant and tries to assign them to an available agent.
+    Runs every RESCUE_INTERVAL_S seconds so that conversations that got stuck
+    after MAX_DELIVERY_COUNT stream retries are eventually picked up when
+    agent capacity frees up.
+    """
+    async with AsyncSessionLocal() as pub_db:
+        result = await pub_db.execute(
+            select(Tenant.slug, Tenant.id).where(Tenant.active == True)
+        )
+        tenants = result.all()
+
+    for slug, tenant_id in tenants:
+        schema = f"t_{slug}"
+        set_tenant_schema(schema)
+        try:
+            async with make_tenant_session(schema) as db:
+                await db.execute(text(f"SET search_path TO {schema}, public"))
+                waiting_result = await db.execute(
+                    select(Conversation.id, Conversation.phone)
+                    .where(Conversation.status == ConversationStatus.WAITING_HUMAN)
+                    .order_by(Conversation.updated_at.asc())  # FIFO: oldest waiting first
+                )
+                waiting = waiting_result.all()
+
+            for conv_id, phone in waiting:
+                async with make_tenant_session(schema) as db:
+                    await db.execute(text(f"SET search_path TO {schema}, public"))
+                    # Re-check status — may have been assigned between queries
+                    conv = await db.scalar(
+                        select(Conversation).where(Conversation.id == conv_id)
+                    )
+                    if conv is None or conv.status != ConversationStatus.WAITING_HUMAN:
+                        continue
+
+                    agent = await assign_agent(redis, db, slug, conv_id)
+                    if agent is not None:
+                        await manager.publish(slug, {
+                            "type": "conversation_assigned",
+                            "conversation_id": str(conv_id),
+                            "agent_id": str(agent.id),
+                            "phone": phone,
+                        })
+                        logger.info(
+                            "Rescue: assigned conv %s → agent %s (tenant %s)",
+                            conv_id, agent.id, slug,
+                        )
+        except Exception:
+            logger.exception("Rescue scanner error for tenant %s", slug)
+
+
+async def _rescue_loop(redis, stop_event: asyncio.Event) -> None:
+    """Background task that periodically calls the rescue scanner."""
+    while not stop_event.is_set():
+        await asyncio.sleep(RESCUE_INTERVAL_S)
+        if stop_event.is_set():
+            break
+        try:
+            await _rescue_waiting_conversations(redis)
+        except Exception:
+            logger.exception("Rescue loop error")
+
+
 async def run(stop_event: asyncio.Event) -> None:
     redis = await get_redis()
     manager.set_redis(redis)
     await ensure_consumer_group(redis, HUMAN_ASSIGN_STREAM, ASSIGN_CONSUMER_GROUP)
     logger.info("assignment_worker started")
+
+    rescue_task = asyncio.create_task(_rescue_loop(redis, stop_event))
 
     while not stop_event.is_set():
         try:
@@ -126,6 +195,12 @@ async def run(stop_event: asyncio.Event) -> None:
         except Exception:
             logger.exception("assignment_worker loop error")
             await asyncio.sleep(2)
+
+    rescue_task.cancel()
+    try:
+        await rescue_task
+    except asyncio.CancelledError:
+        pass
 
     await redis.aclose()
     logger.info("assignment_worker stopped")

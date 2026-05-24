@@ -151,7 +151,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   get canTake(): boolean {
-    return this.conversation()?.status === 'waiting_human';
+    const s = this.conversation()?.status;
+    return s === 'waiting_human' || s === 'bot_active';
   }
 
   get canSend(): boolean {

@@ -15,6 +15,7 @@ Exported dependencies:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -27,8 +28,9 @@ from app.db.session import AsyncSessionLocal, set_tenant_schema
 
 logger = logging.getLogger(__name__)
 
-# In-process cache: slug/id → TenantContext  (cleared on process restart)
-_tenant_cache: dict[str, "TenantContext"] = {}
+# In-process cache: slug/id → (TenantContext, cached_at)  (TTL: 60 s)
+_CACHE_TTL_S = 60.0
+_tenant_cache: dict[str, tuple["TenantContext", float]] = {}
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -62,9 +64,12 @@ async def resolve_tenant(request: Request) -> TenantContext:
         )
 
     if header in _tenant_cache:
-        ctx = _tenant_cache[header]
-        set_tenant_schema(ctx.schema)
-        return ctx
+        ctx, cached_at = _tenant_cache[header]
+        if time.monotonic() - cached_at < _CACHE_TTL_S:
+            set_tenant_schema(ctx.schema)
+            return ctx
+        # TTL expired — remove and re-fetch
+        del _tenant_cache[header]
 
     # Determine lookup column
     try:
@@ -98,7 +103,7 @@ async def resolve_tenant(request: Request) -> TenantContext:
         whatsapp_template_name=tenant.whatsapp_template_name,
         whatsapp_template_language=tenant.whatsapp_template_language or "es",
     )
-    _tenant_cache[header] = ctx
+    _tenant_cache[header] = (ctx, time.monotonic())
     set_tenant_schema(ctx.schema)
     return ctx
 

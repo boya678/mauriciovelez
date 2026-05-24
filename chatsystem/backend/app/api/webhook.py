@@ -35,11 +35,18 @@ logger = logging.getLogger(__name__)
 
 def _verify_signature(body: bytes, signature: str | None, secret: str) -> bool:
     if not signature or not signature.startswith("sha256="):
+        logger.warning("Signature missing or bad format: %r", signature)
         return False
     expected = hmac.new(
         secret.encode(), body, hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(f"sha256={expected}", signature)
+    match = hmac.compare_digest(f"sha256={expected}", signature)
+    if not match:
+        logger.warning(
+            "Signature mismatch — received: %s | expected: sha256=%s",
+            signature, expected,
+        )
+    return match
 
 
 # ── GET — Meta verification ───────────────────────────────────────────────────
@@ -69,13 +76,17 @@ async def receive_webhook(
             detail="Missing ?tenant= query parameter",
         )
     # Reuse resolve_tenant logic inline
-    from app.db.tenant import _tenant_cache, TenantContext, set_tenant_schema
+    import time as _time
+    from app.db.tenant import _tenant_cache, _CACHE_TTL_S, TenantContext, set_tenant_schema
     from sqlalchemy import text as sa_text
 
     header = tenant_param.strip()
-    if header in _tenant_cache:
-        tenant = _tenant_cache[header]
+    _cached = _tenant_cache.get(header)
+    if _cached and (_time.monotonic() - _cached[1]) < _CACHE_TTL_S:
+        tenant = _cached[0]
     else:
+        if _cached:
+            del _tenant_cache[header]
         try:
             uuid.UUID(header)
             col = "id"
@@ -104,14 +115,24 @@ async def receive_webhook(
             whatsapp_template_name=row_data.whatsapp_template_name,
             whatsapp_template_language=row_data.whatsapp_template_language,
         )
-        _tenant_cache[header] = tenant
+        _tenant_cache[header] = (tenant, _time.monotonic())
 
     body = await request.body()
 
     # Signature validation — only enforce if Meta sends the header AND tenant has a secret configured
     sig = request.headers.get("X-Hub-Signature-256")
+    logger.info(
+        "Webhook POST tenant=%s | has_secret=%s | sig_header=%s",
+        tenant.slug,
+        bool(tenant.webhook_secret),
+        sig or "(none)",
+    )
     if tenant.webhook_secret and sig:
         if not _verify_signature(body, sig, tenant.webhook_secret):
+            logger.error(
+                "401 Bad signature for tenant=%s | body_len=%d",
+                tenant.slug, len(body),
+            )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bad signature")
 
     try:

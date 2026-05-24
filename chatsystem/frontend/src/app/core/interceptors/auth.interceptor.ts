@@ -3,11 +3,14 @@ import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // Skip if request already carries its own Authorization (e.g. superadmin requests)
+  if (req.headers.has('Authorization')) return next(req);
+
   const auth = inject(AuthService);
   const token = auth.getToken();
   const tenantSlug = auth.getTenantSlug();
 
-  // Skip if no token (e.g. login request adds its own X-Tenant-ID header)
+  // Skip if no agent token
   if (!token) return next(req);
 
   const headers: Record<string, string> = {
