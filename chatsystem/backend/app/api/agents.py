@@ -176,7 +176,7 @@ async def update_settings(
 ):
     """Updates the AI system prompt for this tenant."""
     from app.models.tenant import Tenant
-    from app.db.tenant import _tenant_cache
+    from app.services.tenant_cache import publish_tenant_invalidate
     t = await db.scalar(select(Tenant).where(Tenant.id == tenant.id))
     if not t:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -184,9 +184,9 @@ async def update_settings(
     t.whatsapp_template_name = body.whatsapp_template_name
     t.whatsapp_template_language = body.whatsapp_template_language
     await db.commit()
-    # Invalidate in-process cache so next request picks up new settings
-    _tenant_cache.pop(tenant.slug, None)
-    _tenant_cache.pop(str(tenant.id), None)
+    # Broadcast invalidation to every backend process via Redis Pub/Sub.
+    redis = await get_redis()
+    await publish_tenant_invalidate(redis, tenant.slug, str(tenant.id))
     return PromptSettings(
         ai_system_prompt=t.ai_system_prompt,
         whatsapp_template_name=t.whatsapp_template_name,

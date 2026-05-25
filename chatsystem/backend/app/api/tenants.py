@@ -154,10 +154,13 @@ async def update_tenant(
 
     await db.commit()
     await db.refresh(tenant)
-    # Invalidate in-process cache so next request picks up new settings
-    from app.db.tenant import _tenant_cache
-    _tenant_cache.pop(tenant.slug, None)
-    _tenant_cache.pop(str(tenant.id), None)
+
+    # Broadcast invalidation to every backend process via Redis Pub/Sub.
+    from app.services.tenant_cache import publish_tenant_invalidate
+    from app.redis.client import get_redis
+    redis = await get_redis()
+    await publish_tenant_invalidate(redis, tenant.slug, str(tenant.id))
+
     return TenantOut.model_validate(tenant)
 
 

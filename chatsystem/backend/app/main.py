@@ -28,6 +28,8 @@ from app.api.message_stats import router as message_stats_router
 from app.redis.client import init_redis, close_redis
 from app.workers.runner import start_workers, stop_workers
 from app.websocket.manager import manager
+from app.services.tenant_cache import start_invalidation_listener
+import asyncio
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -47,6 +49,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     redis = await init_redis()
     manager.set_redis(redis)
 
+    invalidation_task = start_invalidation_listener(redis)
+
     worker_tasks = await start_workers()
     logger.info("All workers running")
 
@@ -54,6 +58,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Shutdown
     logger.info("Shutting down…")
+    invalidation_task.cancel()
+    try:
+        await invalidation_task
+    except asyncio.CancelledError:
+        pass
     await stop_workers(worker_tasks)
     await close_redis()
     logger.info("Shutdown complete")
