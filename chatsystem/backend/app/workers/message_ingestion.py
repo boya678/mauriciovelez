@@ -44,7 +44,8 @@ from app.redis.streams import (
 from app.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
-CONSUMER_NAME = "ingest-1"
+import os
+CONSUMER_NAME = f"ingest-{os.environ.get('HOSTNAME', '1')}"
 BATCH = 10
 BLOCK_MS = 2000
 AUTOCLAIM_IDLE_MS = 30_000

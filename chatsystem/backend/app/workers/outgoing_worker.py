@@ -11,6 +11,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from sqlalchemy import update, text
 
 from app.db.session import AsyncSessionLocal, make_tenant_session
@@ -27,7 +28,8 @@ from app.redis.streams import (
 from app.services.whatsapp import send_text_message, send_interactive_message, send_template_message
 
 logger = logging.getLogger(__name__)
-CONSUMER_NAME = "outgoing-1"
+import os
+CONSUMER_NAME = f"outgoing-{os.environ.get('HOSTNAME', '1')}"
 BATCH = 10
 BLOCK_MS = 1000
 AUTOCLAIM_IDLE_MS = 30_000
@@ -47,6 +49,8 @@ async def _process_entry(entry_id: str, data: dict) -> None:
     template_language = data.get("template_language", "es") or "es"
 
     schema = f"t_{tenant_slug}" if tenant_slug else "public"
+
+    print(f"[OUTGOING] sending msg={message_id} phone={phone} interactive={bool(interactive_raw)} template={template_name or '-'} window_open={window_open}", flush=True)
 
     try:
         if interactive_raw:
@@ -75,8 +79,26 @@ async def _process_entry(entry_id: str, data: dict) -> None:
                 text=content,
             )
         new_status = MessageStatus.PROCESSED
+        print(f"[OUTGOING] OK msg={message_id} phone={phone}", flush=True)
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text if exc.response is not None else ""
+        status_code = exc.response.status_code if exc.response is not None else "?"
+        print(
+            f"[OUTGOING] HTTP-ERROR msg={message_id} phone={phone} status={status_code} body={body}",
+            flush=True,
+        )
+        logger.error(
+            "WhatsApp send failed for msg %s phone=%s status=%s body=%s",
+            message_id, phone, status_code, body,
+        )
+        new_status = MessageStatus.ERROR
     except Exception as exc:
-        logger.error("WhatsApp send failed for msg %s: %s", message_id, exc)
+        import traceback
+        print(
+            f"[OUTGOING] EXC msg={message_id} phone={phone} type={type(exc).__name__} err={exc}\n{traceback.format_exc()}",
+            flush=True,
+        )
+        logger.exception("WhatsApp send failed for msg %s phone=%s", message_id, phone)
         new_status = MessageStatus.ERROR
 
     async with make_tenant_session(schema) as db:

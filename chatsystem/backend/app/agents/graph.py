@@ -42,6 +42,7 @@ class ChatState(TypedDict, total=False):
     messages: list[dict]
     tenant_system_prompt: str
     tenant_id: str                # UUID string of the tenant — used for RAG lookup
+    conversation_id: str          # UUID string of the conversation — used for intent caching
     phone: str                    # WhatsApp number of the user (e.g. 573001234567)
     intent: str
     bot_reply: str
@@ -171,6 +172,7 @@ async def run_graph(
     messages: list[dict],
     tenant_system_prompt: str = "",
     tenant_id: str = "",
+    conversation_id: str = "",
     turns: int = 0,
     tools: list[StructuredTool] | None = None,
     phone: str = "",
@@ -196,6 +198,7 @@ async def run_graph(
         "messages": messages,
         "tenant_system_prompt": tenant_system_prompt,
         "tenant_id": tenant_id,
+        "conversation_id": conversation_id,
         "phone": phone,
         "turns": turns,
         "needs_escalation": False,

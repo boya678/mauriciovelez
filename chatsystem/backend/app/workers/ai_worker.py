@@ -46,7 +46,8 @@ from app.services.tool_engine import load_tools
 from app.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
-CONSUMER_NAME = "ai-1"
+import os
+CONSUMER_NAME = f"ai-{os.environ.get('HOSTNAME', '1')}"
 BATCH = 5
 BLOCK_MS = 2000
 AUTOCLAIM_IDLE_MS = 60_000  # AI calls can be slow
@@ -89,10 +90,30 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
         conv = await db.scalar(
             select(Conversation).where(Conversation.id == conversation_id)
         )
-        if conv is None or conv.status not in (
-            ConversationStatus.BOT_ACTIVE, ConversationStatus.NEW
-        ):
-            logger.info("Conv %s not in BOT_ACTIVE state, skipping AI", conversation_id)
+        if conv is None:
+            # Orphan message — just mark it processed so it doesn't show as PROCESSING forever
+            await db.execute(
+                update(Message)
+                .where(Message.id == message_id)
+                .values(status=MessageStatus.PROCESSED)
+            )
+            await db.commit()
+            logger.warning("Conv %s not found, marking msg %s PROCESSED", conversation_id, message_id)
+            return
+
+        if conv.status not in (ConversationStatus.BOT_ACTIVE, ConversationStatus.NEW):
+            # Conversation belongs to a human agent — bot must stay out.
+            # Mark the message as PROCESSED so it doesn't stay in PROCESSING forever.
+            await db.execute(
+                update(Message)
+                .where(Message.id == message_id)
+                .values(status=MessageStatus.PROCESSED)
+            )
+            await db.commit()
+            logger.info(
+                "Conv %s status=%s → skipping AI, msg marked PROCESSED",
+                conversation_id, conv.status,
+            )
             return
 
         history = await _load_history(db, conversation_id)
@@ -121,6 +142,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             messages=history,
             tenant_system_prompt=system_prompt,
             tenant_id=tenant_id,
+            conversation_id=str(conversation_id),
             turns=0,
             tools=tools,
             phone=phone,

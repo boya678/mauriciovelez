@@ -34,7 +34,8 @@ from app.services.round_robin import assign_agent
 from app.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
-CONSUMER_NAME = "assign-1"
+import os
+CONSUMER_NAME = f"assign-{os.environ.get('HOSTNAME', '1')}"
 BATCH = 10
 BLOCK_MS = 3000
 AUTOCLAIM_IDLE_MS = 45_000

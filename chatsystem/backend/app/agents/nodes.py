@@ -30,15 +30,54 @@ logger = logging.getLogger(__name__)
 
 # ── LLM factory ───────────────────────────────────────────────────────────────
 
-def _get_llm(temperature: float = 0.3) -> AzureChatOpenAI:
+def _get_llm(temperature: float = 0.3, max_tokens: int = 400) -> AzureChatOpenAI:
     return AzureChatOpenAI(
         azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
         azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
         api_version=settings.AZURE_OPENAI_API_VERSION,
         api_key=settings.AZURE_OPENAI_API_KEY,
         temperature=temperature,
-        max_tokens=800,
+        max_tokens=max_tokens,
     )
+
+
+# ── Intent cache (cross-pod via Redis) ───────────────────────────────────────
+# Skips the classifier LLM call when we already classified this conversation.
+# Refreshed every _INTENT_CACHE_REFRESH_TURNS turns or on escalation keywords.
+_INTENT_CACHE_TTL_S = 600
+_INTENT_CACHE_REFRESH_TURNS = 5
+
+
+async def _get_cached_intent(conv_id: str) -> tuple[str | None, int]:
+    if not conv_id:
+        return None, 0
+    try:
+        from app.redis.client import get_redis
+        redis = await get_redis()
+        raw = await redis.get(f"chatsystem:intent:{conv_id}")
+        if not raw:
+            return None, 0
+        data = raw.decode() if isinstance(raw, bytes) else raw
+        intent, _, turns_s = data.partition("|")
+        return intent or None, int(turns_s or 0)
+    except Exception as exc:  # pragma: no cover - non-fatal
+        logger.debug("intent cache read failed: %s", exc)
+        return None, 0
+
+
+async def _set_cached_intent(conv_id: str, intent: str, turns: int) -> None:
+    if not conv_id:
+        return
+    try:
+        from app.redis.client import get_redis
+        redis = await get_redis()
+        await redis.set(
+            f"chatsystem:intent:{conv_id}",
+            f"{intent}|{turns}",
+            ex=_INTENT_CACHE_TTL_S,
+        )
+    except Exception as exc:  # pragma: no cover - non-fatal
+        logger.debug("intent cache write failed: %s", exc)
 
 
 # ── Classifier ────────────────────────────────────────────────────────────────
@@ -61,18 +100,32 @@ NO incluyas ninguna explicación."""
 
 async def classifier_node(state: dict) -> dict:
     messages = state["messages"]
-    system_prompt = state.get("tenant_system_prompt", "")
+    conv_id = state.get("conversation_id", "")
+    current_turns = state.get("turns", 0)
 
-    lc_messages = [SystemMessage(content=_CLASSIFIER_SYSTEM)]
-    if system_prompt:
-        lc_messages.append(SystemMessage(content=f"Business context:\n{system_prompt}"))
-    for m in messages[-8:]:
+
+    # ── Cache hit: skip LLM entirely ──────────────────────────────────────────
+    cached_intent, cached_turns = await _get_cached_intent(conv_id)
+    if (
+        cached_intent
+        and (current_turns - cached_turns) < _INTENT_CACHE_REFRESH_TURNS
+    ):
+        logger.debug("Classifier cache hit conv=%s intent=%s", conv_id, cached_intent)
+        return {
+            **state,
+            "intent": cached_intent,
+            "turns": current_turns + 1,
+        }
+
+    # ── LLM classification (cheap: max_tokens=5, no tenant prompt, 2 msgs) ───
+    lc_messages: list[Any] = [SystemMessage(content=_CLASSIFIER_SYSTEM)]
+    for m in messages[-2:]:
         if m["role"] == "user":
             lc_messages.append(HumanMessage(content=m["content"]))
         else:
             lc_messages.append(AIMessage(content=m["content"]))
 
-    llm = _get_llm(temperature=0.0)
+    llm = _get_llm(temperature=0.0, max_tokens=5)
     response = await llm.ainvoke(lc_messages)
     intent = response.content.strip().lower()
 
@@ -83,11 +136,13 @@ async def classifier_node(state: dict) -> dict:
     tokens_in  = int(usage_meta.get("input_tokens",  0))
     tokens_out = int(usage_meta.get("output_tokens", 0))
 
-    logger.debug("Classifier intent: %s", intent)
+    await _set_cached_intent(conv_id, intent, current_turns)
+
+    logger.debug("Classifier intent: %s (conv=%s)", intent, conv_id)
     return {
         **state,
         "intent": intent,
-        "turns": state.get("turns", 0) + 1,
+        "turns": current_turns + 1,
         "tokens_in":  state.get("tokens_in",  0) + tokens_in,
         "tokens_out": state.get("tokens_out", 0) + tokens_out,
     }
@@ -222,17 +277,46 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         tenant_id_str = state.get("tenant_id", "")
         intent = state.get("intent", "faq")
         tool_messages: list[Any] = list(state.get("tool_messages", []))
+        phone = state.get("phone", "")
+        has_pending_image = state.get("has_pending_image", False)
 
+        # ── System messages split into static→dynamic blocks for Azure OpenAI
+        #    prompt caching. Static prefix repeats across turns ⇒ 50% discount
+        #    on cached input tokens (requires ≥1024 token prefix).
+
+        # Block 1 (STATIC per intent): base intent prompt + menu format
         base_prompt = _INTENT_PROMPTS.get(intent, _DEFAULT_PROMPT)
-        system_content = base_prompt + _MENU_FORMAT_INSTRUCTIONS
-        if tenant_prompt:
-            system_content += f"\n\nConocimiento específico del negocio:\n{tenant_prompt}"
+        block_static = base_prompt + _MENU_FORMAT_INSTRUCTIONS
 
-        # ── RAG: inject relevant knowledge chunks ──────────────────────────
+        # Block 2 (SEMI-STATIC): tenant knowledge — changes only when operator
+        # edits the prompt via /settings.
+        block_tenant = (
+            f"Conocimiento específico del negocio:\n{tenant_prompt}"
+            if tenant_prompt else ""
+        )
+
+        # Block 3 (SEMI-STATIC): tools description — changes only when tools
+        # are added/removed for the tenant.
+        block_tools = ""
+        if tools:
+            tool_names = ", ".join(t.name for t in tools)
+            block_tools = (
+                f"IMPORTANTE — Tienes acceso a las siguientes herramientas de "
+                f"consulta en tiempo real: {tool_names}. "
+                f"{'El número de teléfono del usuario ya está identificado como ' + phone + '. ' if phone else ''}"
+                f"NUNCA le pidas al usuario que verifique su identidad ni que proporcione "
+                f"su número de teléfono o nombre completo para consultas de cuenta. "
+                f"Cuando el usuario pregunte por sus números asignados, estado, suscripción, "
+                f"saldo u otra información de su cuenta, llama a la herramienta correspondiente "
+                f"de inmediato sin pedir confirmación. "
+                f"Presenta los resultados de forma amigable y clara en español."
+            )
+
+        # Block 4 (DYNAMIC): RAG context — different every turn.
+        block_rag = ""
         if tenant_id_str and messages:
             try:
                 from app.services.knowledge import search_knowledge
-                # Use the last user message as the search query
                 last_user = next(
                     (m["content"] for m in reversed(messages) if m["role"] == "user"),
                     None,
@@ -244,20 +328,18 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
                         )
                     if chunks:
                         rag_context = "\n\n---\n".join(chunks)
-                        system_content += (
-                            f"\n\nINFORMACIÓN DE REFERENCIA (base de conocimiento):\n"
+                        block_rag = (
+                            f"INFORMACIÓN DE REFERENCIA (base de conocimiento):\n"
                             f"{rag_context}"
                         )
             except Exception as _rag_err:
                 logger.warning("RAG search failed (continuing without context): %s", _rag_err)
-        # ── end RAG ────────────────────────────────────────────────────────
 
-        # When waiting for the user to describe a previously sent image, instruct
-        # the LLM to embed a special tag if the user's message answers that question.
-        has_pending_image = state.get("has_pending_image", False)
+        # Block 5 (DYNAMIC): pending image instructions
+        block_image = ""
         if has_pending_image:
-            system_content += (
-                "\n\nCONTEXTO ESPECIAL — IMAGEN PENDIENTE: El usuario envió una imagen "
+            block_image = (
+                "CONTEXTO ESPECIAL — IMAGEN PENDIENTE: El usuario envió una imagen "
                 "recientemente y aún no ha explicado para qué es. "
                 "Si el último mensaje del usuario responde claramente esa pregunta "
                 "(describe el motivo, tipo, o propósito de la imagen), incluye al "
@@ -268,24 +350,18 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
                 "saber para qué fue la imagen que envió (una sola frase, de forma natural)."
             )
 
-        # If tools are available, tell the LLM how to use them and that the
-        # user's phone is already identified — never ask for identity verification.
-        phone = state.get("phone", "")
-        if tools:
-            tool_names = ", ".join(t.name for t in tools)
-            system_content += (
-                f"\n\nIMPORTANTE — Tienes acceso a las siguientes herramientas de "
-                f"consulta en tiempo real: {tool_names}. "
-                f"{'El número de teléfono del usuario ya está identificado como ' + phone + '. ' if phone else ''}"
-                f"NUNCA le pidas al usuario que verifique su identidad ni que proporcione "
-                f"su número de teléfono o nombre completo para consultas de cuenta. "
-                f"Cuando el usuario pregunte por sus números asignados, estado, suscripción, "
-                f"saldo u otra información de su cuenta, llama a la herramienta correspondiente "
-                f"de inmediato sin pedir confirmación. "
-                f"Presenta los resultados de forma amigable y clara en español."
-            )
+        # Order: static → semi-static → dynamic. Keeps cacheable prefix stable
+        # across consecutive turns of the same conversation.
+        lc_messages: list[Any] = [SystemMessage(content=block_static)]
+        if block_tenant:
+            lc_messages.append(SystemMessage(content=block_tenant))
+        if block_tools:
+            lc_messages.append(SystemMessage(content=block_tools))
+        if block_rag:
+            lc_messages.append(SystemMessage(content=block_rag))
+        if block_image:
+            lc_messages.append(SystemMessage(content=block_image))
 
-        lc_messages: list[Any] = [SystemMessage(content=system_content)]
         for m in messages[-12:]:
             if m["role"] == "user":
                 lc_messages.append(HumanMessage(content=m["content"]))
@@ -295,7 +371,7 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         # Append any previous tool_messages (AIMessage with tool_calls + ToolMessages)
         lc_messages.extend(tool_messages)
 
-        llm = _get_llm(temperature=0.4)
+        llm = _get_llm(temperature=0.4, max_tokens=400)
         if tools:
             llm = llm.bind_tools(tools)  # type: ignore[assignment]
 
