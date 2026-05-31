@@ -194,7 +194,7 @@
     <div class="vip-modal" role="dialog" aria-modal="true" aria-labelledby="vip-title">
 
       <div class="vip-modal-icon">★</div>
-      <h2 id="vip-title" class="vip-modal-title gold-text">Acceso VIP</h2>
+      <h2 id="vip-title" class="vip-modal-title gold-text">Acceso</h2>
       <p class="vip-modal-sub">Ingresa tu código personal para continuar</p>
 
       <div class="field-wrapper vip-field" [class.field-invalid]="vipError()">
@@ -203,7 +203,7 @@
           type="text"
           class="field-input"
           [(ngModel)]="vipCode"
-          placeholder="Código VIP"
+          placeholder="Código"
           (keyup.enter)="submitVipCode()"
           autocomplete="off"
           autofocus

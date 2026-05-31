@@ -23,10 +23,12 @@ class ClienteResponse(BaseModel):
     nombre: str
     celular: str
     codigo_pais: str | None
+    codigo_vip: str | None = None
     correo: str | None
     cc: str | None
     saldo: float
     vip: bool
+    tipo_cliente: int = 1
     enabled: bool
     fecha_nacimiento: date | None = None
     created_at: datetime
@@ -53,3 +55,6 @@ class UpdateMisDatosRequest(BaseModel):
     correo: str | None = Field(default=None, max_length=200)
     cc: str | None = Field(default=None, max_length=30)
     fecha_nacimiento: date | None = None
+    departamento: str | None = Field(default=None, max_length=100)
+    ciudad: str | None = Field(default=None, max_length=100)
+    barrio: str | None = Field(default=None, max_length=100)

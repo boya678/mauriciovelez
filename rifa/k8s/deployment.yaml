@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rifa
+  namespace: mauriciovelez
+  labels:
+    app: rifa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rifa
+  template:
+    metadata:
+      labels:
+        app: rifa
+    spec:
+      containers:
+        - name: rifa
+          image: datara.azurecr.io/mauriciovelez-rifa:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rifa-secrets
+                  key: DATABASE_URL
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      imagePullSecrets:
+        - name: acr-secret

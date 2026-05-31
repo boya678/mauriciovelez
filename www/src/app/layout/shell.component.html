@@ -24,6 +24,14 @@
           {{ item.label }}
         </a>
       }
+      <a class="nav__link nav__link--embajador"
+         routerLink="/embajadores"
+         routerLinkActive="is-active"
+         (click)="closeMenu()">
+        <span class="material-icons-round">workspace_premium</span>
+        Embajadores de Oro
+        <span class="nav__badge nav__badge--gold">Únete</span>
+      </a>
       <a class="nav__link nav__link--software"
          [href]="softwareUrl" target="_blank" rel="noopener"
          (click)="closeMenu()">

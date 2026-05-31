@@ -7,6 +7,8 @@ export interface Cliente {
   id: string;
   nombre: string;
   celular: string;
+  codigo_vip: string | null;
+  tipo_cliente: number;
   correo: string | null;
   cc: string | null;
   saldo: number;
@@ -31,6 +33,12 @@ export interface LoginRequest {
   otp_code: string;
   correo?: string;
   cc?: string;
+}
+
+export interface ReferidoItem {
+  nombre: string;
+  celular: string;
+  fecha_registro: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -86,7 +94,14 @@ export class AuthService {
     );
   }
 
-  updateMisDatos(data: { nombre: string; celular: string; correo?: string | null; cc?: string | null; fecha_nacimiento?: string | null }): Observable<LoginResponse> {
+  getMisReferidos(mes?: string): Observable<ReferidoItem[]> {
+    const options = mes
+      ? { headers: this.authHeaders(), params: { mes } }
+      : { headers: this.authHeaders() };
+    return this.http.get<ReferidoItem[]>(`${environment.apiUrl}/auth/mis-referidos`, options);
+  }
+
+  updateMisDatos(data: { nombre: string; celular: string; correo?: string | null; cc?: string | null; fecha_nacimiento?: string | null; departamento?: string | null; ciudad?: string | null; barrio?: string | null }): Observable<LoginResponse> {
     return this.http
       .put<LoginResponse>(`${environment.apiUrl}/auth/mis-datos`, data, { headers: this.authHeaders() })
       .pipe(

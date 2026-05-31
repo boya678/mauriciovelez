@@ -31,6 +31,13 @@ export const routes: Routes = [
             m => m.MisDatosComponent
           ),
       },
+      {
+        path: 'mis-referidos',
+        loadComponent: () =>
+          import('./features/portal/referidos/referidos.component').then(
+            m => m.ReferidosComponent
+          ),
+      },
     ],
   },
   {

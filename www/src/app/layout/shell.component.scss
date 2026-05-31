@@ -112,6 +112,22 @@
         color: var(--text);
       }
     }
+
+    &--embajador {
+      margin-left: .35rem;
+      color: var(--gold);
+      background: rgba(212,175,55,.10);
+      border: 1px solid rgba(212,175,55,.3);
+      font-weight: 600;
+
+      .material-icons-round { color: var(--gold); opacity: 1; }
+
+      &:hover {
+        background: rgba(212,175,55,.20);
+        border-color: var(--gold);
+        color: var(--gold);
+      }
+    }
   }
 
   &__badge {
@@ -124,6 +140,11 @@
     text-transform: uppercase;
     color: #0A0E1A;
     background: var(--gold);
+
+    &--gold {
+      background: var(--gold);
+      color: #0A0E1A;
+    }
   }
 
   &__cta {
@@ -194,7 +215,8 @@
       justify-content: flex-start;
     }
     &__cta { margin: .5rem 0 0; }
-    &__link--software {
+    &__link--software,
+    &__link--embajador {
       margin: .5rem 0 0;
       width: 100%;
       justify-content: flex-start;

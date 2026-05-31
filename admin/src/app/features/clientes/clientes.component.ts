@@ -1,9 +1,10 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
 import { ClientesService, Cliente } from '../../core/services/clientes.service';
 import { AuthService } from '../../core/services/auth.service';
+import { COLOMBIA_DATA } from '../../core/data/colombia.data';
 
 @Component({
   selector: 'app-clientes',
@@ -45,6 +46,16 @@ export class ClientesComponent implements OnInit {
     { v: 10, n: 'Octubre' }, { v: 11, n: 'Noviembre' }, { v: 12, n: 'Diciembre' },
   ];
   anios = Array.from({ length: 91 }, (_, i) => new Date().getFullYear() - 1 - i);
+
+  // ── Datos Colombia ───────────────────────────────────────────
+  readonly departamentos = COLOMBIA_DATA.map(d => d.dep);
+  private createDepSig = signal('');
+  createCiudades = computed(() => COLOMBIA_DATA.find(d => d.dep === this.createDepSig())?.ciudades ?? []);
+  private editDepSig = signal('');
+  editCiudades = computed(() => COLOMBIA_DATA.find(d => d.dep === this.editDepSig())?.ciudades ?? []);
+
+  onCreateDepChange() { this.createDepSig.set(this.createForm.departamento ?? ''); this.createForm.ciudad = ''; }
+  onEditDepChange() { this.editDepSig.set(this.editForm.departamento ?? ''); this.editForm.ciudad = ''; }
 
   private search$ = new Subject<string>();
 
@@ -98,12 +109,14 @@ export class ClientesComponent implements OnInit {
     } else {
       this.editBdDia = 0; this.editBdMes = 0; this.editBdAnio = 0;
     }
+    this.editDepSig.set(c.departamento ?? '');
     this.editError.set(null);
   }
 
   openCreate() {
-    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, codigo_vip: '', enabled: true, tipo_cliente: 1, departamento: '', ciudad: '', barrio: '' };
+    this.createForm = { nombre: '', celular: '', correo: '', cc: '', saldo: 0, vip: false, enabled: true, tipo_cliente: 1, departamento: '', ciudad: '', barrio: '' };
     this.createBdDia = 0; this.createBdMes = 0; this.createBdAnio = 0;
+    this.createDepSig.set('');
     this.createError.set(null);
     this.showCreate = true;
   }
@@ -144,10 +157,6 @@ export class ClientesComponent implements OnInit {
 
   saveCreate() {
     this.createError.set(null);
-    if (this.createForm.vip && !this.createForm.codigo_vip?.trim()) {
-      this.createError.set('El código es obligatorio cuando el cliente es VIP');
-      return;
-    }
     const payload = { ...this.createForm, fecha_nacimiento: this.composeFecha(this.createBdDia, this.createBdMes, this.createBdAnio) };
     this.svc.create(payload).subscribe({
       next: () => { this.showCreate = false; this.load(); },
@@ -165,11 +174,8 @@ export class ClientesComponent implements OnInit {
     if (this.editTarget.vip) {
       this.editForm.vip = true;
     }
-    if (this.editForm.vip && !this.editForm.codigo_vip?.trim()) {
-      this.editError.set('El código es obligatorio cuando el cliente es VIP');
-      return;
-    }
-    const payload = { ...this.editForm, fecha_nacimiento: this.composeFecha(this.editBdDia, this.editBdMes, this.editBdAnio) };
+    const { codigo_vip: _cv, ...formData } = this.editForm;
+    const payload = { ...formData, fecha_nacimiento: this.composeFecha(this.editBdDia, this.editBdMes, this.editBdAnio) };
     this.svc.update(this.editTarget.id, payload).subscribe({
       next: () => { this.editTarget = null; this.load(); },
       error: (err) => {
@@ -200,10 +206,4 @@ export class ClientesComponent implements OnInit {
     });
   }
 
-  generateCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    this.editForm.codigo_vip = Array.from({ length: 8 }, () =>
-      chars[Math.floor(Math.random() * chars.length)]
-    ).join('');
-  }
 }

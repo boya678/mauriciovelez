@@ -1,0 +1,79 @@
+<div class="referidos-page">
+
+  <div class="summary-grid">
+    <div class="stat-card">
+      <span class="material-icons-round card-icon">account_balance_wallet</span>
+      <div class="card-body">
+        <span class="card-label">Saldo disponible</span>
+        <span class="card-value gold-text">{{ saldoFmt }}</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <span class="material-icons-round card-icon">group</span>
+      <div class="card-body">
+        <span class="card-label">Referidos en vista</span>
+        <span class="card-value">{{ referidos().length }}</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <span class="material-icons-round card-icon">confirmation_number</span>
+      <div class="card-body">
+        <span class="card-label">Mi código VIP</span>
+        <span class="card-value codigo">{{ cliente()?.codigo_vip ?? '—' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="filtro-bar">
+    <label class="filtro-label">
+      <span class="material-icons-round">calendar_month</span>
+      Filtrar por mes
+    </label>
+    <select [(ngModel)]="mesSeleccionado" (ngModelChange)="filtrarMes()">
+      @for (m of meses; track m.value) {
+        <option [value]="m.value">{{ m.label }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="table-container">
+    @if (loading()) {
+      <div class="state-center">
+        <span class="spinner"></span>
+        <span>Cargando...</span>
+      </div>
+    } @else if (error()) {
+      <div class="state-center error">
+        <span class="material-icons-round">error_outline</span>
+        {{ error() }}
+      </div>
+    } @else if (referidos().length === 0) {
+      <div class="state-center empty">
+        <span class="material-icons-round">person_search</span>
+        <span>Aún no tienes referidos en este período</span>
+      </div>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Celular</th>
+            <th>Fecha de registro</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of referidos(); track r.celular) {
+            <tr>
+              <td>{{ r.nombre }}</td>
+              <td>{{ r.celular }}</td>
+              <td>{{ fechaFmt(r.fecha_registro) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+</div>

@@ -154,7 +154,7 @@ export class LoginComponent implements OnInit {
   }
 
   private handleLoginSuccess(res: any): void {
-    if (res.cliente.vip) {
+    if (res.cliente.vip || res.cliente.codigo_vip) {
       this.pendingClienteId = res.cliente.id;
       this.vipCode = '';
       this.vipError.set('');
@@ -231,7 +231,7 @@ export class LoginComponent implements OnInit {
 
   submitVipCode(): void {
     if (!this.vipCode.trim()) {
-      this.vipError.set('Ingresa tu código VIP');
+      this.vipError.set('Ingresa tu código');
       return;
     }
     this.vipLoading.set(true);

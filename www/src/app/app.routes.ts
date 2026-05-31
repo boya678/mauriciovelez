@@ -32,6 +32,12 @@ export const routes: Routes = [
           import('./pages/terminos/terminos.component').then((m) => m.TerminosComponent),
         title: 'Términos y Condiciones — Mauricio Vélez Numerólogo',
       },
+      {
+        path: 'embajadores',
+        loadComponent: () =>
+          import('./pages/embajadores/embajadores.component').then((m) => m.EmbajadoresComponent),
+        title: 'Embajadores de Oro — Mauricio Vélez Numerólogo',
+      },
     ],
   },
   { path: '**', redirectTo: '' },

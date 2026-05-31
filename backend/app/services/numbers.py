@@ -57,6 +57,12 @@ def notificar_nuevo_numero_free(celular: str, numero: str, valid_until: date) ->
     push("nuevo_numero_free", celular, {"numero": numero, "valid_until": valid_until})
 
 
+def notificar_codigo_asignado(celular: str, tipo_cliente: int, codigo_vip: str) -> None:
+    """Encola notificación WhatsApp con el código asignado (tipo 1 = VIP, tipo 3 = Embajador)."""
+    from app.services.notification_queue import push
+    push("codigo_cliente", celular, {"tipo_cliente": tipo_cliente, "codigo_vip": codigo_vip})
+
+
 def assign_number(db: Session, id_user: uuid.UUID, num_type: str) -> NumberUser:
     """
     Asigna un número del pool al usuario para el tipo dado respetando ciclos fijos.

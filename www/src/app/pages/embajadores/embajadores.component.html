@@ -1,0 +1,273 @@
+<!-- HERO -->
+<section class="emb-hero">
+  <div class="container emb-hero__inner">
+    <div class="emb-hero__badge">
+      <span class="material-icons-round">workspace_premium</span>
+      Programa exclusivo
+    </div>
+    <h1 class="emb-hero__title">
+      Embajadores <span class="grad">de Oro</span>
+    </h1>
+    <p class="emb-hero__sub">
+      Sé el referente numérico de tu barrio, ciudad o red. Comparte el método de
+      <strong>Mauricio Vélez</strong> y genera ingresos reales ayudando a otros a
+      dejar de adivinar y empezar a analizar.
+    </p>
+    <div class="emb-hero__cta">
+      <a href="#registro-embajador" class="btn btn--gold-solid">
+        <span class="material-icons-round">person_add</span>
+        Registrarme como Embajador
+      </a>
+      <a [href]="portalLoginUrl" rel="noopener" class="btn btn--ghost">
+        <span class="material-icons-round">login</span>
+        Ya tengo código
+      </a>
+      <a routerLink="/" class="btn btn--ghost">
+        <span class="material-icons-round">arrow_back</span>
+        Volver al inicio
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- QUÉ ES -->
+<section class="block">
+  <div class="container">
+    <div class="emb-intro card">
+      <div class="emb-intro__icon">
+        <span class="material-icons-round">stars</span>
+      </div>
+      <div class="emb-intro__body">
+        <h2 class="section-title">¿Qué es el programa de Embajadores de Oro?</h2>
+        <p>
+          El programa de Embajadores de Oro te permite convertirte en el punto de referencia
+          numerológico en tu comunidad. Recibes acceso a un portal exclusivo donde gestionas
+          tus referidos, sigues tus comisiones en tiempo real y accedes al material de
+          Mauricio Vélez para compartir con tu red.
+        </p>
+        <p>
+          No necesitas experiencia previa. Solo necesitas creer en el poder del análisis
+          numérico y querer compartirlo — nosotros ponemos el resto.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFICIOS -->
+<section class="block">
+  <div class="container">
+    <h2 class="section-title tc">Beneficios de ser Embajador</h2>
+    <div class="emb-grid">
+      @for (b of beneficios; track b.titulo) {
+        <div class="emb-card card">
+          <span class="material-icons-round emb-card__icon">{{ b.icon }}</span>
+          <h3 class="emb-card__title">{{ b.titulo }}</h3>
+          <p class="emb-card__desc">{{ b.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- REGISTRO -->
+<section id="registro-embajador" class="block">
+  <div class="container">
+    <div class="emb-registro">
+      <div class="emb-registro__intro card">
+        <span class="eyebrow">Registro oficial</span>
+        <h2 class="section-title">Crea tu cuenta de Embajador de Oro</h2>
+        <p>
+          Completa tus datos, valida el código que te enviamos por WhatsApp y te asignaremos
+          tu código personal de embajador para entrar al portal.
+        </p>
+        <ul class="emb-registro__checklist">
+          <li>Validación por WhatsApp en dos pasos.</li>
+          <li>Asignación inmediata de tu código de embajador.</li>
+          <li>Acceso posterior al portal con celular + código.</li>
+        </ul>
+        <div class="emb-registro__portal-note">
+          <span class="material-icons-round">info</span>
+          <p>
+            Si ya tienes tu código, no necesitas registrarte de nuevo.
+            <a [href]="portalLoginUrl" rel="noopener">Ingresa aquí al portal de aliados</a>.
+          </p>
+        </div>
+      </div>
+
+      <div class="registro-card card">
+        <div class="brand">
+          <span class="brand-icon">♦</span>
+          <span class="brand-title gold-text">EMBAJADORES DE ORO</span>
+          <span class="brand-sub">Mauricio Vélez · Numerólogo</span>
+        </div>
+
+        @if (step() !== 3) {
+          <div class="stepper">
+            <div class="step-item" [class.active]="step() === 1" [class.done]="step() > 1">
+              <span class="step-num">1</span>
+              <span class="step-label">Tus datos</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step-item" [class.active]="step() === 2" [class.done]="step() > 2">
+              <span class="step-num">2</span>
+              <span class="step-label">Verificación</span>
+            </div>
+          </div>
+        }
+
+        @if (step() === 1) {
+          <div class="field">
+            <label for="nombre">Nombre completo *</label>
+            <input id="nombre" type="text" [(ngModel)]="nombre" placeholder="Ej: María Pérez" />
+          </div>
+
+          <div class="field-row">
+            <div class="field field-pais">
+              <label for="pais">País</label>
+              <input id="pais" type="text" [(ngModel)]="codigoPais" placeholder="57" maxlength="4" />
+            </div>
+            <div class="field field-cel">
+              <label for="celular">Celular (WhatsApp) *</label>
+              <input id="celular" type="tel" [(ngModel)]="celular" placeholder="3001234567" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="correo">Correo electrónico</label>
+            <input id="correo" type="email" [(ngModel)]="correo" placeholder="correo@ejemplo.com" />
+          </div>
+
+          <div class="field">
+            <label for="cc">Cédula / Documento</label>
+            <input id="cc" type="text" [(ngModel)]="cc" placeholder="Número de documento" />
+          </div>
+
+          <div class="field-row">
+            <div class="field field-half">
+              <label for="departamento">Departamento</label>
+              <select id="departamento" [(ngModel)]="departamento" (ngModelChange)="onDepartamentoChange()">
+                <option value="">Selecciona...</option>
+                @for (dep of departamentos; track dep) {
+                  <option [value]="dep">{{ dep }}</option>
+                }
+              </select>
+            </div>
+            <div class="field field-half">
+              <label for="ciudad">Ciudad / Municipio</label>
+              <select id="ciudad" [(ngModel)]="ciudad" [disabled]="!departamento">
+                <option value="">Selecciona...</option>
+                @for (c of ciudadesDisponibles(); track c) {
+                  <option [value]="c">{{ c }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="barrio">Barrio / Vereda</label>
+            <input id="barrio" type="text" [(ngModel)]="barrio" placeholder="Ej: El Poblado" />
+          </div>
+
+          @if (errorMsg()) {
+            <div class="error-msg" role="alert">{{ errorMsg() }}</div>
+          }
+
+          <button class="btn-primary" (click)="enviarCodigo()" [disabled]="loading()">
+            @if (loading()) {
+              <span class="spinner"></span>
+            } @else {
+              Enviar código de verificación
+            }
+          </button>
+
+          <p class="footer-link">
+            ¿Ya tienes cuenta?
+            <a [href]="portalLoginUrl" rel="noopener">Inicia sesión en el portal</a>
+          </p>
+        }
+
+        @if (step() === 2) {
+          @if (successMsg()) {
+            <div class="success-msg">{{ successMsg() }}</div>
+          }
+
+          <p class="otp-hint">
+            Ingresa el código de 6 dígitos que recibiste por WhatsApp.
+          </p>
+
+          <div class="field">
+            <label for="otp">Código de verificación</label>
+            <input
+              id="otp"
+              type="text"
+              inputmode="numeric"
+              [(ngModel)]="otpCode"
+              placeholder="000000"
+              maxlength="6"
+              class="otp-input"
+              (keyup.enter)="confirmar()"
+            />
+          </div>
+
+          @if (errorMsg()) {
+            <div class="error-msg" role="alert">{{ errorMsg() }}</div>
+          }
+
+          <button class="btn-primary" (click)="confirmar()" [disabled]="loading()">
+            @if (loading()) {
+              <span class="spinner"></span>
+            } @else {
+              Confirmar y crear cuenta
+            }
+          </button>
+
+          <button class="btn-back" (click)="volverPaso1()" [disabled]="loading()">
+            ← Volver
+          </button>
+        }
+
+        @if (step() === 3) {
+          <div class="bienvenida">
+            <div class="bienvenida-icon">🏆</div>
+            <h2 class="bienvenida-title">¡Ya eres Embajador de Oro!</h2>
+            <p class="bienvenida-sub">
+              Este es tu código personal. Guárdalo: lo necesitas para iniciar sesión en el portal.
+            </p>
+
+            <div class="codigo-badge">
+              <span class="codigo-label">Tu código de aliado</span>
+              <span class="codigo-valor">{{ codigoAsignado() }}</span>
+            </div>
+
+            <p class="bienvenida-hint">
+              Entra al portal con tu celular y este código para gestionar tus referidos.
+            </p>
+
+            <a class="btn-primary" [href]="portalLoginUrl" rel="noopener">
+              Ir al portal de aliados →
+            </a>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="block">
+  <div class="container">
+    <div class="emb-cta card">
+      <span class="material-icons-round emb-cta__icon">workspace_premium</span>
+      <h2 class="emb-cta__title">¿Ya eres embajador?</h2>
+      <p class="emb-cta__sub">
+        Si ya completaste tu registro y tienes tu código, entra al portal para revisar
+        tus referidos y mantener actualizados tus datos.
+      </p>
+      <a [href]="portalLoginUrl" rel="noopener" class="btn btn--gold-solid">
+        <span class="material-icons-round">login</span>
+        Ir al Portal de Aliados
+      </a>
+    </div>
+  </div>
+</section>

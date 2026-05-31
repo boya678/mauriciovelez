@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService, Cliente } from '../../../core/services/auth.service';
+import { COLOMBIA_DATA } from '../../../core/data/colombia.data';
 
 @Component({
   selector: 'app-mis-datos',
@@ -19,6 +20,21 @@ export class MisDatosComponent implements OnInit {
   bdDia = 0;
   bdMes = 0;
   bdAnio = 0;
+  departamento = '';
+  ciudad = '';
+  barrio = '';
+
+  // ── Datos Colombia ───────────────────────────────────────────
+  readonly departamentos = COLOMBIA_DATA.map(d => d.dep);
+  private departamentoSig = signal('');
+  ciudadesDisponibles = computed(() =>
+    COLOMBIA_DATA.find(d => d.dep === this.departamentoSig())?.ciudades ?? []
+  );
+
+  onDepartamentoChange(): void {
+    this.departamentoSig.set(this.departamento);
+    this.ciudad = '';
+  }
 
   meses = [
     { v: 1, n: 'Enero' }, { v: 2, n: 'Febrero' }, { v: 3, n: 'Marzo' },
@@ -48,7 +64,7 @@ export class MisDatosComponent implements OnInit {
 
   ngOnInit() {
     const c = this.auth.getCliente();
-    if (!c?.vip) {
+    if (!c?.codigo_vip) {
       this.router.navigate(['/portal/numerologia']);
       return;
     }
@@ -60,6 +76,10 @@ export class MisDatosComponent implements OnInit {
       const [ay, am, ad] = c.fecha_nacimiento.split('-').map(Number);
       this.bdAnio = ay; this.bdMes = am; this.bdDia = ad;
     }
+    this.departamento = (c as any).departamento ?? '';
+    this.departamentoSig.set(this.departamento);
+    this.ciudad = (c as any).ciudad ?? '';
+    this.barrio = (c as any).barrio ?? '';
   }
 
   submit(form: NgForm) {
@@ -78,6 +98,9 @@ export class MisDatosComponent implements OnInit {
       correo: this.correo.trim() || null,
       cc: this.cc.trim() || null,
       fecha_nacimiento: fechaNacimiento,
+      departamento: this.departamento || null,
+      ciudad: this.ciudad || null,
+      barrio: this.barrio.trim() || null,
     }).subscribe({
       next: () => {
         this.saving = false;

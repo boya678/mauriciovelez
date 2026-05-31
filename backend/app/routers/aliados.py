@@ -10,6 +10,7 @@ from app.core.security import create_access_token, get_current_user
 from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.referido import Referido
+from app.models.suscripcion import Suscripcion
 from app.routers.auth import (
     OTP_TTL_MINUTES,
     _enviar_whatsapp_otp,
@@ -57,12 +58,32 @@ class RegistroEmbajadorRequest(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────
 
-def _check_aliado(cliente: Cliente) -> None:
-    if cliente.tipo_cliente not in (2, 3) or not cliente.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso restringido a aliados tipo 2 o 3",
+def _check_aliado(cliente: Cliente, db: Optional[Session] = None) -> None:
+    """Permite el acceso a aliados tipo 2/3 o usuarios VIP activos."""
+    if not cliente.enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta deshabilitada")
+    es_aliado = cliente.tipo_cliente in (2, 3)
+    if es_aliado:
+        return
+    # Para VIP: verificar que tiene al menos una suscripción activa vigente
+    if cliente.vip and db is not None:
+        now = datetime.now(timezone.utc)
+        tiene_suscripcion = (
+            db.query(Suscripcion)
+            .filter(
+                Suscripcion.cliente_id == cliente.id,
+                Suscripcion.activa.is_(True),
+                Suscripcion.fin >= now,
+            )
+            .first()
+            is not None
         )
+        if tiene_suscripcion:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Acceso restringido a aliados activos o usuarios VIP con suscripción vigente",
+    )
 
 
 def _aliado_dict(c: Cliente) -> dict:
@@ -73,6 +94,7 @@ def _aliado_dict(c: Cliente) -> dict:
         "saldo": float(c.saldo),
         "codigo_vip": c.codigo_vip,
         "tipo_cliente": c.tipo_cliente,
+        "vip": c.vip,
         "fecha_nacimiento": c.fecha_nacimiento.isoformat() if c.fecha_nacimiento else None,
         "correo": c.correo,
         "cc": c.cc,
@@ -86,13 +108,12 @@ def _aliado_dict(c: Cliente) -> dict:
 
 @router.post("/login", status_code=200)
 def aliado_login(payload: AliadoLoginRequest, db: Session = Depends(get_db)):
-    """Login para aliados tipo 2 y 3. Autentica con celular + codigo_vip propio."""
+    """Login para aliados tipo 2/3 y usuarios VIP activos. Autentica con celular + codigo_vip."""
     cliente = (
         db.query(Cliente)
         .filter(
             Cliente.celular == payload.celular,
             Cliente.codigo_vip == payload.codigo_vip,
-            Cliente.tipo_cliente.in_([2, 3]),
             Cliente.enabled.is_(True),
         )
         .first()
@@ -100,8 +121,31 @@ def aliado_login(payload: AliadoLoginRequest, db: Session = Depends(get_db)):
     if not cliente:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas o no tienes acceso de aliado",
+            detail="Credenciales inválidas",
         )
+
+    # Verificar acceso: aliado tipo 2/3 O usuario VIP con suscripción vigente
+    es_aliado = cliente.tipo_cliente in (2, 3)
+    es_vip_activo = False
+    if cliente.vip:
+        now = datetime.now(timezone.utc)
+        es_vip_activo = (
+            db.query(Suscripcion)
+            .filter(
+                Suscripcion.cliente_id == cliente.id,
+                Suscripcion.activa.is_(True),
+                Suscripcion.fin >= now,
+            )
+            .first()
+            is not None
+        )
+
+    if not (es_aliado or es_vip_activo):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes acceso. Debes ser aliado activo o usuario VIP con suscripción vigente.",
+        )
+
     token = create_access_token(str(cliente.id))
     return {
         "access_token": token,
@@ -111,9 +155,9 @@ def aliado_login(payload: AliadoLoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/perfil", status_code=200)
-def get_perfil(current_user: Cliente = Depends(get_current_user)):
-    """Retorna el perfil del aliado autenticado."""
-    _check_aliado(current_user)
+def get_perfil(current_user: Cliente = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Retorna el perfil del aliado o VIP autenticado."""
+    _check_aliado(current_user, db)
     return _aliado_dict(current_user)
 
 
@@ -123,8 +167,8 @@ def update_perfil(
     current_user: Cliente = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualiza nombre, correo, cc y fecha de nacimiento del aliado."""
-    _check_aliado(current_user)
+    """Actualiza nombre, correo, cc y fecha de nacimiento del aliado o VIP."""
+    _check_aliado(current_user, db)
 
     current_user.nombre = data.nombre
     current_user.correo = data.correo or None
@@ -152,9 +196,9 @@ def get_mis_referidos(
     current_user: Cliente = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Lista de clientes que se registraron usando el código de este aliado.
+    """Lista de clientes que se registraron usando el código de este aliado/VIP.
     Parámetro opcional: mes=YYYY-MM para filtrar por mes."""
-    _check_aliado(current_user)
+    _check_aliado(current_user, db)
 
     query = (
         db.query(Referido, Cliente)

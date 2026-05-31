@@ -105,10 +105,10 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         _send_template(numero_dest, settings.WHATSAPP_VENCIMIENTO_VIP, [])
 
     elif type == "codigo_cliente":
-        texto = f"{params['tipo_cliente']} codigo asignado {params['codigo_vip']}"
+        codigo = params["codigo_vip"]
         _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_CODIGO, [
             {"type": "body", "parameters": [
-                {"type": "text", "text": texto},
+                {"type": "text", "text": codigo},
             ]},
         ])
 

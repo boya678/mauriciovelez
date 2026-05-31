@@ -28,13 +28,22 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
   showDisabledModal = signal(false);
   private subs = new Subscription();
 
-  menuItems: MenuItem[] = [
-    { label: 'Numerología', icon: 'auto_awesome', route: '/portal/numerologia' },
-  ];
+  get menuItems(): MenuItem[] {
+    if (this.cliente?.tipo_cliente === 1) {
+      return [{ label: 'Numerología', icon: 'auto_awesome', route: '/portal/numerologia' }];
+    }
+    return [];
+  }
 
   get vipMenuItems(): MenuItem[] {
-    if (!this.cliente?.vip) return [];
-    return [{ label: 'Mis Datos', icon: 'manage_accounts', route: '/portal/mis-datos' }];
+    const items: MenuItem[] = [];
+    if (this.cliente?.codigo_vip) {
+      items.push({ label: 'Mis Referidos', icon: 'group', route: '/portal/mis-referidos' });
+    }
+    if (this.cliente?.codigo_vip) {
+      items.push({ label: 'Mis Datos', icon: 'manage_accounts', route: '/portal/mis-datos' });
+    }
+    return items;
   }
 
   constructor(

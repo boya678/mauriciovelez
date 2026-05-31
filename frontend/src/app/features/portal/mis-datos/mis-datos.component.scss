@@ -61,7 +61,7 @@
 
   .req { color: var(--accent-red, #f87171); }
 
-  input {
+  input, select {
     background: rgba(10, 0, 25, 0.65);
     border: 1px solid rgba(255, 215, 0, 0.18);
     border-radius: 8px;
@@ -69,6 +69,8 @@
     font-size: 0.95rem;
     padding: 0.65rem 0.9rem;
     transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+    box-sizing: border-box;
 
     &::placeholder { color: var(--text-secondary); opacity: 0.55; }
 
@@ -81,6 +83,18 @@
     &.ng-invalid.ng-touched {
       border-color: var(--accent-red, #f87171);
     }
+  }
+
+  select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ffd700' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    padding-right: 2.5rem;
+    option { background: #0a0019; }
+
+    &:disabled { opacity: 0.45; cursor: not-allowed; }
   }
 }
 

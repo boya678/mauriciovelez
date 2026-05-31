@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sorteo — Mauricio Vélez Numerólogo</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Orbs de fondo decorativas -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb--1"></div>
+    <div class="orb orb--2"></div>
+    <div class="orb orb--3"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <span class="logo__icon">🎰</span>
+      <div>
+        <div class="logo__title">Mauricio Vélez Numerólogo</div>
+        <div class="logo__sub">Sorteo oficial de clientes</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido principal -->
+  <main class="main">
+    <div class="machine">
+      <div class="machine__title">SORTEO EN VIVO</div>
+      <p class="machine__sub" id="sub-text">
+        Haz clic en <strong>SORTEAR</strong> para seleccionar al ganador
+      </p>
+
+      <!-- Tambor / slot -->
+      <div class="drum-wrapper" aria-live="polite" aria-label="Nombre en sorteo">
+        <div class="drum-mask drum-mask--top"></div>
+        <div class="drum" id="drum">
+          <div class="drum__item" id="drum-current">Presiona SORTEAR</div>
+        </div>
+        <div class="drum-mask drum-mask--bottom"></div>
+        <div class="drum-line drum-line--top"></div>
+        <div class="drum-line drum-line--bottom"></div>
+      </div>
+
+      <!-- Contador -->
+      <div class="count-badge">
+        <span class="count-badge__dot"></span>
+        <span id="count-num">—</span> participantes registrados
+      </div>
+
+      <!-- Botón principal -->
+      <button class="btn-sortear" id="btn-sortear" disabled>
+        <span class="btn-sortear__icon">🎲</span>
+        <span id="btn-label">Cargando…</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- Overlay de contraseña (se muestra primero) -->
+  <div class="lock-overlay" id="lock-overlay">
+    <div class="lock-card">
+      <div class="lock-card__icon">🔐</div>
+      <div class="lock-card__title">Acceso restringido</div>
+      <p class="lock-card__sub">Ingresa la contraseña para continuar</p>
+      <form class="lock-form" id="lock-form" autocomplete="off">
+        <input
+          class="lock-input"
+          id="lock-input"
+          type="password"
+          placeholder="Contraseña"
+          required
+          autofocus
+        />
+        <div class="lock-error" id="lock-error"></div>
+        <button class="btn-sortear" type="submit" style="width:100%;justify-content:center;">
+          <span class="btn-sortear__icon">🔓</span>
+          <span>Entrar</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Overlay del ganador -->
+  <div class="winner-overlay" id="winner-overlay" role="dialog" aria-modal="true" aria-label="Ganador del sorteo">
+    <div class="confetti-layer" id="confetti-layer"></div>
+    <div class="winner-card" id="winner-card">
+      <div class="winner-card__trophy">🏆</div>
+      <div class="winner-card__tag">¡GANADOR!</div>
+      <div class="winner-card__name" id="winner-name"></div>
+      <div class="winner-card__divider"></div>
+      <div class="winner-card__code-label">Código VIP</div>
+      <div class="winner-card__code" id="winner-code"></div>
+      <button class="btn-nuevo" id="btn-nuevo">
+        🔄 &nbsp;Nuevo sorteo
+      </button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

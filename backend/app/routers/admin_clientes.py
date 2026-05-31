@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -19,7 +19,7 @@ from app.models.cliente import Cliente
 from app.models.suscripcion import Suscripcion
 from app.models.cuenta_vip import acumular_cuenta_vip
 from app.models.numbers_users import NumberUser
-from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
+from app.services.numbers import assign_number, notificar_codigo_asignado, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
 
 router = APIRouter(prefix="/admin/clientes", tags=["Admin Clientes"])
 
@@ -54,7 +54,6 @@ class ClienteUpdate(BaseModel):
     cc: Optional[str] = None
     saldo: Optional[float] = None
     vip: Optional[bool] = None
-    codigo_vip: Optional[str] = None
     enabled: Optional[bool] = None
     tipo_cliente: Optional[int] = None
     fecha_nacimiento: Optional[date] = None
@@ -62,7 +61,7 @@ class ClienteUpdate(BaseModel):
     ciudad: Optional[str] = None
     barrio: Optional[str] = None
 
-    @field_validator('correo', 'cc', 'codigo_vip', 'departamento', 'ciudad', 'barrio', mode='before')
+    @field_validator('correo', 'cc', 'departamento', 'ciudad', 'barrio', mode='before')
     @classmethod
     def empty_to_none(cls, v):
         return None if v == '' else v
@@ -76,7 +75,6 @@ class ClienteCreate(BaseModel):
     cc: Optional[str] = None
     saldo: float = 0
     vip: bool = False
-    codigo_vip: Optional[str] = None
     enabled: bool = True
     tipo_cliente: int = 1
     fecha_nacimiento: Optional[date] = None
@@ -128,6 +126,16 @@ def create_cliente(
     db: Session = Depends(get_db),
     user=Depends(require_admin),
 ):
+    # Auto-generate codigo_vip via sequence según tipo_cliente
+    if payload.tipo_cliente == 1:
+        _seq = db.execute(text("SELECT nextval('seq_vip_codigo')")).scalar()
+        auto_codigo_vip = f"{_seq:05d}"
+    elif payload.tipo_cliente == 3:
+        _seq = db.execute(text("SELECT nextval('seq_embajador_codigo')")).scalar()
+        auto_codigo_vip = f"E{_seq:05d}"
+    else:
+        auto_codigo_vip = None
+
     nuevo = Cliente(
         id=uuid.uuid4(),
         nombre=payload.nombre,
@@ -137,7 +145,7 @@ def create_cliente(
         cc=payload.cc or None,
         saldo=payload.saldo,
         vip=payload.vip,
-        codigo_vip=payload.codigo_vip or None,
+        codigo_vip=auto_codigo_vip,
         enabled=payload.enabled,
         tipo_cliente=payload.tipo_cliente,
         fecha_nacimiento=payload.fecha_nacimiento,
@@ -177,6 +185,8 @@ def create_cliente(
             notificar_nuevo_numero_free(celular_wp, free_number, free_valid_until)
         if payload.vip and payload.tipo_cliente == 1:
             notificar_nuevo_numero_vip(celular_wp, number_vip, valid_until_vip)
+        if auto_codigo_vip and payload.tipo_cliente in (1, 3):
+            notificar_codigo_asignado(celular_wp, payload.tipo_cliente, auto_codigo_vip)
         from app.core.live_events import publish_event
         publish_event("nuevo_cliente", {"nombre": nuevo.nombre})
     except IntegrityError as e:
@@ -300,6 +310,11 @@ def update_cliente(
 
         for key, val in changes.items():
             setattr(obj, key, val)
+
+        # Auto-assign codigo_vip si se activa VIP y aún no tiene código
+        if obj.vip and obj.tipo_cliente == 1 and obj.codigo_vip is None:
+            _seq = db.execute(text("SELECT nextval('seq_vip_codigo')")).scalar()
+            obj.codigo_vip = f"{_seq:05d}"
 
         # Si el cliente es (o acaba de ser marcado como) VIP, asegurar que tenga número VIP.
         # Solo aplica a tipo_cliente == 1 (clientes con números asignados).

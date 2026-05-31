@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { environment } from '../../../../environments/environment';
 
@@ -44,11 +45,16 @@ export class NumerologiaComponent implements OnInit {
   aciertos: AciertoCliente[] = [];
   loadingAciertos = true;
 
-  constructor(private authService: AuthService, private http: HttpClient) {
+  constructor(private authService: AuthService, private http: HttpClient, private router: Router) {
     this.clienteNombre = authService.getCliente()?.nombre ?? 'Visitante';
   }
 
   ngOnInit(): void {
+    const cliente = this.authService.getCliente();
+    if (cliente && cliente.tipo_cliente !== 1) {
+      this.router.navigate(['/portal/mis-referidos']);
+      return;
+    }
     const token = this.authService.getToken();
     const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 

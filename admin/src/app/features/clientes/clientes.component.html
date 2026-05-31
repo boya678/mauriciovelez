@@ -124,16 +124,27 @@
       </div>
       <div class="form-group">
         <label>Departamento</label>
-        <input type="text" [(ngModel)]="createForm.departamento" placeholder="Ej. Antioquia" />
+        <select [(ngModel)]="createForm.departamento" (ngModelChange)="onCreateDepChange()">
+          <option value="">-- Selecciona --</option>
+          @for (dep of departamentos; track dep) {
+            <option [value]="dep">{{ dep }}</option>
+          }
+        </select>
       </div>
       <div class="form-group">
         <label>Ciudad / Municipio</label>
-        <input type="text" [(ngModel)]="createForm.ciudad" placeholder="Ej. Medellín" />
+        <select [(ngModel)]="createForm.ciudad" [disabled]="!createForm.departamento">
+          <option value="">-- Selecciona --</option>
+          @for (c of createCiudades(); track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
       </div>
       <div class="form-group">
         <label>Barrio</label>
         <input type="text" [(ngModel)]="createForm.barrio" placeholder="Opcional" />
       </div>
+      <div class="form-group">
         <div class="date-split">
           <select [(ngModel)]="createBdAnio" (ngModelChange)="onCreateAnioChange()">
             <option [value]="0">Año</option>
@@ -174,10 +185,6 @@
           <input type="checkbox" [(ngModel)]="createForm.enabled" /> Habilitado
         </label>
       </div>
-      <div class="form-group">
-        <label>Código @if (createForm.vip) { <span class="required">*</span> }</label>
-        <input type="text" [(ngModel)]="createForm.codigo_vip" placeholder="Requerido si es VIP" [class.input-error]="createForm.vip && !createForm.codigo_vip?.trim()" />
-      </div>
       @if (createError()) {
         <p class="form-error">{{ createError() }}</p>
       }
@@ -212,16 +219,27 @@
       </div>
       <div class="form-group">
         <label>Departamento</label>
-        <input type="text" [(ngModel)]="editForm.departamento" placeholder="Ej. Antioquia" />
+        <select [(ngModel)]="editForm.departamento" (ngModelChange)="onEditDepChange()">
+          <option value="">-- Selecciona --</option>
+          @for (dep of departamentos; track dep) {
+            <option [value]="dep">{{ dep }}</option>
+          }
+        </select>
       </div>
       <div class="form-group">
         <label>Ciudad / Municipio</label>
-        <input type="text" [(ngModel)]="editForm.ciudad" placeholder="Ej. Medellín" />
+        <select [(ngModel)]="editForm.ciudad" [disabled]="!editForm.departamento">
+          <option value="">-- Selecciona --</option>
+          @for (c of editCiudades(); track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
       </div>
       <div class="form-group">
         <label>Barrio</label>
         <input type="text" [(ngModel)]="editForm.barrio" placeholder="Opcional" />
       </div>
+      <div class="form-group">
         <div class="date-split">
           <select [(ngModel)]="editBdAnio" (ngModelChange)="onEditAnioChange()">
             <option [value]="0">Año</option>
@@ -268,11 +286,9 @@
         </label>
       </div>
       <div class="form-group">
-        <label>Código @if (editForm.vip) { <span class="required">*</span> }</label>
-        <div class="input-with-btn">
-          <input type="text" [(ngModel)]="editForm.codigo_vip" placeholder="Requerido si es VIP" [class.input-error]="editForm.vip && !editForm.codigo_vip?.trim()" />
-          <button type="button" class="btn-ghost btn-sm" (click)="generateCode()">Generar</button>
-        </div>
+        <label>Código</label>
+        <input type="text" [value]="editTarget?.codigo_vip || ''" readonly class="input-readonly" />
+        <span class="hint-locked"><span class="material-icons-round" style="font-size:0.85rem;vertical-align:middle">lock</span> El código se asigna automáticamente</span>
       </div>
       @if (editError()) {
         <p class="form-error">{{ editError() }}</p>

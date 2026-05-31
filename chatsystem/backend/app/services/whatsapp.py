@@ -165,6 +165,12 @@ def parse_incoming_message(payload: dict) -> list[dict]:
                         content = btn.get("id", "")
                     else:
                         content = f"[{msg_type}]"
+                elif msg_type == "button":
+                    # Template quick-reply button. Meta sends:
+                    #   { "type": "button", "button": { "text": "Sí", "payload": "..." } }
+                    btn = msg.get("button", {})
+                    content = btn.get("text") or btn.get("payload") or "[button]"
+                    msg_type = "text"
                 else:
                     content = f"[{msg_type}]"
 

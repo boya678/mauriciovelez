@@ -4,12 +4,14 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import extract
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import create_access_token, get_current_user
 from app.database import get_db
 from app.models.cliente import Cliente
+from app.models.referido import Referido
 from app.models.suscripcion import Suscripcion
 from app.schemas.cliente import (
     OtpRequest,
@@ -26,6 +28,12 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 class ReferidoRequest(BaseModel):
     codigo: str = Field(..., min_length=1, max_length=50)
+
+
+class ReferidoItemResponse(BaseModel):
+    nombre: str
+    celular: str
+    fecha_registro: str | None
 # ── OTP store en memoria: {celular: (codigo, expira_en)} ──────
 _otp_store: dict[str, tuple[str, datetime]] = {}
 OTP_TTL_MINUTES = 5
@@ -143,10 +151,14 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/verify-vip")
 def verify_vip(payload: VipVerifyRequest, db: Session = Depends(get_db)):
     cliente = db.query(Cliente).filter(Cliente.id == payload.cliente_id).first()
-    if not cliente or not cliente.vip:
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    # Permite VIP clientes y embajadores (tipo_cliente 2/3 con codigo_vip)
+    tiene_acceso = cliente.vip or (cliente.tipo_cliente in (2, 3) and cliente.codigo_vip)
+    if not tiene_acceso:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     if not cliente.codigo_vip or cliente.codigo_vip != payload.codigo:
-        raise HTTPException(status_code=400, detail="C\u00f3digo VIP incorrecto")
+        raise HTTPException(status_code=400, detail="C\u00f3digo incorrecto")
     return {"ok": True}
 
 
@@ -178,8 +190,8 @@ def actualizar_mis_datos(
     cliente: Cliente = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not cliente.vip:
-        raise HTTPException(status_code=403, detail="Solo clientes VIP pueden editar sus datos")
+    if not cliente.codigo_vip:
+        raise HTTPException(status_code=403, detail="Solo usuarios con código pueden editar sus datos")
 
     # Verificar que el celular no pertenezca a otro cliente
     if payload.celular != cliente.celular:
@@ -195,6 +207,9 @@ def actualizar_mis_datos(
     cliente.correo = payload.correo
     cliente.cc = payload.cc
     cliente.fecha_nacimiento = payload.fecha_nacimiento
+    cliente.departamento = payload.departamento
+    cliente.ciudad = payload.ciudad
+    cliente.barrio = payload.barrio
     db.commit()
     db.refresh(cliente)
 
@@ -266,3 +281,39 @@ def guardar_referido(
     _enviar_whatsapp_referido(referente.celular, current_user.nombre, current_user.celular)
 
     return {'ok': True}
+
+
+@router.get('/mis-referidos', response_model=list[ReferidoItemResponse], status_code=200)
+def get_mis_referidos(
+    mes: str | None = None,
+    current_user: Cliente = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.codigo_vip:
+        raise HTTPException(status_code=403, detail='Esta cuenta no tiene código VIP')
+
+    query = (
+        db.query(Referido, Cliente)
+        .join(Cliente, Cliente.id == Referido.referido_id)
+        .filter(Referido.referente_id == current_user.id)
+    )
+
+    if mes:
+        try:
+            anio, mes_num = map(int, mes.split('-'))
+            query = query.filter(
+                extract('year', Referido.fecha_registro) == anio,
+                extract('month', Referido.fecha_registro) == mes_num,
+            )
+        except (ValueError, AttributeError):
+            pass
+
+    rows = query.order_by(Referido.fecha_registro.desc()).all()
+    return [
+        ReferidoItemResponse(
+            nombre=cliente.nombre,
+            celular=cliente.celular,
+            fecha_registro=referido.fecha_registro.strftime('%Y-%m-%d') if referido.fecha_registro else None,
+        )
+        for referido, cliente in rows
+    ]
