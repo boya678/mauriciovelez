@@ -1,0 +1,117 @@
+<div class="rifa-page">
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab" [class.active]="tab() === 'activa'" (click)="setTab('activa')">
+      Rifa Actual
+    </button>
+    <button class="tab" [class.active]="tab() === 'historico'" (click)="setTab('historico')">
+      Historial
+    </button>
+  </div>
+
+  <!-- ── Rifa Activa ────────────────────────────────────────────────── -->
+  @if (tab() === 'activa') {
+    @if (loadingActiva()) {
+      <p class="loading">Cargando…</p>
+    } @else if (!rifaActiva()) {
+      <div class="empty-state">
+        <span class="material-icons-round">confirmation_number</span>
+        <p>No hay una rifa activa en este momento.</p>
+      </div>
+    } @else {
+      <div class="rifa-detalle">
+        @if (rifaActiva()!.tiene_imagen) {
+          <img class="rifa-img" [src]="imagenUrl(rifaActiva()!.id)" [alt]="rifaActiva()!.titulo" />
+        }
+        <div class="rifa-info">
+          <h2 class="rifa-titulo">{{ rifaActiva()!.titulo }}</h2>
+          @if (rifaActiva()!.descripcion) {
+            <p class="rifa-desc">{{ rifaActiva()!.descripcion }}</p>
+          }
+          <div class="rifa-meta">
+            <span>📅 {{ rifaActiva()!.fecha_inicio }} → {{ rifaActiva()!.fecha_fin }}</span>
+            <span>🎟️ {{ rifaActiva()!.total_boletas }} boletas asignadas</span>
+          </div>
+
+          @if (misBoletasActiva().length === 0) {
+            <div class="sin-boletas">
+              <p>Aún no tienes boletas en esta rifa. Renueva tu suscripción para participar.</p>
+            </div>
+          } @else {
+            <div class="mis-boletas-section">
+              <h3 class="section-title">Mis Boletas ({{ misBoletasActiva().length }})</h3>
+              <div class="boletas-grid">
+                @for (b of misBoletasActiva(); track b.numero) {
+                  <div class="boleta">
+                    {{ formatNum(b.numero, rifaActiva()!.seq_fin) }}
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ── Histórico ──────────────────────────────────────────────────── -->
+  @if (tab() === 'historico') {
+    @if (loadingHistorico()) {
+      <p class="loading">Cargando historial…</p>
+    } @else if (historico().length === 0) {
+      <div class="empty-state">
+        <span class="material-icons-round">history</span>
+        <p>No hay rifas finalizadas todavía.</p>
+      </div>
+    } @else {
+      <div class="historico-list">
+        @for (rifa of historico(); track rifa.id) {
+          <div class="hist-card">
+            <div class="hist-card__header" (click)="toggleHistorico(rifa)">
+              <div class="hist-title-wrap">
+                @if (rifa.tiene_imagen) {
+                  <img class="hist-thumb" [src]="imagenUrl(rifa.id)" [alt]="rifa.titulo" />
+                }
+                <div>
+                  <span class="hist-titulo">{{ rifa.titulo }}</span>
+                  <span class="hist-dates">{{ rifa.fecha_inicio }} → {{ rifa.fecha_fin }}</span>
+                </div>
+              </div>
+              <div class="hist-right">
+                @if (rifa.ganador_numero !== null) {
+                  <span class="winner-chip">
+                    🏆 {{ formatNum(rifa.ganador_numero, rifa.seq_fin) }}
+                  </span>
+                }
+                @if (yoGane(getMisBoletasHist(rifa.id))) {
+                  <span class="yo-gane-chip">¡Ganaste!</span>
+                }
+                <span class="expand-icon material-icons-round">
+                  {{ expandedId() === rifa.id ? 'expand_less' : 'expand_more' }}
+                </span>
+              </div>
+            </div>
+
+            @if (expandedId() === rifa.id) {
+              <div class="hist-card__body">
+                @if (getMisBoletasHist(rifa.id).length === 0) {
+                  <p class="sin-boletas-msg">No tuviste boletas en esta rifa.</p>
+                } @else {
+                  <h4>Mis boletas en esta rifa:</h4>
+                  <div class="boletas-grid">
+                    @for (b of getMisBoletasHist(rifa.id); track b.numero) {
+                      <div class="boleta" [class.ganadora]="b.es_ganadora">
+                        {{ formatNum(b.numero, rifa.seq_fin) }}
+                        @if (b.es_ganadora) { <span class="star">🏆</span> }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

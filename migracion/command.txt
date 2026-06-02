@@ -1,0 +1,2 @@
+python migrar.py --src "postgresql://postgres:Ardilla1*@transferiadb.postgres.database.azure.com:5432/portal" --dst "postgresql://postgres:Ardilla1*@dataradb.postgres.database.azure.com.postgres.database.azure.com:5432/portal"
+python migrar.py --src "postgresql://postgres:Ardilla1*@transferiadb.postgres.database.azure.com:5432/chat" --dst "postgresql://postgres:Ardilla1*@dataradb.postgres.database.azure.com.postgres.database.azure.com:5432/chat"

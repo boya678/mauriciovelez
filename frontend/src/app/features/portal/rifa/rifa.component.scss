@@ -1,0 +1,207 @@
+.rifa-page {
+  padding: 1.25rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────────
+.tabs {
+  display: flex;
+  gap: .25rem;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 1.5rem;
+}
+
+.tab {
+  padding: .6rem 1.4rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: .95rem;
+  font-weight: 500;
+  color: #666;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+
+  &.active {
+    color: #1976d2;
+    border-bottom-color: #1976d2;
+  }
+
+  &:hover:not(.active) { color: #333; }
+}
+
+// ── Estado vacío ───────────────────────────────────────────────────────────────
+.loading { color: #888; font-style: italic; padding: 2rem 0; text-align: center; }
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #aaa;
+
+  .material-icons-round { font-size: 3.5rem; margin-bottom: .75rem; }
+  p { font-size: 1rem; margin: 0; }
+}
+
+// ── Rifa activa ────────────────────────────────────────────────────────────────
+.rifa-detalle { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.rifa-img {
+  width: 100%;
+  border-radius: 12px;
+  max-height: 320px;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+}
+
+.rifa-titulo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 .4rem;
+}
+
+.rifa-desc { color: #555; font-size: .95rem; margin-bottom: .75rem; }
+
+.rifa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  font-size: .88rem;
+  color: #444;
+  margin-bottom: 1rem;
+}
+
+.sin-boletas {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  padding: .9rem 1.1rem;
+  color: #5d4037;
+  font-size: .92rem;
+}
+
+.mis-boletas-section { margin-top: .5rem; }
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: .75rem;
+  color: #333;
+}
+
+// ── Grid de boletas ────────────────────────────────────────────────────────────
+.boletas-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.boleta {
+  background: #e3f2fd;
+  color: #0d47a1;
+  border-radius: 8px;
+  padding: .45rem .75rem;
+  font-family: monospace;
+  font-size: .95rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  position: relative;
+
+  &.ganadora {
+    background: #fff9c4;
+    color: #b71c1c;
+    border: 2px solid #fbc02d;
+  }
+}
+
+.star { margin-left: .25rem; }
+
+// ── Histórico ──────────────────────────────────────────────────────────────────
+.historico-list { display: flex; flex-direction: column; gap: .75rem; }
+
+.hist-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .85rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    &:hover { background: #f7f7f7; }
+  }
+
+  &__body {
+    padding: .85rem 1rem;
+    border-top: 1px solid #eee;
+  }
+}
+
+.hist-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+.hist-thumb {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.hist-titulo {
+  display: block;
+  font-weight: 600;
+  font-size: .95rem;
+}
+
+.hist-dates {
+  display: block;
+  font-size: .8rem;
+  color: #777;
+  margin-top: .1rem;
+}
+
+.hist-right {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.winner-chip {
+  background: #fff9c4;
+  border: 1px solid #fbc02d;
+  color: #795548;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.yo-gane-chip {
+  background: #c8e6c9;
+  color: #1b5e20;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.expand-icon { color: #888; font-size: 1.3rem; }
+
+.sin-boletas-msg { color: #888; font-style: italic; font-size: .9rem; }
+
+h4 {
+  font-size: .9rem;
+  font-weight: 600;
+  margin: 0 0 .6rem;
+  color: #444;
+}

@@ -155,6 +155,11 @@ def renovar(
 
     acumular_cuenta_vip(db)
 
+    # Asignar boletas de rifa si hay una activa y el cliente aplica
+    if cliente:
+        from app.services.rifas import asignar_boletas_por_suscripcion
+        asignar_boletas_por_suscripcion(db, cliente, nueva.id)
+
     db.add(AuditLog(
         platform_user_id=user.id,
         usuario=user.usuario,

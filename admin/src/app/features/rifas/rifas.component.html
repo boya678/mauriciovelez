@@ -1,0 +1,240 @@
+<div class="page">
+  <!-- ── Encabezado ─────────────────────────────────────────────────── -->
+  <div class="page-header">
+    <h2 class="page-title">Rifas</h2>
+    <button class="btn btn-primary" (click)="openNew()">+ Nueva Rifa</button>
+  </div>
+
+  @if (loading()) {
+    <p class="loading-text">Cargando…</p>
+  }
+
+  <!-- ── Lista de rifas ─────────────────────────────────────────────── -->
+  <div class="rifas-grid">
+    @for (rifa of rifas(); track rifa.id) {
+      <div class="rifa-card" [class.finalizada]="rifa.estado === 'finalizada'">
+
+        <div class="rifa-card__header">
+          <span class="rifa-titulo">{{ rifa.titulo }}</span>
+          <span class="badge" [class.badge--activa]="rifa.estado === 'activa'"
+                              [class.badge--finalizada]="rifa.estado === 'finalizada'">
+            {{ rifa.estado }}
+          </span>
+        </div>
+
+        @if (rifa.tiene_imagen) {
+          <img class="rifa-img" [src]="imagenUrl(rifa.id)" alt="{{ rifa.titulo }}" />
+        }
+
+        <div class="rifa-card__body">
+          @if (rifa.descripcion) {
+            <p class="desc">{{ rifa.descripcion }}</p>
+          }
+          <div class="info-row">
+            <span class="label">Período</span>
+            <span>{{ rifa.fecha_inicio }} → {{ rifa.fecha_fin }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Rango</span>
+            <span>{{ rifa.seq_inicio }} – {{ rifa.seq_fin }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Boletas / renovación</span>
+            <span>{{ rifa.boletas_por_renovacion }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Boletas asignadas</span>
+            <span class="count">{{ rifa.total_boletas }}</span>
+          </div>
+          @if (rifa.solo_vip) {
+            <div class="badge-vip">Solo VIP</div>
+          }
+          @if (rifa.ganador_numero !== null) {
+            <div class="winner-badge">
+              🏆 Ganador: <strong>{{ formatNum(rifa.ganador_numero, rifa.seq_fin) }}</strong>
+            </div>
+          }
+        </div>
+
+        <div class="rifa-card__actions">
+          @if (rifa.estado === 'activa') {
+            <button class="btn btn-sm btn-outline" (click)="openEdit(rifa)">Editar</button>
+            <button class="btn btn-sm btn-outline" (click)="openGanador(rifa)">Registrar Ganador</button>
+            <button class="btn btn-sm btn-ghost" (click)="finalizar(rifa)">Finalizar</button>
+          }
+          <button class="btn btn-sm btn-outline"
+                  [class.active]="rifaSeleccionada?.id === rifa.id"
+                  (click)="verBoletas(rifa)">
+            Ver Boletas ({{ rifa.total_boletas }})
+          </button>
+        </div>
+
+        <!-- Panel de boletas (inline) -->
+        @if (rifaSeleccionada?.id === rifa.id) {
+          <div class="boletas-panel">
+            <div class="boletas-panel__header">
+              <span>Boletas asignadas — {{ boletasTotal }} total</span>
+              <div class="pagination">
+                <button class="btn btn-xs" (click)="prevPage()" [disabled]="boletasPage === 1">‹</button>
+                <span>{{ boletasPage }} / {{ totalPages }}</span>
+                <button class="btn btn-xs" (click)="nextPage()" [disabled]="boletasPage >= totalPages">›</button>
+              </div>
+            </div>
+
+            @if (loadingBoletas()) {
+              <p class="loading-text">Cargando boletas…</p>
+            } @else {
+              <table class="boletas-table">
+                <thead>
+                  <tr>
+                    <th>Número</th>
+                    <th>Cliente</th>
+                    <th>Celular</th>
+                    <th>Asignado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (b of boletas(); track b.id) {
+                    <tr [class.ganadora]="rifaSeleccionada!.ganador_numero === b.numero">
+                      <td class="numero">{{ formatNum(b.numero, rifaSeleccionada!.seq_fin) }}</td>
+                      <td>{{ b.nombre }}</td>
+                      <td>{{ b.celular }}</td>
+                      <td>{{ b.asignado_en | date:'dd/MM/yy HH:mm':'America/Bogota' }}</td>
+                    </tr>
+                  }
+                  @if (boletas().length === 0) {
+                    <tr><td colspan="4" class="empty">Sin boletas asignadas</td></tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+        }
+
+      </div>
+    }
+
+    @if (rifas().length === 0 && !loading()) {
+      <p class="empty-state">No hay rifas registradas. Crea la primera.</p>
+    }
+  </div>
+</div>
+
+<!-- ── Modal Crear / Editar ──────────────────────────────────────────── -->
+@if (showModal()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editId ? 'Editar Rifa' : 'Nueva Rifa' }}</h3>
+        <button class="btn-close" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        @if (errorMsg()) {
+          <div class="alert-error">{{ errorMsg() }}</div>
+        }
+
+        <div class="form-grid">
+          <label class="form-label full">
+            Título *
+            <input type="text" class="form-input" [(ngModel)]="fTitulo" placeholder="Nombre de la rifa" />
+          </label>
+
+          <label class="form-label full">
+            Descripción
+            <textarea class="form-input" [(ngModel)]="fDescripcion" rows="2" placeholder="Descripción opcional…"></textarea>
+          </label>
+
+          <label class="form-label">
+            Fecha inicio *
+            <input type="date" class="form-input" [(ngModel)]="fFechaInicio" />
+          </label>
+
+          <label class="form-label">
+            Fecha fin *
+            <input type="date" class="form-input" [(ngModel)]="fFechaFin" />
+          </label>
+
+          <label class="form-label">
+            Secuencia desde
+            <input type="number" class="form-input" [(ngModel)]="fSeqInicio" min="0" />
+          </label>
+
+          <label class="form-label">
+            Secuencia hasta
+            <input type="number" class="form-input" [(ngModel)]="fSeqFin" min="1" />
+          </label>
+
+          <label class="form-label full">
+            Boletas por renovación
+            <input type="number" class="form-input" [(ngModel)]="fBoletasPorRenovacion" min="1" />
+          </label>
+
+          <div class="form-label full checkbox-row">
+            <label>
+              <input type="checkbox" [(ngModel)]="fSoloVip" />
+              Solo para clientes VIP
+            </label>
+          </div>
+
+          <div class="form-label full">
+            <span class="label-text">Tipos de cliente (vacío = todos)</span>
+            <div class="tipos-grid">
+              @for (t of tiposCliente(); track t.id) {
+                <label class="tipo-check">
+                  <input type="checkbox"
+                         [checked]="isTipoSelected(t.id)"
+                         (change)="toggleTipo(t.id)" />
+                  {{ t.nombre }}
+                </label>
+              }
+            </div>
+          </div>
+
+          <div class="form-label full">
+            <span class="label-text">Imagen (opcional)</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onFileChange($event)" />
+            @if (fPreview) {
+              <img class="img-preview" [src]="fPreview" alt="preview" />
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+          {{ saving() ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear rifa') }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Modal Registrar Ganador ───────────────────────────────────────── -->
+@if (showGanadorModal()) {
+  <div class="modal-overlay" (click)="closeGanadorModal()">
+    <div class="modal modal--sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Registrar Ganador</h3>
+        <button class="btn-close" (click)="closeGanadorModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        @if (ganadorError) {
+          <div class="alert-error">{{ ganadorError }}</div>
+        }
+        <p>Rifa: <strong>{{ rifaGanador?.titulo }}</strong></p>
+        <p>Rango válido: {{ rifaGanador?.seq_inicio }} – {{ rifaGanador?.seq_fin }}</p>
+        <label class="form-label full">
+          Número ganador
+          <input type="number" class="form-input" [(ngModel)]="fNumeroGanador"
+                 [min]="rifaGanador?.seq_inicio ?? null" [max]="rifaGanador?.seq_fin ?? null" />
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeGanadorModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="guardarGanador()">Confirmar Ganador</button>
+      </div>
+    </div>
+  </div>
+}

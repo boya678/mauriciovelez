@@ -53,6 +53,10 @@ export const routes: Routes = [
         path: 'loterias',
         loadComponent: () => import('./features/loterias/loterias.component').then(m => m.LoteriasComponent),
       },
+      {
+        path: 'rifas',
+        loadComponent: () => import('./features/rifas/rifas.component').then(m => m.RifasComponent),
+      },
     ],
   },
   {

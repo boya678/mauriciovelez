@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { RifaBannerComponent } from '../../../shared/rifa-banner/rifa-banner.component';
 import { environment } from '../../../../environments/environment';
 
 export interface NumeroData {
@@ -32,7 +33,7 @@ export interface AciertoCliente {
 @Component({
   selector: 'app-numerologia',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RifaBannerComponent],
   templateUrl: './numerologia.component.html',
   styleUrl: './numerologia.component.scss',
 })

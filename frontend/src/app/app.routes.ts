@@ -38,6 +38,13 @@ export const routes: Routes = [
             m => m.ReferidosComponent
           ),
       },
+      {
+        path: 'rifa',
+        loadComponent: () =>
+          import('./features/portal/rifa/rifa.component').then(
+            m => m.RifaComponent
+          ),
+      },
     ],
   },
   {

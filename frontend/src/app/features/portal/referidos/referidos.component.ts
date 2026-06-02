@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { AuthService, Cliente, ReferidoItem } from '../../../core/services/auth.service';
+import { RifaBannerComponent } from '../../../shared/rifa-banner/rifa-banner.component';
 
 interface MesOption {
   value: string;
@@ -13,7 +14,7 @@ interface MesOption {
 @Component({
   selector: 'app-referidos',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RifaBannerComponent],
   templateUrl: './referidos.component.html',
   styleUrl: './referidos.component.scss',
 })
