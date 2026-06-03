@@ -57,6 +57,10 @@ export const routes: Routes = [
         path: 'rifas',
         loadComponent: () => import('./features/rifas/rifas.component').then(m => m.RifasComponent),
       },
+      {
+        path: 'transacciones',
+        loadComponent: () => import('./features/transacciones/transacciones.component').then(m => m.TransaccionesComponent),
+      },
     ],
   },
   {

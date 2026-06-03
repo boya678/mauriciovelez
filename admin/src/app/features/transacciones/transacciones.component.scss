@@ -1,0 +1,241 @@
+.trans-page {
+  padding: 24px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 16px;
+  color: var(--text-primary, #fff);
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 13px;
+  color: var(--text-muted, #aaa);
+}
+
+.date-input {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #333);
+  background: var(--surface, #1e1e2e);
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.count-badge {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  background: rgba(255,255,255,0.06);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+// ── Estados ───────────────────────────────────────────────────────────────────
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted, #aaa);
+  padding: 40px 0;
+  justify-content: center;
+
+  .spin { animation: spin 1s linear infinite; }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-banner {
+  background: rgba(239, 83, 80, 0.12);
+  color: #ef5350;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 60px 0;
+  color: var(--text-muted, #666);
+
+  .material-icons-round { font-size: 48px; opacity: 0.3; }
+}
+
+// ── Tabla ─────────────────────────────────────────────────────────────────────
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border, #2a2a3a);
+}
+
+.trans-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  thead tr {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--border, #2a2a3a);
+  }
+
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.15s;
+
+    &:last-child { border-bottom: none; }
+    &:hover { background: rgba(255,255,255,0.03); }
+  }
+
+  td {
+    padding: 8px 14px;
+    color: var(--text-primary, #fff);
+    vertical-align: middle;
+  }
+}
+
+.col-hora  { white-space: nowrap; color: var(--text-muted, #888); font-variant-numeric: tabular-nums; }
+.col-phone { white-space: nowrap; font-family: monospace; font-size: 13px; }
+.col-img   { width: 72px; padding: 6px 14px; }
+.col-cliente { min-width: 140px; }
+.col-estado  { white-space: nowrap; }
+.col-tipo    { white-space: nowrap; }
+.col-desc    { font-size: 12px; color: var(--text-secondary, #bbb); max-width: 340px; }
+
+.thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: zoom-in;
+  display: block;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: transform 0.15s;
+
+  &:hover { transform: scale(1.08); }
+}
+
+.no-img {
+  font-size: 28px;
+  color: #444;
+  display: block;
+}
+
+.muted { color: var(--text-muted, #888); font-style: italic; }
+
+// ── Paginación ────────────────────────────────────────────────────────────────
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0 8px;
+}
+
+.page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #2a2a3a);
+  background: transparent;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+
+  &:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+  &:disabled { opacity: 0.3; cursor: default; }
+
+  .material-icons-round { font-size: 20px; }
+}
+
+.page-info {
+  font-size: 13px;
+  color: var(--text-secondary, #bbb);
+}
+
+// ── Badges ────────────────────────────────────────────────────────────────────
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-right: 4px;
+
+  &.badge-vip      { background: rgba(255, 183, 77, 0.18);  color: #ffb74d; }
+  &.badge-activo   { background: rgba(76, 175, 80, 0.18);   color: #81c784; }
+  &.badge-inactivo { background: rgba(239, 83, 80, 0.15);   color: #ef9a9a; }
+  &.badge-tipo     { background: rgba(100, 181, 246, 0.15); color: #64b5f6; }
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.lightbox-img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 6px;
+  object-fit: contain;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover { background: rgba(255,255,255,0.2); }
+}

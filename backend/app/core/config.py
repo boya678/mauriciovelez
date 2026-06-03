@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     LOTERIAS_EVITAR: str = ""  # nombres separados por coma a ignorar en el cron
     REDIS_URL: str = "redis://redis:6379/0"
     REDIS_TTL: int = 14400  # segundos — tiempo de vida del historial de eventos live (4h)
+    # Base de datos secundaria (chat)
+    DATABASE_URL_2: str = ""
+    DATABASE_SCHEMA_2: str = "t_mauriciovelez"
 
     model_config = SettingsConfigDict(
         env_file=".env",

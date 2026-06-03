@@ -1,0 +1,106 @@
+<div class="trans-page">
+  <div class="page-header">
+    <h2 class="page-title">Transacciones de imágenes</h2>
+    <div class="filter-row">
+      <label class="filter-label">Fecha</label>
+      <input type="date" class="date-input" [(ngModel)]="fecha" (change)="onFechaChange()" />
+      <span class="count-badge">{{ total() }} registros</span>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <span class="material-icons-round spin">autorenew</span>
+      Cargando…
+    </div>
+  }
+
+  @if (error()) {
+    <div class="error-banner">{{ error() }}</div>
+  }
+
+  @if (!loading() && !error() && items().length === 0) {
+    <div class="empty-state">
+      <span class="material-icons-round">image_not_supported</span>
+      <p>Sin imágenes para este día</p>
+    </div>
+  }
+
+  @if (!loading() && items().length > 0) {
+    <div class="table-wrap">
+      <table class="trans-table">
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Imagen</th>
+            <th>Teléfono</th>
+            <th>Cliente</th>
+            <th>Estado</th>
+            <th>Tipo</th>
+            <th>Descripción IA</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of items(); track t.id) {
+            <tr>
+              <td class="col-hora">{{ t.created_at | date:'HH:mm:ss' }}</td>
+              <td class="col-img">
+                @if (imgSrc(t)) {
+                  <img [src]="imgSrc(t)" alt="imagen" class="thumb" loading="lazy"
+                       (click)="openLightbox(imgSrc(t))" />
+                } @else {
+                  <span class="material-icons-round no-img">image</span>
+                }
+              </td>
+              <td class="col-phone">{{ t.phone_local }}</td>
+              <td class="col-cliente">
+                @if (t.cliente.registrado) {
+                  {{ t.cliente.nombre }}
+                } @else {
+                  <span class="muted">No registrado</span>
+                }
+              </td>
+              <td class="col-estado">
+                @if (t.cliente.registrado) {
+                  @if (t.cliente.vip) { <span class="badge badge-vip">VIP</span> }
+                  @if (t.cliente.activo) {
+                    <span class="badge badge-activo">Activo</span>
+                  } @else {
+                    <span class="badge badge-inactivo">Inactivo</span>
+                  }
+                }
+              </td>
+              <td class="col-tipo">
+                @if (t.cliente.tipo_nombre) {
+                  <span class="badge badge-tipo">{{ t.cliente.tipo_nombre }}</span>
+                }
+              </td>
+              <td class="col-desc">{{ t.imagen_descripcion }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="pagination">
+        <button class="page-btn" [disabled]="page() === 1" (click)="prevPage()">
+          <span class="material-icons-round">chevron_left</span>
+        </button>
+        <span class="page-info">Página {{ page() }} de {{ totalPages() }}</span>
+        <button class="page-btn" [disabled]="page() === totalPages()" (click)="nextPage()">
+          <span class="material-icons-round">chevron_right</span>
+        </button>
+      </div>
+    }
+  }
+
+  @if (lightboxSrc()) {
+    <div class="lightbox-overlay" (click)="closeLightbox()">
+      <button class="lightbox-close" (click)="closeLightbox()">
+        <span class="material-icons-round">close</span>
+      </button>
+      <img [src]="lightboxSrc()!" alt="imagen ampliada" class="lightbox-img" (click)="$event.stopPropagation()" />
+    </div>
+  }
+</div>
