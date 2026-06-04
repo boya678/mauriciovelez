@@ -30,15 +30,28 @@ logger = logging.getLogger(__name__)
 
 # ── LLM factory ───────────────────────────────────────────────────────────────
 
+# Temperature is read from settings.AZURE_OPENAI_TEMPERATURE.
+#   - If empty ("")  → not sent (uses model default; required by gpt-5-mini).
+#   - If a number    → sent as the temperature for every call.
+# The `temperature` argument is kept for backwards-compat but ignored.
+
 def _get_llm(temperature: float = 0.3, max_tokens: int = 400) -> AzureChatOpenAI:
-    return AzureChatOpenAI(
-        azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-        azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT,
-        api_version=settings.AZURE_OPENAI_API_VERSION,
-        api_key=settings.AZURE_OPENAI_API_KEY,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    kwargs: dict = {
+        "azure_endpoint": settings.AZURE_OPENAI_ENDPOINT,
+        "azure_deployment": settings.AZURE_OPENAI_DEPLOYMENT,
+        "api_version": settings.AZURE_OPENAI_API_VERSION,
+        "api_key": settings.AZURE_OPENAI_API_KEY,
+        "max_tokens": max_tokens,
+    }
+    temp_env = (settings.AZURE_OPENAI_TEMPERATURE or "").strip()
+    if temp_env:
+        try:
+            kwargs["temperature"] = float(temp_env)
+        except ValueError:
+            logger.warning(
+                "Invalid AZURE_OPENAI_TEMPERATURE=%r; ignoring", temp_env
+            )
+    return AzureChatOpenAI(**kwargs)
 
 
 # ── Intent cache (cross-pod via Redis) ───────────────────────────────────────
@@ -98,16 +111,31 @@ Responde ÚNICAMENTE con la palabra de la categoría (faq / sales / support / es
 NO incluyas ninguna explicación."""
 
 
+# Keywords that force a classifier refresh even when an intent is cached,
+# so a user asking for a human is detected immediately and not held back by
+# a stale "faq"/"support" cache entry from previous turns.
+_ESCALATE_KEYWORDS = (
+    "humano", "persona", "asesor", "agente", "operador", "representante",
+)
+
+
 async def classifier_node(state: dict) -> dict:
     messages = state["messages"]
     conv_id = state.get("conversation_id", "")
     current_turns = state.get("turns", 0)
 
+    last_user = next(
+        (m["content"] for m in reversed(messages) if m["role"] == "user"),
+        "",
+    ) or ""
+    user_wants_human = any(k in last_user.lower() for k in _ESCALATE_KEYWORDS)
 
     # ── Cache hit: skip LLM entirely ──────────────────────────────────────────
     cached_intent, cached_turns = await _get_cached_intent(conv_id)
     if (
         cached_intent
+        and cached_intent != "escalate"
+        and not user_wants_human
         and (current_turns - cached_turns) < _INTENT_CACHE_REFRESH_TURNS
     ):
         logger.debug("Classifier cache hit conv=%s intent=%s", conv_id, cached_intent)
@@ -117,7 +145,7 @@ async def classifier_node(state: dict) -> dict:
             "turns": current_turns + 1,
         }
 
-    # ── LLM classification (cheap: max_tokens=5, no tenant prompt, 2 msgs) ───
+    # ── LLM classification (cheap: max_tokens=256, no tenant prompt, 2 msgs) ──
     lc_messages: list[Any] = [SystemMessage(content=_CLASSIFIER_SYSTEM)]
     for m in messages[-2:]:
         if m["role"] == "user":
@@ -125,7 +153,7 @@ async def classifier_node(state: dict) -> dict:
         else:
             lc_messages.append(AIMessage(content=m["content"]))
 
-    llm = _get_llm(temperature=0.0, max_tokens=5)
+    llm = _get_llm(temperature=0.0, max_tokens=256)
     response = await llm.ainvoke(lc_messages)
     intent = response.content.strip().lower()
 
@@ -136,7 +164,10 @@ async def classifier_node(state: dict) -> dict:
     tokens_in  = int(usage_meta.get("input_tokens",  0))
     tokens_out = int(usage_meta.get("output_tokens", 0))
 
-    await _set_cached_intent(conv_id, intent, current_turns)
+    # Never cache explicit escalation intent; otherwise future turns may
+    # keep re-escalating even after simple greetings.
+    if intent != "escalate":
+        await _set_cached_intent(conv_id, intent, current_turns)
 
     logger.debug("Classifier intent: %s (conv=%s)", intent, conv_id)
     return {
@@ -171,6 +202,15 @@ _INTENT_PROMPTS: dict[str, str] = {
         "paso a paso. Sé empático y paciente. Si el problema requiere acceso a "
         "sistemas internos o una decisión humana, reconócelo y ofrece escalar. "
         "Mantén las respuestas claras y estructuradas."
+    ),
+    "escalate": (
+        "El usuario ha pedido explicitamente hablar con un agente humano. "
+        "Responde SIEMPRE en español con una despedida corta (máximo 2 frases) "
+        "que: (1) confirme que vas a transferirlo, (2) le pida un momento de "
+        "paciencia mientras un asesor toma su caso. "
+        "Personaliza brevemente según el motivo si está claro en los últimos "
+        "mensajes, pero NO intentes resolver el problema tú mismo y NO hagas "
+        "preguntas adicionales. NO uses menús ni JSON."
     ),
 }
 
@@ -341,13 +381,19 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
             block_image = (
                 "CONTEXTO ESPECIAL — IMAGEN PENDIENTE: El usuario envió una imagen "
                 "recientemente y aún no ha explicado para qué es. "
-                "Si el último mensaje del usuario responde claramente esa pregunta "
-                "(describe el motivo, tipo, o propósito de la imagen), incluye al "
-                "INICIO de tu respuesta la etiqueta [IMG_CTX:descripción breve]. "
-                "Ejemplo: [IMG_CTX:pago conferencia marzo]. "
-                "Si el mensaje NO tiene relación con la imagen, responde su consulta "
-                "con normalidad y AL FINAL recuérdale amablemente que aún necesitas "
-                "saber para qué fue la imagen que envió (una sola frase, de forma natural)."
+                "OBLIGATORIO: en TODA respuesta de este turno debes incluir al INICIO "
+                "una etiqueta [IMG_CTX:...]. Reglas para el valor de la etiqueta:\n"
+                "  - Si el usuario describe el motivo, propósito o contenido de la "
+                "imagen, usa esa descripción. Ej: [IMG_CTX:pago conferencia marzo].\n"
+                "  - Si el usuario dice que no es nada, no quiere hablar de ella, la "
+                "envió por error, presiona un botón como 'no_es_un_pago' o similar, "
+                "o repite la misma respuesta sin agregar contexto, usa "
+                "[IMG_CTX:descartada].\n"
+                "  - Si el usuario cambia de tema y NO menciona la imagen, usa "
+                "[IMG_CTX:sin_descripcion] y responde su consulta normal sin volver "
+                "a preguntar por la imagen.\n"
+                "NUNCA omitas la etiqueta [IMG_CTX:...] cuando hay imagen pendiente. "
+                "La etiqueta se eliminará de la respuesta antes de enviarla al usuario."
             )
 
         # Block 6 (DYNAMIC): hard guard when no image is pending
@@ -382,7 +428,7 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         # Append any previous tool_messages (AIMessage with tool_calls + ToolMessages)
         lc_messages.extend(tool_messages)
 
-        llm = _get_llm(temperature=0.4, max_tokens=400)
+        llm = _get_llm(temperature=0.4, max_tokens=2048)
         if tools:
             llm = llm.bind_tools(tools)  # type: ignore[assignment]
 
@@ -446,18 +492,19 @@ def should_escalate(state: dict) -> Literal["escalate", "reply"]:
     intent = state.get("intent", "faq")
     confidence = state.get("confidence", 1.0)
     turns = state.get("turns", 0)
-    max_turns = settings.AI_MAX_TURNS
     threshold = settings.AI_CONFIDENCE_THRESHOLD
 
     # Always honor an explicit user request for a human agent
     if intent == "escalate":
         return "escalate"
-    # Guard auto-escalation (confidence/turns) on the first interaction
+    # Guard auto-escalation on the very first interaction
     if turns <= 1:
         return "reply"
+    # Escalate only when the bot itself signals low confidence in its reply.
+    # We intentionally do NOT escalate based on total turn count — that would
+    # punish long, healthy conversations (e.g. the user has chatted 10+ times
+    # and sends a new image: there's no reason to dump them to a human).
     if confidence < threshold:
-        return "escalate"
-    if turns >= max_turns:
         return "escalate"
     return "reply"
 
@@ -466,7 +513,7 @@ def should_escalate(state: dict) -> Literal["escalate", "reply"]:
 
 def route_intent(state: dict) -> Literal["faq", "sales", "support", "escalate"]:
     intent = state.get("intent", "faq")
-    # Always route explicit escalation intents — do NOT guard on turns here.
-    # The turns guard only applies to automatic escalation (confidence/max_turns),
-    # which is handled inside should_escalate.
+    # All intents — including "escalate" — go through the specialist so the
+    # user receives a contextual reply / farewell. The final escalation
+    # decision is taken after the specialist via should_escalate().
     return intent  # type: ignore[return-value]

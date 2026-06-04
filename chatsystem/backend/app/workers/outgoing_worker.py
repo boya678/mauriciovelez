@@ -68,6 +68,11 @@ async def _process_entry(entry_id: str, data: dict) -> None:
         flush=True,
     )
 
+    # Default to PROCESSED for all success paths. Branches that succeed without
+    # explicitly setting new_status (interactive / image / audio / template)
+    # would otherwise leave the variable unbound when the DB UPDATE runs.
+    new_status: MessageStatus = MessageStatus.PROCESSED
+
     try:
         if interactive_raw:
             interactive = json.loads(interactive_raw) if isinstance(interactive_raw, str) else interactive_raw
@@ -111,14 +116,25 @@ async def _process_entry(entry_id: str, data: dict) -> None:
                 language=template_language,
             )
         else:
-            await send_text_message(
-                phone_id=phone_id,
-                token=token,
-                to=phone,
-                text=content,
-            )
-        new_status = MessageStatus.PROCESSED
-        print(f"[OUTGOING] OK msg={message_id} phone={phone}", flush=True)
+            if not content or not content.strip():
+                # Nothing to send (LLM returned empty content, e.g. reasoning
+                # model ran out of tokens). Mark processed and skip to avoid
+                # WhatsApp 400 "text.body is required".
+                logger.warning(
+                    "Empty content for msg %s phone=%s \u2192 skipping send",
+                    message_id, phone,
+                )
+                new_status = MessageStatus.PROCESSED
+                print(f"[OUTGOING] SKIP-EMPTY msg={message_id} phone={phone}", flush=True)
+            else:
+                await send_text_message(
+                    phone_id=phone_id,
+                    token=token,
+                    to=phone,
+                    text=content,
+                )
+                new_status = MessageStatus.PROCESSED
+                print(f"[OUTGOING] OK msg={message_id} phone={phone}", flush=True)
     except httpx.HTTPStatusError as exc:
         body = exc.response.text if exc.response is not None else ""
         status_code = exc.response.status_code if exc.response is not None else "?"

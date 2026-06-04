@@ -152,7 +152,10 @@ def build_graph(tools: list[StructuredTool] | None = None) -> Any:
             "faq": "specialist",
             "sales": "specialist",
             "support": "specialist",
-            "escalate": "escalate",
+            # Even for explicit escalation we go through the specialist first
+            # so the user receives a contextual farewell. should_escalate then
+            # routes to the escalate node which flips needs_escalation=True.
+            "escalate": "specialist",
         },
     )
 

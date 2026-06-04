@@ -50,20 +50,42 @@ import os
 CONSUMER_NAME = f"ai-{os.environ.get('HOSTNAME', '1')}"
 BATCH = 5
 BLOCK_MS = 2000
-AUTOCLAIM_IDLE_MS = 60_000  # AI calls can be slow
+# Generous: reasoning models (gpt-5-mini) can take 60-120s per turn. Avoid
+# autoclaiming entries that are still being processed by the original consumer.
+AUTOCLAIM_IDLE_MS = 240_000
 
 
-async def _load_history(db, conversation_id: uuid.UUID) -> list[dict]:
+async def _load_history(db, conversation_id: uuid.UUID) -> tuple[list[dict], int]:
+    """Return (history, user_turns).
+
+    history    : list of {role, content} dicts. Image messages are rendered as
+                 [IMAGEN: <desc>] or [IMAGEN sin describir aún] so the LLM is
+                 aware of attachments even though it can't see binary data.
+    user_turns : count of USER messages in this conversation. Used to feed a
+                 realistic turn counter into the graph (cache + escalation).
+    """
     msgs = await db.scalars(
         select(Message)
         .where(Message.conversation_id == conversation_id)
         .order_by(Message.created_at)
     )
-    history = []
+    history: list[dict] = []
+    user_turns = 0
     for m in msgs.all():
-        role = "user" if m.sender_type == SenderType.USER else "bot"
-        history.append({"role": role, "content": m.content})
-    return history
+        is_user = m.sender_type == SenderType.USER
+        role = "user" if is_user else "bot"
+        if is_user:
+            user_turns += 1
+        content = m.content or ""
+        mtype = getattr(m, "message_type", "text") or "text"
+        if mtype == "image":
+            desc = getattr(m, "imagen_descripcion", None)
+            marker = f"[IMAGEN: {desc}]" if desc else "[IMAGEN sin describir aún]"
+            content = f"{marker} {content}".strip()
+        elif mtype == "audio" and not content:
+            content = "[audio sin transcribir]"
+        history.append({"role": role, "content": content})
+    return history, user_turns
 
 
 async def _process_entry(redis, entry_id: str, data: dict) -> None:
@@ -79,6 +101,18 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
     async with make_tenant_session(schema) as db:
         from sqlalchemy import text
         await db.execute(text(f"SET search_path TO {schema}, public"))
+
+        # Idempotency: if this message was already processed (e.g. a previous
+        # run completed but the ACK didn't reach Redis, so autoclaim re-delivered
+        # it), skip it. Avoids duplicate LLM calls / duplicate bot replies.
+        existing_status = await db.scalar(
+            select(Message.status).where(Message.id == message_id)
+        )
+        if existing_status == MessageStatus.PROCESSED:
+            logger.info(
+                "Msg %s already PROCESSED \u2192 skipping (idempotent)", message_id,
+            )
+            return
 
         # Load tenant system prompt
         tenant = await db.scalar(
@@ -102,27 +136,68 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             return
 
         if conv.status not in (ConversationStatus.BOT_ACTIVE, ConversationStatus.NEW):
-            # Conversation belongs to a human agent — bot must stay out.
-            # Mark the message as PROCESSED so it doesn't stay in PROCESSING forever.
+            # Conversation belongs to a human agent (or is awaiting one).
+            # Don't run the bot, but DO forward the message to the human-assign
+            # stream so the assigned agent (or assignment_worker) gets it.
+            # Mark the message as PROCESSED so it doesn't stay in PROCESSING.
             await db.execute(
                 update(Message)
                 .where(Message.id == message_id)
                 .values(status=MessageStatus.PROCESSED)
             )
             await db.commit()
+
+            payload = {
+                "tenant_id": tenant_id,
+                "tenant_slug": tenant_slug,
+                "conversation_id": str(conversation_id),
+                "message_id": str(message_id),
+                "phone": phone,
+            }
+            if conv.assigned_agent_id:
+                payload["agent_id"] = str(conv.assigned_agent_id)
+            await xadd(redis, HUMAN_ASSIGN_STREAM, payload)
+
             logger.info(
-                "Conv %s status=%s → skipping AI, msg marked PROCESSED",
-                conversation_id, conv.status,
+                "Conv %s status=%s \u2192 re-routed msg %s to human_assign_stream",
+                conversation_id, conv.status, message_id,
             )
             return
 
-        history = await _load_history(db, conversation_id)
+        history, user_turns = await _load_history(db, conversation_id)
 
         # Check if there is an image awaiting description for this conversation.
         # We use a FIFO list so multiple images are handled in arrival order.
         pending_image_key = f"pending_images:{conversation_id}"
         pending_image_id_str = await redis.lindex(pending_image_key, 0)  # peek first
         has_pending_image = bool(pending_image_id_str)
+
+        # Safety net: if the LLM has been asked about the same pending image
+        # too many times without success, drop it automatically so the bot
+        # eventually stops nagging. The worker only runs when the user sends
+        # a new message, so a high cap is fine — it just protects against an
+        # LLM that consistently ignores the [IMG_CTX:...] tag.
+        MAX_IMAGE_ATTEMPTS = 6
+        attempts_key: str | None = None
+        if has_pending_image:
+            pending_id_str = (
+                pending_image_id_str.decode()
+                if isinstance(pending_image_id_str, bytes)
+                else pending_image_id_str
+            )
+            attempts_key = f"pending_image_attempts:{conversation_id}:{pending_id_str}"
+            attempts = await redis.incr(attempts_key)
+            await redis.expire(attempts_key, 3600)
+            if attempts > MAX_IMAGE_ATTEMPTS:
+                await redis.lpop(pending_image_key)
+                await redis.delete(attempts_key)
+                has_pending_image = False
+                pending_image_id_str = None
+                attempts_key = None
+                logger.info(
+                    "Dropped pending image for conv %s after %d attempts",
+                    conversation_id, attempts - 1,
+                )
 
         # Load dynamic tools for this tenant
         tools = await load_tools(
@@ -135,40 +210,54 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
 
         now = datetime.now(timezone.utc)
 
-        # Run LangGraph — always start turns at 0 so the first-message
-        # escalation guard (turns <= 1) works correctly even when a
-        # conversation is reopened after previous exchanges.
+        # Run LangGraph with the real USER turn count so cache refresh and
+        # auto-escalation by turns/confidence actually trigger.
         result = await run_graph(
             messages=history,
             tenant_system_prompt=system_prompt,
             tenant_id=tenant_id,
             conversation_id=str(conversation_id),
-            turns=0,
+            turns=user_turns,
             tools=tools,
             phone=phone,
             has_pending_image=has_pending_image,
         )
 
-        # If the LLM confirmed the user described the image, persist it and
-        # clear the pending key.  If imagen_contexto is None the key stays in
-        # Redis so we try again on the next turn.
-        if has_pending_image and result.get("imagen_contexto"):
-            pending_image_id = uuid.UUID(
-                pending_image_id_str.decode()
-                if isinstance(pending_image_id_str, bytes)
-                else pending_image_id_str
-            )
-            await db.execute(
-                update(Message)
-                .where(Message.id == pending_image_id)
-                .values(imagen_descripcion=result["imagen_contexto"])
-            )
-            await db.commit()
-            await redis.lpop(pending_image_key)  # remove only the first item
-            logger.info(
-                "Tagged image %s with descripcion=%r (conv %s)",
-                pending_image_id, result["imagen_contexto"], conversation_id,
-            )
+        # Handle the IMG_CTX tag emitted by the specialist:
+        #   - real description → persist on the image Message and clear the queue
+        #   - "descartada" / "sin_descripcion" → just clear the queue (no description)
+        #   - missing → keep image pending (counter above will drop it eventually)
+        if has_pending_image:
+            ctx = (result.get("imagen_contexto") or "").strip()
+            ctx_low = ctx.lower()
+            drop_only = ctx_low in ("descartada", "sin_descripcion", "sin descripcion")
+            if ctx and not drop_only:
+                pending_image_id = uuid.UUID(
+                    pending_image_id_str.decode()
+                    if isinstance(pending_image_id_str, bytes)
+                    else pending_image_id_str
+                )
+                await db.execute(
+                    update(Message)
+                    .where(Message.id == pending_image_id)
+                    .values(imagen_descripcion=ctx)
+                )
+                await db.commit()
+                await redis.lpop(pending_image_key)
+                if attempts_key:
+                    await redis.delete(attempts_key)
+                logger.info(
+                    "Tagged image %s with descripcion=%r (conv %s)",
+                    pending_image_id, ctx, conversation_id,
+                )
+            elif drop_only:
+                await redis.lpop(pending_image_key)
+                if attempts_key:
+                    await redis.delete(attempts_key)
+                logger.info(
+                    "Dropped pending image for conv %s (LLM marked %s)",
+                    conversation_id, ctx_low,
+                )
 
         if result["needs_escalation"]:
             # Send a goodbye bot message first if there is a reply
@@ -191,6 +280,13 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                     "phone_id": tenant.whatsapp_phone_id if tenant else "",
                     "token": tenant.whatsapp_token if tenant else "",
                 })
+
+            # Mark the triggering user message as processed so it doesn't stay stuck.
+            await db.execute(
+                update(Message)
+                .where(Message.id == message_id)
+                .values(status=MessageStatus.PROCESSED)
+            )
 
             # Update conversation status
             await db.execute(

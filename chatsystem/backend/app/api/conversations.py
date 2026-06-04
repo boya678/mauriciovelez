@@ -338,6 +338,18 @@ ALLOWED_AUDIO_MIME_TYPES = {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/webm"
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_AUDIO_BYTES = 16 * 1024 * 1024
 
+EXTENSION_TO_MIME: dict[str, str] = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "ogg": "audio/ogg",
+    "mp3": "audio/mpeg",
+    "mp4": "audio/mp4",
+    "m4a": "audio/mp4",
+    "webm": "audio/webm",
+}
+
 
 @router.post("/{conversation_id}/send", response_model=MessageOut)
 async def send_message(
@@ -444,7 +456,12 @@ async def send_media_message(
             detail="La ventana de 24 h está cerrada; primero reabre con plantilla.",
         )
 
-    mime_type = (file.content_type or "").lower().strip()
+    raw_mime_type = (file.content_type or "").lower().strip()
+    mime_type = raw_mime_type.split(";", 1)[0].strip()
+    if not mime_type or mime_type == "application/octet-stream":
+        filename = (file.filename or "").lower().strip()
+        ext = filename.rsplit(".", 1)[-1] if "." in filename else ""
+        mime_type = EXTENSION_TO_MIME.get(ext, mime_type)
     if mime_type in ALLOWED_IMAGE_MIME_TYPES:
         message_type = "image"
         max_bytes = MAX_IMAGE_BYTES

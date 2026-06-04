@@ -19,7 +19,13 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_KEY: str = ""
     AZURE_OPENAI_DEPLOYMENT: str = "gpt-4o"
+    AZURE_OPENAI_VOICE_DEPLOYMENT: str = ""
+    AZURE_OPENAI_ENDPOINT_VOICE: str = ""
+    AZURE_OPENAI_API_KEY_VOICE: str = ""
     AZURE_OPENAI_API_VERSION: str = "2024-02-01"
+    # Empty string means: don't send the parameter (use model default).
+    # Required for deployments like gpt-5-mini that only accept temperature=1.
+    AZURE_OPENAI_TEMPERATURE: str = ""
 
     # Azure OpenAI — Embeddings
     AZURE_OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-large"

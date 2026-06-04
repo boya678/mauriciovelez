@@ -27,6 +27,7 @@ from app.db.tenant import set_tenant_schema
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import Message, MessageStatus, SenderType
 from app.models.tenant import Tenant
+from app.services.audio_transcription import transcribe_audio_bytes
 from app.services.whatsapp import download_media
 from app.services.message_stats import record_messages
 from app.redis.client import get_redis
@@ -97,22 +98,32 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             db.add(conv)
             await db.flush()
         else:
-            # Reopen closed conversations so the bot can respond again
+            # Keep existing ownership/status; just refresh timestamps.
             new_values: dict = {"updated_at": now, "last_user_message_at": now}
+            # Reopen CLOSED conversations so the bot answers again when the
+            # user comes back after the agent (or auto-close) shut it down.
+            # We don't touch HUMAN_ACTIVE / WAITING_HUMAN — those stay with
+            # the agent. Only CLOSED transitions back to BOT_ACTIVE.
             if conv.status == ConversationStatus.CLOSED:
                 new_values["status"] = ConversationStatus.BOT_ACTIVE
                 new_values["assigned_agent_id"] = None
                 new_values["closed_at"] = None
-                logger.info("Reopening closed conv %s → BOT_ACTIVE", conversation_id)
+                logger.info(
+                    "Reopened CLOSED conv %s → BOT_ACTIVE (new user msg)",
+                    conversation_id,
+                )
             await db.execute(
                 update(Conversation)
                 .where(Conversation.id == conversation_id)
                 .values(**new_values)
             )
-            # Refresh to get updated status for routing below
+            # Expire+refresh to be sure the in-memory object reflects the new
+            # status (needed by the routing block below).
+            db.expire(conv)
             await db.refresh(conv)
 
         # 3. Insert message — download media if present
+        raw_bytes: bytes | None = None
         media_content: str | None = None
         media_mime_type: str | None = None
 
@@ -134,6 +145,21 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                     logger.warning("No whatsapp_token for tenant %s — media not downloaded", tenant_id)
             except Exception as exc:
                 logger.error("Failed to download media %s: %s", media_id, exc)
+
+            # For incoming audio, transcribe and replace placeholder content with text
+            # so the AI can understand what the user asked.
+            if message_type == "audio" and raw_bytes and media_mime_type:
+                try:
+                    transcript = await transcribe_audio_bytes(raw_bytes, media_mime_type)
+                    if transcript:
+                        content = transcript
+                        logger.info("Transcribed audio for conv %s", conversation_id)
+                except Exception as exc:
+                    logger.warning(
+                        "Audio transcription failed for conv %s: %s",
+                        conversation_id,
+                        exc,
+                    )
 
         msg = Message(
             id=uuid.uuid4(),
@@ -176,12 +202,13 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
         })
 
         # 4. Route
-        # HUMAN_ACTIVE (with agent) → notify agent stream
-        # WAITING_HUMAN (no agent yet) → assignment stream to find one
-        # Otherwise (BOT_ACTIVE / NEW) → AI stream
-        if conv.status == ConversationStatus.HUMAN_ACTIVE and conv.assigned_agent_id:
-            target_stream = HUMAN_ASSIGN_STREAM
-        elif conv.status == ConversationStatus.WAITING_HUMAN:
+        # HUMAN_ACTIVE / WAITING_HUMAN → assignment stream (which forwards to
+        #   the assigned agent if any, or finds one). NEVER fall back to AI.
+        # Otherwise (BOT_ACTIVE / NEW / CLOSED-just-reopened) → AI stream.
+        if conv.status in (
+            ConversationStatus.HUMAN_ACTIVE,
+            ConversationStatus.WAITING_HUMAN,
+        ):
             target_stream = HUMAN_ASSIGN_STREAM
         else:
             target_stream = AI_STREAM
