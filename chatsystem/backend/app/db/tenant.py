@@ -45,6 +45,7 @@ class TenantContext:
     ai_system_prompt: str | None
     whatsapp_template_name: str | None
     whatsapp_template_language: str | None
+    image_menu_payload: str | None = None
 
     @property
     def schema(self) -> str:
@@ -83,7 +84,8 @@ async def resolve_tenant(request: Request) -> TenantContext:
             text(
                 f"SELECT id, slug, whatsapp_phone_id, whatsapp_token, "
                 f"webhook_secret, ai_system_prompt, "
-                f"whatsapp_template_name, whatsapp_template_language "
+                f"whatsapp_template_name, whatsapp_template_language, "
+                f"image_menu_payload "
                 f"FROM public.tenants WHERE {col} = :val AND active = true"
             ),
             {"val": header},
@@ -102,6 +104,7 @@ async def resolve_tenant(request: Request) -> TenantContext:
         ai_system_prompt=tenant.ai_system_prompt,
         whatsapp_template_name=tenant.whatsapp_template_name,
         whatsapp_template_language=tenant.whatsapp_template_language or "es",
+        image_menu_payload=tenant.image_menu_payload,
     )
     _tenant_cache[header] = (ctx, time.monotonic())
     set_tenant_schema(ctx.schema)

@@ -378,22 +378,37 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         # Block 5 (DYNAMIC): pending image instructions
         block_image = ""
         if has_pending_image:
+            image_menu_payload = state.get("image_menu_payload") or ""
             block_image = (
                 "CONTEXTO ESPECIAL — IMAGEN PENDIENTE: El usuario envió una imagen "
-                "recientemente y aún no ha explicado para qué es. "
-                "OBLIGATORIO: en TODA respuesta de este turno debes incluir al INICIO "
-                "una etiqueta [IMG_CTX:...]. Reglas para el valor de la etiqueta:\n"
-                "  - Si el usuario describe el motivo, propósito o contenido de la "
-                "imagen, usa esa descripción. Ej: [IMG_CTX:pago conferencia marzo].\n"
-                "  - Si el usuario dice que no es nada, no quiere hablar de ella, la "
-                "envió por error, presiona un botón como 'no_es_un_pago' o similar, "
-                "o repite la misma respuesta sin agregar contexto, usa "
-                "[IMG_CTX:descartada].\n"
-                "  - Si el usuario cambia de tema y NO menciona la imagen, usa "
-                "[IMG_CTX:sin_descripcion] y responde su consulta normal sin volver "
-                "a preguntar por la imagen.\n"
-                "NUNCA omitas la etiqueta [IMG_CTX:...] cuando hay imagen pendiente. "
-                "La etiqueta se eliminará de la respuesta antes de enviarla al usuario."
+                "recientemente y aún no se ha registrado su propósito.\n"
+                "Tienes disponible la herramienta 'guardar_descripcion_imagen'.\n"
+                "REGLAS OBLIGATORIAS:\n"
+                "  1. Si el usuario selecciona una opción de menú (por ejemplo "
+                "'pago_vip', 'pago_conferencia', 'pago_donacion', "
+                "'pago_metodo21_moto') o describe con palabras el motivo de la "
+                "imagen → llama INMEDIATAMENTE a 'guardar_descripcion_imagen' "
+                "con esa descripción, luego responde con normalidad.\n"
+                "  2. Si el usuario seleccionó 'no_es_un_pago' o indica "
+                "explícitamente que la imagen no tiene relación → llama a "
+                "'guardar_descripcion_imagen' con description='descartada'.\n"
+                "  3. Si el usuario envió un mensaje que NO tiene relación con "
+                "la imagen (cambia de tema) → responde su consulta brevemente "
+                "y al final añade un mensaje como: '⚠️ Es importante que me "
+                "indiques para qué fue la imagen que enviaste — por favor "
+                "selecciona una opción:' y muéstrale de nuevo el menú"
+            )
+            if image_menu_payload:
+                block_image += (
+                    f" usando exactamente este JSON:\n{image_menu_payload}"
+                )
+            else:
+                block_image += (
+                    " preguntándole amablemente para qué fue la imagen."
+                )
+            block_image += (
+                "\nNO inventes ni asumas la descripción — espera la selección "
+                "o respuesta explícita del usuario."
             )
 
         # Block 6 (DYNAMIC): hard guard when no image is pending
@@ -452,13 +467,6 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         # Final text reply
         reply = response.content.strip() if isinstance(response.content, str) else ""
 
-        # Extract and strip the [IMG_CTX:...] tag if present
-        imagen_contexto: str | None = None
-        img_ctx_match = re.search(r"\[IMG_CTX:([^\]]+)\]", reply)
-        if img_ctx_match:
-            imagen_contexto = img_ctx_match.group(1).strip()
-            reply = re.sub(r"\[IMG_CTX:[^\]]+\]\s*", "", reply).strip()
-
         uncertainty_phrases = [
             "i don't know", "i'm not sure", "i cannot", "i can't",
             "no sé", "no puedo", "no tengo información",
@@ -469,14 +477,12 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
 
         # Check if the LLM replied with a menu JSON
         interactive_payload = parse_menu_reply(reply)
-        # Use a human-readable content for DB storage when it's a menu
-        stored_content = reply if not interactive_payload else reply
+        stored_content = reply
 
         return {
             **state,
             "bot_reply": stored_content,
             "interactive_payload": interactive_payload,
-            "imagen_contexto": imagen_contexto,
             "confidence": confidence,
             "tool_messages": [],  # reset after final reply
             "tokens_in":  state.get("tokens_in",  0) + tokens_in,

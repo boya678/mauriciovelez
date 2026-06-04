@@ -53,6 +53,7 @@ class ChatState(TypedDict, total=False):
     tool_messages: list[Any]      # internal LangChain messages for ToolNode loop
     interactive_payload: dict | None  # Meta interactive object when bot replies with a menu
     has_pending_image: bool       # True when there is an image awaiting user description
+    image_menu_payload: str | None  # Tenant-configured JSON menu for image responses
     imagen_contexto: str | None   # LLM-extracted description of the pending image
     tokens_in: int                # prompt tokens consumed this turn (accumulated over tool loops)
     tokens_out: int               # completion tokens produced this turn
@@ -180,6 +181,7 @@ async def run_graph(
     tools: list[StructuredTool] | None = None,
     phone: str = "",
     has_pending_image: bool = False,
+    image_menu_payload: str | None = None,
 ) -> dict:
     """
     Run the conversation graph and return the final state.
@@ -208,6 +210,7 @@ async def run_graph(
         "lc_tools": tools or [],
         "tool_messages": [],
         "has_pending_image": has_pending_image,
+        "image_menu_payload": image_menu_payload,
         "imagen_contexto": None,
         "tokens_in": 0,
         "tokens_out": 0,

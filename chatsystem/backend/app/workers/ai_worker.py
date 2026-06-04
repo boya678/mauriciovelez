@@ -208,6 +208,75 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             tenant_slug=tenant_slug,
         )
 
+        # When there is a pending image, inject a dedicated tool so the LLM
+        # can explicitly save the user's description. This is more reliable
+        # than tag-parsing ([IMG_CTX:...]) because the LLM makes a deliberate
+        # tool call instead of embedding a tag in free text.
+        if has_pending_image:
+            from pydantic import BaseModel as _BM, Field as _F
+            from langchain_core.tools import StructuredTool as _ST
+            from sqlalchemy import text as _text
+
+            class _SaveImageDescInput(_BM):
+                description: str = _F(
+                    description=(
+                        "Descripción del propósito de la imagen. "
+                        "Usa 'descartada' si el usuario indicó que no tiene relación."
+                    )
+                )
+
+            # Capture loop vars in the closure
+            _pending_key   = pending_image_key
+            _pending_id    = pending_image_id_str
+            _attempts_k    = attempts_key
+            _conv_id       = conversation_id
+            _schema        = schema
+
+            async def _save_image_description(description: str) -> str:
+                desc = description.strip()
+                if not desc:
+                    return "Error: descripción vacía."
+                try:
+                    is_drop = desc.lower() in ("descartada", "sin_descripcion")
+                    if not is_drop:
+                        _img_id = uuid.UUID(
+                            _pending_id.decode()
+                            if isinstance(_pending_id, bytes)
+                            else _pending_id
+                        )
+                        async with make_tenant_session(_schema) as _tdb:
+                            await _tdb.execute(_text(f"SET search_path TO {_schema}, public"))
+                            await _tdb.execute(
+                                update(Message)
+                                .where(Message.id == _img_id)
+                                .values(imagen_descripcion=desc)
+                            )
+                            await _tdb.commit()
+                    await redis.lpop(_pending_key)
+                    if _attempts_k:
+                        await redis.delete(_attempts_k)
+                    logger.info(
+                        "Tool saved image description=%r for conv %s (drop=%s)",
+                        desc, _conv_id, is_drop,
+                    )
+                    return f"Descripción registrada: {desc}"
+                except Exception as _e:
+                    logger.error("save_image_description tool error: %s", _e)
+                    return f"Error al guardar: {_e}"
+
+            save_img_tool = _ST.from_function(
+                coroutine=_save_image_description,
+                name="guardar_descripcion_imagen",
+                description=(
+                    "Registra el propósito de la imagen pendiente. "
+                    "Llámala cuando el usuario indique para qué es la imagen o "
+                    "seleccione una opción del menú. "
+                    "Usa description='descartada' si la imagen no aplica."
+                ),
+                args_schema=_SaveImageDescInput,
+            )
+            tools = list(tools) + [save_img_tool]
+
         now = datetime.now(timezone.utc)
 
         # Run LangGraph with the real USER turn count so cache refresh and
@@ -221,43 +290,34 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             tools=tools,
             phone=phone,
             has_pending_image=has_pending_image,
+            image_menu_payload=(tenant.image_menu_payload if tenant else None),
         )
 
-        # Handle the IMG_CTX tag emitted by the specialist:
-        #   - real description → persist on the image Message and clear the queue
-        #   - "descartada" / "sin_descripcion" → just clear the queue (no description)
-        #   - missing → keep image pending (counter above will drop it eventually)
-        if has_pending_image:
-            ctx = (result.get("imagen_contexto") or "").strip()
-            ctx_low = ctx.lower()
-            drop_only = ctx_low in ("descartada", "sin_descripcion", "sin descripcion")
-            if ctx and not drop_only:
-                pending_image_id = uuid.UUID(
-                    pending_image_id_str.decode()
-                    if isinstance(pending_image_id_str, bytes)
-                    else pending_image_id_str
-                )
-                await db.execute(
-                    update(Message)
-                    .where(Message.id == pending_image_id)
-                    .values(imagen_descripcion=ctx)
-                )
-                await db.commit()
-                await redis.lpop(pending_image_key)
-                if attempts_key:
-                    await redis.delete(attempts_key)
-                logger.info(
-                    "Tagged image %s with descripcion=%r (conv %s)",
-                    pending_image_id, ctx, conversation_id,
-                )
-            elif drop_only:
-                await redis.lpop(pending_image_key)
-                if attempts_key:
-                    await redis.delete(attempts_key)
-                logger.info(
-                    "Dropped pending image for conv %s (LLM marked %s)",
-                    conversation_id, ctx_low,
-                )
+        # On the very first bot response after an image arrives (attempts==1),
+        # override whatever the LLM replied with the deterministic tenant menu.
+        # On subsequent turns the LLM handles it via the guardar_descripcion_imagen
+        # tool — no override needed.
+        _img_attempts = attempts if has_pending_image and attempts_key is not None else (
+            1 if has_pending_image else 0
+        )
+        if has_pending_image and _img_attempts == 1:
+            raw_menu = (getattr(tenant, "image_menu_payload", None) or "").strip() if tenant else ""
+            if raw_menu:
+                try:
+                    import json as _json_menu
+                    parsed_menu = _json_menu.loads(raw_menu)
+                    from app.agents.nodes import parse_menu_reply
+                    interactive_override = parse_menu_reply(raw_menu)
+                    if interactive_override:
+                        result = dict(result)
+                        result["interactive_payload"] = interactive_override
+                        result["bot_reply"] = parsed_menu.get("body", result.get("bot_reply", ""))
+                        logger.info(
+                            "Overrode interactive_payload with tenant image_menu_payload for conv %s (attempt 1)",
+                            conversation_id,
+                        )
+                except Exception as _menu_err:
+                    logger.warning("Could not parse tenant image_menu_payload: %s", _menu_err)
 
         if result["needs_escalation"]:
             # Send a goodbye bot message first if there is a reply
@@ -349,6 +409,33 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 "token": tenant.whatsapp_token if tenant else "",
             }
             interactive = result.get("interactive_payload")
+
+            # If the pending image was NOT handled by the tool this turn (queue
+            # still has the image) and the LLM didn't emit a menu payload,
+            # force-inject the tenant menu so the user always sees buttons,
+            # regardless of what the LLM chose to include in its reply.
+            if not interactive and has_pending_image:
+                still_pending = await redis.lindex(pending_image_key, 0)
+                if still_pending:
+                    raw_menu = (getattr(tenant, "image_menu_payload", None) or "").strip() if tenant else ""
+                    if raw_menu:
+                        try:
+                            from app.agents.nodes import parse_menu_reply as _pmr
+                            import json as _json_fi
+                            interactive = _pmr(raw_menu)
+                            if interactive:
+                                parsed_body = _json_fi.loads(raw_menu).get("body", "")
+                                if parsed_body and not result["bot_reply"]:
+                                    result = dict(result)
+                                    result["bot_reply"] = parsed_body
+                                    bot_msg.content = parsed_body
+                                logger.info(
+                                    "Force-injected image menu for conv %s (still pending, LLM skipped menu)",
+                                    conversation_id,
+                                )
+                        except Exception as _fi_err:
+                            logger.warning("Could not force-inject image menu: %s", _fi_err)
+
             if interactive:
                 import json as _json
                 outgoing_payload["interactive_payload"] = _json.dumps(interactive)

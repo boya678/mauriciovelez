@@ -14,6 +14,7 @@ export class SettingsComponent implements OnInit {
   promptText = '';
   templateName = '';
   templateLanguage = 'es';
+  imageMenuPayload = '';
   loading = signal(true);
   saving = signal(false);
   saved = signal(false);
@@ -35,6 +36,7 @@ export class SettingsComponent implements OnInit {
         this.promptText = s.ai_system_prompt ?? '';
         this.templateName = s.whatsapp_template_name ?? '';
         this.templateLanguage = s.whatsapp_template_language ?? 'es';
+        this.imageMenuPayload = s.image_menu_payload ?? '';
         this.loading.set(false);
       },
       error: () => {
@@ -57,6 +59,7 @@ export class SettingsComponent implements OnInit {
       ai_system_prompt: this.promptText || null,
       whatsapp_template_name: this.templateName || null,
       whatsapp_template_language: this.templateLanguage || null,
+      image_menu_payload: this.imageMenuPayload || null,
     }).subscribe({
       next: () => {
         this.saving.set(false);

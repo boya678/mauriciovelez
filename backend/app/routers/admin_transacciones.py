@@ -102,12 +102,7 @@ def get_transacciones(
           AND (m.created_at AT TIME ZONE 'America/Bogota')::date = :fecha
     """
 
-    total: int = chat_db.execute(
-        text(f"SELECT COUNT(*) {base_where}"), {"fecha": fecha}
-    ).scalar_one()
-
-    offset = (page - 1) * PAGE_SIZE
-    rows = chat_db.execute(text(f"""
+    rows_all = chat_db.execute(text(f"""
         SELECT
             m.id,
             m.media_content,
@@ -117,11 +112,14 @@ def get_transacciones(
             c.phone
         {base_where}
         ORDER BY m.created_at ASC
-        LIMIT {PAGE_SIZE} OFFSET :offset
-    """), {"fecha": fecha, "offset": offset}).mappings().all()
+    """), {"fecha": fecha}).mappings().all()
 
-    # Filtrar filas ya procesadas
-    rows = [r for r in rows if r["id"] not in procesados]
+    # Filtrar filas ya procesadas ANTES de contar/paginar para que total e items sean consistentes.
+    rows_filtradas = [r for r in rows_all if r["id"] not in procesados]
+    total = len(rows_filtradas)
+
+    offset = (page - 1) * PAGE_SIZE
+    rows = rows_filtradas[offset:offset + PAGE_SIZE]
 
     # Batch lookup de clientes por número local
     local_phones = list({_strip_country_code(r["phone"] or "") for r in rows if r["phone"]})

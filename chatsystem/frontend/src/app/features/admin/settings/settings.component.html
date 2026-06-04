@@ -37,6 +37,22 @@
           </div>
         </div>
 
+        <div class="field-group">
+          <label for="imageMenuPayload">Menú de imagen (JSON)</label>
+          <p class="field-hint">
+            JSON interactivo que se envía automáticamente cuando el usuario manda una imagen.
+            Si está vacío, el bot genera la respuesta con IA. Usa el mismo formato
+            <code>menu_type: list | buttons</code>.
+          </p>
+          <textarea
+            id="imageMenuPayload"
+            rows="8"
+            [(ngModel)]="imageMenuPayload"
+            [disabled]="saving()"
+            placeholder='{"menu_type":"list","body":"¿Para qué es esta imagen?","button_text":"Ver opciones","sections":[...]}'
+          ></textarea>
+        </div>
+
         @if (error()) {
           <div class="alert alert-error">{{ error() }}</div>
         }

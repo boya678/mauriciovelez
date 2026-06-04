@@ -25,6 +25,7 @@ class Tenant(Base):
     ai_system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     whatsapp_template_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     whatsapp_template_language: Mapped[str | None] = mapped_column(String(20), nullable=True, default="es")
+    image_menu_payload: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -152,6 +152,7 @@ class PromptSettings(BaseModel):
     ai_system_prompt: str | None = None
     whatsapp_template_name: str | None = None
     whatsapp_template_language: str | None = None
+    image_menu_payload: str | None = None
 
 
 @router.get("/settings", response_model=PromptSettings)
@@ -164,6 +165,7 @@ async def get_settings(
         ai_system_prompt=tenant.ai_system_prompt,
         whatsapp_template_name=tenant.whatsapp_template_name,
         whatsapp_template_language=tenant.whatsapp_template_language,
+        image_menu_payload=tenant.image_menu_payload,
     )
 
 
@@ -183,6 +185,7 @@ async def update_settings(
     t.ai_system_prompt = body.ai_system_prompt
     t.whatsapp_template_name = body.whatsapp_template_name
     t.whatsapp_template_language = body.whatsapp_template_language
+    t.image_menu_payload = body.image_menu_payload
     await db.commit()
     # Broadcast invalidation to every backend process via Redis Pub/Sub.
     redis = await get_redis()
@@ -191,6 +194,7 @@ async def update_settings(
         ai_system_prompt=t.ai_system_prompt,
         whatsapp_template_name=t.whatsapp_template_name,
         whatsapp_template_language=t.whatsapp_template_language,
+        image_menu_payload=t.image_menu_payload,
     )
 
 

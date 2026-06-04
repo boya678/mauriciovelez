@@ -8,6 +8,7 @@ export interface TenantSettings {
   ai_system_prompt: string | null;
   whatsapp_template_name: string | null;
   whatsapp_template_language: string | null;
+  image_menu_payload: string | null;
 }
 
 export interface KnowledgeStatus {
