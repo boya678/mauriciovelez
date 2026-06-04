@@ -6,6 +6,7 @@ Side effects   : Sends message via WhatsApp Cloud API
                  Updates Message.status → PROCESSED | ERROR
 """
 import asyncio
+import base64
 import json
 import logging
 import uuid
@@ -25,7 +26,14 @@ from app.redis.streams import (
     xack,
     xautoclaim,
 )
-from app.services.whatsapp import send_text_message, send_interactive_message, send_template_message
+from app.services.whatsapp import (
+    send_text_message,
+    send_interactive_message,
+    send_template_message,
+    send_image_message,
+    send_audio_message,
+    upload_media,
+)
 
 logger = logging.getLogger(__name__)
 import os
@@ -43,6 +51,10 @@ async def _process_entry(entry_id: str, data: dict) -> None:
     token = data.get("token", "")
     tenant_slug = data.get("tenant_slug", "")
     interactive_raw = data.get("interactive_payload", "")
+    message_type = str(data.get("message_type", "text") or "text")
+    media_content = data.get("media_content", "")
+    media_mime_type = data.get("media_mime_type", "")
+    media_filename = data.get("media_filename", "upload.bin")
     # Window flag: absent (bot replies) or "1" means open; "0" means expired → use template
     window_open = data.get("window_open", "1") != "0"
     template_name = data.get("template_name", "")
@@ -50,7 +62,11 @@ async def _process_entry(entry_id: str, data: dict) -> None:
 
     schema = f"t_{tenant_slug}" if tenant_slug else "public"
 
-    print(f"[OUTGOING] sending msg={message_id} phone={phone} interactive={bool(interactive_raw)} template={template_name or '-'} window_open={window_open}", flush=True)
+    print(
+        f"[OUTGOING] sending msg={message_id} phone={phone} type={message_type} "
+        f"interactive={bool(interactive_raw)} template={template_name or '-'} window_open={window_open}",
+        flush=True,
+    )
 
     try:
         if interactive_raw:
@@ -60,6 +76,29 @@ async def _process_entry(entry_id: str, data: dict) -> None:
                 token=token,
                 to=phone,
                 interactive=interactive,
+            )
+        elif message_type == "image" and media_content:
+            media_bytes = base64.b64decode(media_content)
+            mime = str(media_mime_type or "image/jpeg")
+            filename = str(media_filename or "image.jpg")
+            media_id = await upload_media(phone_id, token, media_bytes, mime, filename)
+            await send_image_message(
+                phone_id=phone_id,
+                token=token,
+                to=phone,
+                media_id=media_id,
+                caption=content if content and content != "[imagen]" else None,
+            )
+        elif message_type == "audio" and media_content:
+            media_bytes = base64.b64decode(media_content)
+            mime = str(media_mime_type or "audio/ogg")
+            filename = str(media_filename or "audio.ogg")
+            media_id = await upload_media(phone_id, token, media_bytes, mime, filename)
+            await send_audio_message(
+                phone_id=phone_id,
+                token=token,
+                to=phone,
+                media_id=media_id,
             )
         elif not window_open and template_name:
             # 24-hour window expired — must use a pre-approved template

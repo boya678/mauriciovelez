@@ -10,11 +10,12 @@ POST   /conversations/{id}/reopen — reopen a closed conversation
 POST   /conversations/{id}/send — agent sends a message to the user
 """
 import logging
+import base64
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from pydantic import BaseModel
 from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -332,6 +333,12 @@ class SendMessageBody(BaseModel):
     content: str
 
 
+ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_AUDIO_MIME_TYPES = {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/webm"}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_AUDIO_BYTES = 16 * 1024 * 1024
+
+
 @router.post("/{conversation_id}/send", response_model=MessageOut)
 async def send_message(
     conversation_id: uuid.UUID,
@@ -402,6 +409,115 @@ async def send_message(
             await record_messages(tenant.id, stats_db, human=1)
     except Exception:
         pass  # stats are best-effort
+
+    return MessageOut.model_validate(msg)
+
+
+@router.post("/{conversation_id}/send-media", response_model=MessageOut)
+async def send_media_message(
+    conversation_id: uuid.UUID,
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    agent=Depends(require_agent),
+):
+    conv = await db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant.id,
+        )
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if conv.status == ConversationStatus.CLOSED:
+        raise HTTPException(status_code=409, detail="Conversation is closed")
+
+    now = datetime.now(timezone.utc)
+    last_user_ts = conv.last_user_message_at
+    if last_user_ts and last_user_ts.tzinfo is None:
+        last_user_ts = last_user_ts.replace(tzinfo=timezone.utc)
+    window_open = last_user_ts is not None and (now - last_user_ts) < timedelta(hours=24)
+    if not window_open:
+        raise HTTPException(
+            status_code=409,
+            detail="La ventana de 24 h está cerrada; primero reabre con plantilla.",
+        )
+
+    mime_type = (file.content_type or "").lower().strip()
+    if mime_type in ALLOWED_IMAGE_MIME_TYPES:
+        message_type = "image"
+        max_bytes = MAX_IMAGE_BYTES
+        content = caption.strip() or "[imagen]"
+        default_filename = "image.jpg"
+    elif mime_type in ALLOWED_AUDIO_MIME_TYPES:
+        message_type = "audio"
+        max_bytes = MAX_AUDIO_BYTES
+        content = "[audio]"
+        default_filename = "audio.ogg"
+    else:
+        raise HTTPException(status_code=415, detail="Tipo de archivo no soportado")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Archivo vacío")
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=413, detail="Archivo supera el tamaño permitido")
+
+    media_content_b64 = base64.b64encode(raw).decode("ascii")
+    media_filename = file.filename or default_filename
+
+    msg = Message(
+        id=uuid.uuid4(),
+        conversation_id=conversation_id,
+        sender_type=SenderType.HUMAN,
+        content=content,
+        message_type=message_type,
+        media_content=media_content_b64,
+        media_mime_type=mime_type,
+        status=MessageStatus.PENDING,
+        created_at=now,
+    )
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+
+    redis = await get_redis()
+    await xadd(redis, OUTGOING_STREAM, {
+        "tenant_id": str(tenant.id),
+        "tenant_slug": tenant.slug,
+        "phone": conv.phone,
+        "message_id": str(msg.id),
+        "content": content,
+        "message_type": message_type,
+        "media_content": media_content_b64,
+        "media_mime_type": mime_type,
+        "media_filename": media_filename,
+        "phone_id": tenant.whatsapp_phone_id,
+        "token": tenant.whatsapp_token,
+        "window_open": "1",
+    })
+
+    await manager.publish(tenant.slug, {
+        "type": "new_message",
+        "conversation_id": str(conversation_id),
+        "message": {
+            "id": str(msg.id),
+            "content": content,
+            "sender_type": SenderType.HUMAN.value,
+            "message_type": message_type,
+            "media_content": media_content_b64,
+            "media_mime_type": mime_type,
+            "created_at": now.isoformat(),
+        },
+    })
+
+    try:
+        from app.db.session import AsyncSessionLocal
+        async with AsyncSessionLocal() as stats_db:
+            await record_messages(tenant.id, stats_db, human=1)
+    except Exception:
+        pass
 
     return MessageOut.model_validate(msg)
 

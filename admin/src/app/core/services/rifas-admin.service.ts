@@ -51,8 +51,8 @@ export class RifasAdminService {
     return this.http.get<RifaItem[]>(this.base);
   }
 
-  crear(form: FormData): Observable<RifaItem> {
-    return this.http.post<RifaItem>(this.base, form);
+  crear(form: FormData): Observable<{ mensaje: string; rifa: RifaItem }> {
+    return this.http.post<{ mensaje: string; rifa: RifaItem }>(this.base, form);
   }
 
   editar(id: string, form: FormData): Observable<RifaItem> {

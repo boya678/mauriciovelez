@@ -157,7 +157,7 @@ def verify_vip(payload: VipVerifyRequest, db: Session = Depends(get_db)):
     tiene_acceso = cliente.vip or (cliente.tipo_cliente in (2, 3) and cliente.codigo_vip)
     if not tiene_acceso:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    if not cliente.codigo_vip or cliente.codigo_vip != payload.codigo:
+    if not cliente.codigo_vip or cliente.codigo_vip.upper() != payload.codigo.upper():
         raise HTTPException(status_code=400, detail="C\u00f3digo incorrecto")
     return {"ok": True}
 

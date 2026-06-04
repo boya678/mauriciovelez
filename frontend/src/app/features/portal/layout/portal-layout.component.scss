@@ -159,6 +159,13 @@
   text-overflow: ellipsis;
 }
 
+.user-code {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
 .user-role {
   color: var(--gold-mid);
   font-size: 0.72rem;
@@ -300,6 +307,22 @@
   display: flex;
   align-items: center;
   gap: 0.9rem;
+}
+
+.code-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  border-radius: 24px;
+  padding: 0.32rem 0.9rem;
+  color: var(--gold-bright);
+  font-weight: 600;
+  font-size: 0.86rem;
+  white-space: nowrap;
+
+  .material-icons-round { font-size: 1rem; }
 }
 
 .balance-chip {

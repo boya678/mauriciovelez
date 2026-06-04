@@ -38,12 +38,13 @@
             <th>Estado</th>
             <th>Tipo</th>
             <th>Descripción IA</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           @for (t of items(); track t.id) {
             <tr>
-              <td class="col-hora">{{ t.created_at | date:'HH:mm:ss' }}</td>
+              <td class="col-hora">{{ t.created_at | date:'HH:mm:ss':'America/Bogota' }}</td>
               <td class="col-img">
                 @if (imgSrc(t)) {
                   <img [src]="imgSrc(t)" alt="imagen" class="thumb" loading="lazy"
@@ -76,6 +77,35 @@
                 }
               </td>
               <td class="col-desc">{{ t.imagen_descripcion }}</td>
+              <td class="col-acciones">
+                <div class="acciones-group">
+                  <button class="btn-accion btn-renovar"
+                          [disabled]="actionLoading() === t.id || !t.cliente.registrado || t.cliente.tipo_cliente !== 1"
+                          (click)="onRenovar(t)"
+                          [title]="!t.cliente.registrado ? 'Cliente no registrado en el sistema' : t.cliente.tipo_cliente !== 1 ? 'Solo se puede renovar clientes tipo 1' : 'Renovar suscripción'">
+                    @if (actionLoading() === t.id) {
+                      <span class="material-icons-round spin">autorenew</span>
+                    } @else {
+                      <span class="material-icons-round">autorenew</span>
+                    }
+                    Renovar
+                  </button>
+                  <button class="btn-accion btn-eliminar"
+                          [disabled]="actionLoading() === t.id"
+                          (click)="onEliminar(t)"
+                          title="Eliminar / ocultar">
+                    <span class="material-icons-round">delete</span>
+                    Eliminar
+                  </button>
+                  <button class="btn-accion btn-mensaje"
+                          [disabled]="actionLoading() === t.id"
+                          (click)="openModalMensaje(t)"
+                          title="Enviar mensaje WhatsApp">
+                    <span class="material-icons-round">send</span>
+                    Mensaje
+                  </button>
+                </div>
+              </td>
             </tr>
           }
         </tbody>
@@ -104,3 +134,127 @@
     </div>
   }
 </div>
+
+<!-- Modal: Confirmar eliminar -->
+@if (modalEliminar()) {
+  <div class="modal-overlay" (click)="closeModalEliminar()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="material-icons-round">delete</span>
+        <h3>Eliminar transacción</h3>
+        <button class="modal-close-btn" (click)="closeModalEliminar()">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>¿Ocultar la transacción de <strong>{{ modalEliminar()!.phone_local }}</strong>@if (modalEliminar()!.cliente.nombre) { — {{ modalEliminar()!.cliente.nombre }}}?</p>
+        <p class="modal-hint">No aparecerá más en el listado.</p>
+        @if (modalEliminarError()) {
+          <div class="modal-error">{{ modalEliminarError() }}</div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeModalEliminar()" [disabled]="actionLoading() === modalEliminar()!.id">Cancelar</button>
+        <button class="btn-danger" (click)="confirmarEliminar()" [disabled]="actionLoading() === modalEliminar()!.id">
+          @if (actionLoading() === modalEliminar()!.id) {
+            <span class="material-icons-round spin">autorenew</span>
+          } @else {
+            <span class="material-icons-round">delete</span>
+          }
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal: Confirmar renovar -->
+@if (modalRenovar()) {
+  <div class="modal-overlay" (click)="closeModalRenovar()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="material-icons-round">autorenew</span>
+        <h3>Renovar suscripción</h3>
+        <button class="modal-close-btn" (click)="closeModalRenovar()">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        @if (!modalRenovarExito()) {
+          <p>¿Renovar suscripción de <strong>{{ modalRenovar()!.cliente.nombre || modalRenovar()!.phone_local }}</strong>?</p>
+          <p class="modal-hint">Se asignarán nuevos números y la transacción quedará oculta.</p>
+        } @else {
+          <div class="modal-exito">
+            <span class="material-icons-round">check_circle</span>
+            <p>{{ modalRenovarExito() }}</p>
+          </div>
+        }
+        @if (modalRenovarError()) {
+          <div class="modal-error">{{ modalRenovarError() }}</div>
+        }
+      </div>
+      <div class="modal-footer">
+        @if (!modalRenovarExito()) {
+          <button class="btn-secondary" (click)="closeModalRenovar()" [disabled]="actionLoading() === modalRenovar()!.id">Cancelar</button>
+          <button class="btn-primary" (click)="confirmarRenovar()" [disabled]="actionLoading() === modalRenovar()!.id">
+            @if (actionLoading() === modalRenovar()!.id) {
+              <span class="material-icons-round spin">autorenew</span>
+            } @else {
+              <span class="material-icons-round">autorenew</span>
+            }
+            Renovar
+          </button>
+        } @else {
+          <button class="btn-secondary" (click)="closeModalRenovar()">Cerrar</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal: Enviar mensaje WhatsApp -->
+@if (modalMensaje()) {
+  <div class="modal-overlay" (click)="closeModalMensaje()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <span class="material-icons-round">send</span>
+        <h3>Enviar mensaje WhatsApp</h3>
+        <button class="modal-close-btn" (click)="closeModalMensaje()">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-dest">
+          <span class="material-icons-round">phone</span>
+          {{ modalMensaje()!.phone_local }}
+          @if (modalMensaje()!.cliente.nombre) {
+            — {{ modalMensaje()!.cliente.nombre }}
+          }
+        </p>
+        <label class="modal-label">Parámetro del mensaje</label>
+        <textarea
+          class="modal-textarea"
+          rows="4"
+          placeholder="Escribe el texto que se enviará como parámetro de la plantilla…"
+          [(ngModel)]="textoMensaje"
+          [disabled]="modalLoading()">
+        </textarea>
+        @if (modalError()) {
+          <div class="modal-error">{{ modalError() }}</div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeModalMensaje()" [disabled]="modalLoading()">Cancelar</button>
+        <button class="btn-primary" (click)="onEnviarMensaje()" [disabled]="modalLoading()">
+          @if (modalLoading()) {
+            <span class="material-icons-round spin">autorenew</span>
+          } @else {
+            <span class="material-icons-round">send</span>
+          }
+          Enviar
+        </button>
+      </div>
+    </div>
+  </div>
+}
+

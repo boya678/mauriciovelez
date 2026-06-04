@@ -27,6 +27,9 @@
       @if (!collapsed()) {
         <div class="user-text">
           <span class="user-name">{{ cliente?.nombre }}</span>
+          @if (cliente?.codigo_vip) {
+            <span class="user-code">Código: {{ cliente?.codigo_vip }}</span>
+          }
           <span class="user-role">{{ cliente?.vip ? '★ VIP' : 'Cliente' }}</span>
           @if (cliente?.vip && vipFin) {
             <span class="vip-expires">Vence: {{ vipFin | date:'dd/MM/yyyy' }}</span>
@@ -97,6 +100,13 @@
       <h2 class="topbar-title gold-text">Portal</h2>
       <div class="topbar-right">
         @if (cliente) {
+          @if (cliente.codigo_vip) {
+            <div class="code-chip">
+              <span class="material-icons-round">tag</span>
+              <span>Código</span>
+              <span>{{ cliente.codigo_vip }}</span>
+            </div>
+          }
           <div class="balance-chip">
             <span class="material-icons-round">monetization_on</span>
             <span>$ {{ cliente.saldo | number:'1.2-2' }}</span>

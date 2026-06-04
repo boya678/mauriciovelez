@@ -350,6 +350,15 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
                 "saber para qué fue la imagen que envió (una sola frase, de forma natural)."
             )
 
+        # Block 6 (DYNAMIC): hard guard when no image is pending
+        block_no_image = ""
+        if not has_pending_image:
+            block_no_image = (
+                "REGLA ESTRICTA: En esta conversación NO hay una imagen pendiente. "
+                "No preguntes ni menciones imagen, foto, comprobante o evidencia visual "
+                "a menos que el usuario lo solicite explícitamente en su mensaje actual."
+            )
+
         # Order: static → semi-static → dynamic. Keeps cacheable prefix stable
         # across consecutive turns of the same conversation.
         lc_messages: list[Any] = [SystemMessage(content=block_static)]
@@ -361,6 +370,8 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
             lc_messages.append(SystemMessage(content=block_rag))
         if block_image:
             lc_messages.append(SystemMessage(content=block_image))
+        if block_no_image:
+            lc_messages.append(SystemMessage(content=block_no_image))
 
         for m in messages[-12:]:
             if m["role"] == "user":

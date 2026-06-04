@@ -50,8 +50,8 @@
 .rifa-img {
   width: 100%;
   border-radius: 12px;
-  max-height: 320px;
-  object-fit: cover;
+  max-height: 420px;
+  object-fit: contain;
   box-shadow: 0 4px 16px rgba(0,0,0,.1);
 }
 
@@ -70,6 +70,9 @@
   font-size: .88rem;
   color: #444;
   margin-bottom: 1rem;
+
+  span { display: flex; align-items: center; gap: .3rem; }
+  .material-icons-round { font-size: 1rem; }
 }
 
 .sin-boletas {

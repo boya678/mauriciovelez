@@ -112,6 +112,27 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
             ]},
         ])
 
+    elif type == "contacto_transacciones":
+        if not settings.WHATSAPP_CONTACTO_TRANSACCIONES:
+            logger.warning("WHATSAPP_CONTACTO_TRANSACCIONES no configurado")
+            return
+        texto = params["texto"]
+        _send_template(numero_dest, settings.WHATSAPP_CONTACTO_TRANSACCIONES, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": texto},
+            ]},
+        ])
+
+    elif type == "notificar_renovacion":
+        if not settings.WHATSAPP_NOTIFICAR_RENOVACION:
+            return
+        fecha_fin = params.get("fecha_fin", "")
+        _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_RENOVACION, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": fecha_fin},
+            ]},
+        ])
+
     else:
         logger.warning("Tipo de notificación desconocido: %s", type)
 

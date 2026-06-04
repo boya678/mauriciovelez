@@ -20,6 +20,7 @@ export class RifasComponent implements OnInit {
   tiposCliente = signal<TipoClienteItem[]>([]);
   loading = signal(false);
   errorMsg = signal('');
+  successMsg = signal('');
   saving = signal(false);
 
   // Modal creación/edición
@@ -83,6 +84,7 @@ export class RifasComponent implements OnInit {
     this.fFile = null;
     this.fPreview = null;
     this.errorMsg.set('');
+    this.successMsg.set('');
     this.showModal.set(true);
   }
 
@@ -100,6 +102,7 @@ export class RifasComponent implements OnInit {
     this.fFile = null;
     this.fPreview = rifa.tiene_imagen ? this.svc.imagenUrl(rifa.id) : null;
     this.errorMsg.set('');
+    this.successMsg.set('');
     this.showModal.set(true);
   }
 
@@ -134,6 +137,7 @@ export class RifasComponent implements OnInit {
     }
     this.saving.set(true);
     this.errorMsg.set('');
+    this.successMsg.set('');
 
     const fd = new FormData();
     fd.append('titulo', this.fTitulo.trim());
@@ -147,12 +151,29 @@ export class RifasComponent implements OnInit {
     fd.append('tipos_cliente', JSON.stringify(this.fTiposCliente));
     if (this.fFile) fd.append('imagen', this.fFile);
 
-    const req$ = this.editId
-      ? this.svc.editar(this.editId, fd)
-      : this.svc.crear(fd);
+    if (this.editId) {
+      this.svc.editar(this.editId, fd).subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.showModal.set(false);
+          this.successMsg.set('');
+          this.load();
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.errorMsg.set(err?.error?.detail ?? 'Error al guardar la rifa.');
+        },
+      });
+      return;
+    }
 
-    req$.subscribe({
-      next: () => { this.saving.set(false); this.showModal.set(false); this.load(); },
+    this.svc.crear(fd).subscribe({
+      next: (res) => {
+        this.saving.set(false);
+        this.showModal.set(false);
+        this.successMsg.set(res.mensaje);
+        this.load();
+      },
       error: (err) => {
         this.saving.set(false);
         this.errorMsg.set(err?.error?.detail ?? 'Error al guardar la rifa.');

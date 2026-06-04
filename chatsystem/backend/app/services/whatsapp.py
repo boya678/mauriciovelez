@@ -100,6 +100,88 @@ async def send_interactive_message(
     return resp.json()
 
 
+async def upload_media(
+    phone_id: str,
+    token: str,
+    media_bytes: bytes,
+    mime_type: str,
+    filename: str,
+) -> str:
+    """Upload media to WhatsApp Cloud API and return media id."""
+    url = f"{WA_API_BASE}/{phone_id}/media"
+    headers = {"Authorization": f"Bearer {token}"}
+    files = {
+        "messaging_product": (None, "whatsapp"),
+        "file": (filename, media_bytes, mime_type),
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, headers=headers, files=files)
+    if resp.status_code >= 400:
+        logger.error("WhatsApp media upload failed %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    data = resp.json()
+    media_id = data.get("id")
+    if not media_id:
+        raise RuntimeError("Meta did not return media id")
+    return media_id
+
+
+async def send_image_message(
+    phone_id: str,
+    token: str,
+    to: str,
+    media_id: str,
+    caption: str | None = None,
+) -> dict:
+    """Send an image message referencing a previously uploaded media id."""
+    url = f"{WA_API_BASE}/{phone_id}/messages"
+    image_obj: dict = {"id": media_id}
+    if caption:
+        image_obj["caption"] = caption
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "image",
+        "image": image_obj,
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+    if resp.status_code >= 400:
+        logger.error("WhatsApp image send failed %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def send_audio_message(
+    phone_id: str,
+    token: str,
+    to: str,
+    media_id: str,
+) -> dict:
+    """Send an audio message referencing a previously uploaded media id."""
+    url = f"{WA_API_BASE}/{phone_id}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "audio",
+        "audio": {"id": media_id},
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+    if resp.status_code >= 400:
+        logger.error("WhatsApp audio send failed %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def download_media(media_id: str, token: str) -> tuple[bytes, str]:
     """
     Download a WhatsApp media file.
@@ -158,6 +240,10 @@ def parse_incoming_message(payload: dict) -> list[dict]:
                     doc = msg.get("document", {})
                     content = doc.get("filename", "") or "[documento]"
                     media_id = doc.get("id")
+                elif msg_type == "sticker":
+                    sticker = msg.get("sticker", {})
+                    content = "[sticker]"
+                    media_id = sticker.get("id")
                 elif msg_type == "interactive":
                     interactive = msg.get("interactive", {})
                     btn = interactive.get("button_reply") or interactive.get("list_reply")

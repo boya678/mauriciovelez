@@ -12,7 +12,7 @@ import { RifasService, RifaPublic } from '../../core/services/rifas.service';
       <a class="rifa-banner" routerLink="/portal/rifa">
         <span class="rifa-banner__icon material-icons-round">confirmation_number</span>
         <div class="rifa-banner__body">
-          <span class="rifa-banner__label">¡Rifa activa!</span>
+          <span class="rifa-banner__label">¡Evento activo!</span>
           <span class="rifa-banner__titulo">{{ rifa()!.titulo }}</span>
           <span class="rifa-banner__dates">
             {{ rifa()!.fecha_inicio | date:'d MMM' }} – {{ rifa()!.fecha_fin | date:'d MMM yyyy' }}

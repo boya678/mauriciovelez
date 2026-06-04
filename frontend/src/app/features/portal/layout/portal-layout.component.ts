@@ -43,7 +43,7 @@ export class PortalLayoutComponent implements OnInit, OnDestroy {
     if (this.cliente?.codigo_vip) {
       items.push({ label: 'Mis Datos', icon: 'manage_accounts', route: '/portal/mis-datos' });
     }
-    items.push({ label: 'Rifa', icon: 'confirmation_number', route: '/portal/rifa' });
+    items.push({ label: 'Evento', icon: 'confirmation_number', route: '/portal/rifa' });
     return items;
   }
 

@@ -58,3 +58,19 @@ class RifaBoleta(Base):
 
     rifa = relationship("Rifa", backref="boletas")
     cliente = relationship("Cliente", backref="rifa_boletas")
+
+
+class RifaNumero(Base):
+    __tablename__ = "rifa_numeros"
+
+    rifa_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("rifas.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    numero: Mapped[int] = mapped_column(Integer(), primary_key=True)
+    orden_aleatorio: Mapped[int] = mapped_column(Integer(), nullable=False)
+    asignado: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
+
+    rifa = relationship("Rifa", backref="numeros_pool")

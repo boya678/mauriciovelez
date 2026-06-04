@@ -176,10 +176,43 @@
 // ── Input area ────────────────────────────────────────────────────────────────
 .chat-input-area {
   display: flex;
+  align-items: flex-end;
   gap: 8px;
   padding: 12px 16px;
   background: #fff;
   border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  background: #f8fafc;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  input {
+    display: none;
+  }
+
+  &:hover {
+    background: #f1f5f9;
+  }
+}
+
+.mic-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 

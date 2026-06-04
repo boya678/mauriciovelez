@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -13,9 +14,10 @@ from app.database import get_db
 from app.models.cliente import Cliente
 from app.models.rifa import Rifa, RifaBoleta
 from app.models.tipo_cliente import TipoCliente
-from app.services.rifas import asignar_boletas_retroactivo
+from app.services.rifas import lanzar_procesamiento_rifa_background
 
 router = APIRouter(prefix="/admin/rifas", tags=["Admin Rifas"])
+logger = logging.getLogger(__name__)
 
 IMAGEN_MAX_BYTES = 5 * 1024 * 1024
 IMAGEN_MIMES = {"image/jpeg", "image/png", "image/webp"}
@@ -41,6 +43,11 @@ class RifaOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class RifaCreadaOut(BaseModel):
+    mensaje: str
+    rifa: RifaOut
 
 
 class TipoClienteOut(BaseModel):
@@ -107,7 +114,7 @@ def listar_rifas(
     return result
 
 
-@router.post("", response_model=RifaOut)
+@router.post("", response_model=RifaCreadaOut)
 def crear_rifa(
     titulo: str = Form(...),
     descripcion: Optional[str] = Form(None),
@@ -148,14 +155,16 @@ def crear_rifa(
         estado="activa",
     )
     db.add(rifa)
-    db.flush()  # para que rifa.id esté disponible antes de asignar boletas
-
-    asignadas = asignar_boletas_retroactivo(db, rifa)
     db.commit()
     db.refresh(rifa)
 
+    lanzar_procesamiento_rifa_background(rifa.id)
+
     total = db.query(RifaBoleta).filter(RifaBoleta.rifa_id == rifa.id).count()
-    return _to_out(rifa, total)
+    return RifaCreadaOut(
+        mensaje="El evento se está creando y seguirá procesándose en segundo plano.",
+        rifa=_to_out(rifa, total),
+    )
 
 
 @router.get("/{rifa_id}/imagen")
@@ -190,13 +199,13 @@ def editar_rifa(
         raise HTTPException(404, "Rifa no encontrada")
     if seq_inicio > seq_fin:
         raise HTTPException(400, "seq_inicio no puede ser mayor que seq_fin")
+    if seq_inicio != rifa.seq_inicio or seq_fin != rifa.seq_fin:
+        raise HTTPException(400, "No se permite editar la secuencia de la rifa")
 
     rifa.titulo = titulo
     rifa.descripcion = descripcion
     rifa.fecha_inicio = fecha_inicio
     rifa.fecha_fin = fecha_fin
-    rifa.seq_inicio = seq_inicio
-    rifa.seq_fin = seq_fin
     rifa.boletas_por_renovacion = boletas_por_renovacion
     rifa.solo_vip = solo_vip
     rifa.tipos_cliente = json.loads(tipos_cliente) if tipos_cliente else []

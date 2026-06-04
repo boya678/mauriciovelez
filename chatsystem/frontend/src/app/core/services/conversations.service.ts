@@ -32,6 +32,13 @@ export class ConversationsService {
     return this.http.post<Message>(`${environment.apiUrl}/api/v1/conversations/${id}/send`, { content });
   }
 
+  sendMedia(id: string, file: Blob, filename: string, caption = '') {
+    const formData = new FormData();
+    formData.append('file', file, filename);
+    formData.append('caption', caption);
+    return this.http.post<Message>(`${environment.apiUrl}/api/v1/conversations/${id}/send-media`, formData);
+  }
+
   startConversation(phone: string) {
     return this.http.post<Conversation>(`${environment.apiUrl}/api/v1/conversations`, { phone });
   }

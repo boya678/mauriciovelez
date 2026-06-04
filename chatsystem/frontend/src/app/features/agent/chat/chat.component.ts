@@ -39,9 +39,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   newMessage = '';
   showReopenConfirm = signal(false);
   reopening = signal(false);
+  recording = signal(false);
+  mediaSending = signal(false);
 
   private shouldScroll = false;
   private wsSub?: Subscription;
+  private mediaRecorder?: MediaRecorder;
+  private mediaStream?: MediaStream;
+  private recordedChunks: BlobPart[] = [];
 
   @ViewChild('msgContainer') msgContainer!: ElementRef<HTMLDivElement>;
 
@@ -133,6 +138,130 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         );
       },
     });
+  }
+
+  onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const id = this.conversation()?.id;
+    const file = input.files?.[0];
+    if (!id || !file || this.mediaSending()) return;
+
+    this.mediaSending.set(true);
+    this.sendError.set(null);
+    this.conversationsService.sendMedia(id, file, file.name, '').subscribe({
+      next: () => {
+        this.mediaSending.set(false);
+        this.load(id);
+        input.value = '';
+      },
+      error: (err) => {
+        this.mediaSending.set(false);
+        const detail = err?.error?.detail;
+        this.sendError.set(
+          typeof detail === 'string' ? detail : 'Error al enviar la imagen. Intenta de nuevo.'
+        );
+        input.value = '';
+      },
+    });
+  }
+
+  async startRecording(): Promise<void> {
+    const id = this.conversation()?.id;
+    if (!id || this.recording() || this.mediaSending()) return;
+
+    try {
+      this.sendError.set(null);
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const supportedMime = this.getPreferredAudioMimeType();
+      this.recordedChunks = [];
+      this.mediaRecorder = supportedMime
+        ? new MediaRecorder(this.mediaStream, { mimeType: supportedMime })
+        : new MediaRecorder(this.mediaStream);
+
+      this.mediaRecorder.ondataavailable = (ev: BlobEvent) => {
+        if (ev.data && ev.data.size > 0) this.recordedChunks.push(ev.data);
+      };
+      this.mediaRecorder.onstop = () => {
+        void this.sendRecordedAudio();
+      };
+
+      this.mediaRecorder.start();
+      this.recording.set(true);
+    } catch (err) {
+      this.cleanupRecorder();
+      this.sendError.set('No se pudo acceder al micrófono. Revisa permisos del navegador.');
+    }
+  }
+
+  stopRecording(): void {
+    if (!this.mediaRecorder || !this.recording()) return;
+    this.recording.set(false);
+    if (this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+  }
+
+  private async sendRecordedAudio(): Promise<void> {
+    const id = this.conversation()?.id;
+    if (!id) {
+      this.cleanupRecorder();
+      return;
+    }
+
+    const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
+    const ext = this.extensionForMime(mimeType);
+    const blob = new Blob(this.recordedChunks, { type: mimeType });
+    this.recordedChunks = [];
+
+    if (!blob.size) {
+      this.cleanupRecorder();
+      this.sendError.set('No se capturó audio. Intenta grabar de nuevo.');
+      return;
+    }
+
+    this.mediaSending.set(true);
+    this.conversationsService.sendMedia(id, blob, `voice_note.${ext}`, '').subscribe({
+      next: () => {
+        this.mediaSending.set(false);
+        this.cleanupRecorder();
+        this.load(id);
+      },
+      error: (err) => {
+        this.mediaSending.set(false);
+        this.cleanupRecorder();
+        const detail = err?.error?.detail;
+        this.sendError.set(
+          typeof detail === 'string' ? detail : 'Error al enviar el audio. Intenta de nuevo.'
+        );
+      },
+    });
+  }
+
+  private getPreferredAudioMimeType(): string {
+    const candidates = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/mp4'];
+    for (const mime of candidates) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime)) {
+        return mime;
+      }
+    }
+    return '';
+  }
+
+  private extensionForMime(mimeType: string): string {
+    if (mimeType.includes('ogg')) return 'ogg';
+    if (mimeType.includes('mp4')) return 'mp4';
+    if (mimeType.includes('mpeg')) return 'mp3';
+    return 'webm';
+  }
+
+  private cleanupRecorder(): void {
+    try {
+      this.mediaStream?.getTracks().forEach((t) => t.stop());
+    } catch {
+      // ignore cleanup errors
+    }
+    this.mediaStream = undefined;
+    this.mediaRecorder = undefined;
   }
 
   onEnter(event: KeyboardEvent): void {
@@ -234,6 +363,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   ngOnDestroy(): void {
+    this.cleanupRecorder();
     this.wsSub?.unsubscribe();
   }
 }

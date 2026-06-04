@@ -20,10 +20,28 @@ export class TransaccionesComponent implements OnInit {
   totalPages = signal(1);
   total = signal(0);
 
+  // Acciones
+  actionLoading = signal<string | null>(null); // id de la transaccion en proceso
+
+  // Modal eliminar
+  modalEliminar = signal<Transaccion | null>(null);
+  modalEliminarError = signal('');
+
+  // Modal renovar
+  modalRenovar = signal<Transaccion | null>(null);
+  modalRenovarError = signal('');
+  modalRenovarExito = signal('');
+
+  // Modal mensaje
+  modalMensaje = signal<Transaccion | null>(null);
+  textoMensaje = '';
+  modalLoading = signal(false);
+  modalError = signal('');
+
   constructor(private svc: TransaccionesService) {}
 
   ngOnInit() {
-    this.fecha = new Date().toISOString().slice(0, 10);
+    this.fecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
     this.load();
   }
 
@@ -67,4 +85,98 @@ export class TransaccionesComponent implements OnInit {
     this.lightboxSrc.set(null);
   }
 
+  // ── Acciones ──────────────────────────────────────────────────────────────
+
+  onEliminar(t: Transaccion) {
+    this.modalEliminarError.set('');
+    this.modalEliminar.set(t);
+  }
+
+  closeModalEliminar() {
+    this.modalEliminar.set(null);
+    this.modalEliminarError.set('');
+  }
+
+  confirmarEliminar() {
+    const t = this.modalEliminar();
+    if (!t) return;
+    this.actionLoading.set(t.id);
+    this.svc.eliminar(t.id).subscribe({
+      next: () => {
+        this.actionLoading.set(null);
+        this.items.update(list => list.filter(i => i.id !== t.id));
+        this.total.update(n => n - 1);
+        this.closeModalEliminar();
+      },
+      error: () => {
+        this.actionLoading.set(null);
+        this.modalEliminarError.set('Error al eliminar la transacción');
+      },
+    });
+  }
+
+  onRenovar(t: Transaccion) {
+    this.modalRenovarError.set('');
+    this.modalRenovarExito.set('');
+    this.modalRenovar.set(t);
+  }
+
+  closeModalRenovar() {
+    this.modalRenovar.set(null);
+    this.modalRenovarError.set('');
+    this.modalRenovarExito.set('');
+  }
+
+  confirmarRenovar() {
+    const t = this.modalRenovar();
+    if (!t) return;
+    this.actionLoading.set(t.id);
+    this.modalRenovarError.set('');
+    this.svc.renovar(t.id).subscribe({
+      next: (res) => {
+        this.actionLoading.set(null);
+        this.items.update(list => list.filter(i => i.id !== t.id));
+        this.total.update(n => n - 1);
+        const fecha = new Intl.DateTimeFormat('es-CO', {
+          timeZone: 'America/Bogota', day: '2-digit', month: '2-digit', year: 'numeric'
+        }).format(new Date(res.nueva_fin));
+        this.modalRenovarExito.set(`Suscripción renovada para ${res.cliente}. Vence: ${fecha}`);
+      },
+      error: (err) => {
+        this.actionLoading.set(null);
+        this.modalRenovarError.set(err?.error?.detail || 'Error al renovar la suscripción');
+      },
+    });
+  }
+
+  openModalMensaje(t: Transaccion) {
+    this.modalMensaje.set(t);
+    this.textoMensaje = '';
+    this.modalError.set('');
+  }
+
+  closeModalMensaje() {
+    this.modalMensaje.set(null);
+    this.textoMensaje = '';
+    this.modalError.set('');
+  }
+
+  onEnviarMensaje() {
+    const t = this.modalMensaje();
+    if (!t) return;
+    if (!this.textoMensaje.trim()) { this.modalError.set('El mensaje no puede estar vacío'); return; }
+    this.modalLoading.set(true);
+    this.modalError.set('');
+    this.svc.enviarMensaje(t.id, this.textoMensaje.trim()).subscribe({
+      next: () => {
+        this.modalLoading.set(false);
+        this.closeModalMensaje();
+      },
+      error: (err) => {
+        this.modalLoading.set(false);
+        this.modalError.set(err?.error?.detail || 'Error al enviar el mensaje');
+      },
+    });
+  }
 }
+

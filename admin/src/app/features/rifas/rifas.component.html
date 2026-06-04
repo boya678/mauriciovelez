@@ -1,12 +1,16 @@
 <div class="page">
   <!-- ── Encabezado ─────────────────────────────────────────────────── -->
   <div class="page-header">
-    <h2 class="page-title">Rifas</h2>
-    <button class="btn btn-primary" (click)="openNew()">+ Nueva Rifa</button>
+    <h2 class="page-title">Eventos</h2>
+    <button class="btn btn-primary" (click)="openNew()">+ Nuevo Evento</button>
   </div>
 
   @if (loading()) {
     <p class="loading-text">Cargando…</p>
+  }
+
+  @if (successMsg()) {
+    <div class="alert-success">{{ successMsg() }}</div>
   }
 
   <!-- ── Lista de rifas ─────────────────────────────────────────────── -->
@@ -115,7 +119,7 @@
     }
 
     @if (rifas().length === 0 && !loading()) {
-      <p class="empty-state">No hay rifas registradas. Crea la primera.</p>
+      <p class="empty-state">No hay eventos registrados. Crea el primero.</p>
     }
   </div>
 </div>
@@ -125,7 +129,7 @@
   <div class="modal-overlay" (click)="closeModal()">
     <div class="modal" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3>{{ editId ? 'Editar Rifa' : 'Nueva Rifa' }}</h3>
+        <h3>{{ editId ? 'Editar Evento' : 'Nuevo Evento' }}</h3>
         <button class="btn-close" (click)="closeModal()">✕</button>
       </div>
 
@@ -137,7 +141,7 @@
         <div class="form-grid">
           <label class="form-label full">
             Título *
-            <input type="text" class="form-input" [(ngModel)]="fTitulo" placeholder="Nombre de la rifa" />
+            <input type="text" class="form-input" [(ngModel)]="fTitulo" placeholder="Nombre del evento" />
           </label>
 
           <label class="form-label full">
@@ -204,7 +208,7 @@
       <div class="modal-footer">
         <button class="btn btn-ghost" (click)="closeModal()">Cancelar</button>
         <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
-          {{ saving() ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear rifa') }}
+          {{ saving() ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear evento') }}
         </button>
       </div>
     </div>
@@ -223,7 +227,7 @@
         @if (ganadorError) {
           <div class="alert-error">{{ ganadorError }}</div>
         }
-        <p>Rifa: <strong>{{ rifaGanador?.titulo }}</strong></p>
+        <p>Evento: <strong>{{ rifaGanador?.titulo }}</strong></p>
         <p>Rango válido: {{ rifaGanador?.seq_inicio }} – {{ rifaGanador?.seq_fin }}</p>
         <label class="form-label full">
           Número ganador

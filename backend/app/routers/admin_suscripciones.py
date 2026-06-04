@@ -1,26 +1,20 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from zoneinfo import ZoneInfo
 
 import openpyxl
 import io
-from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select as _select
 from sqlalchemy.orm import Session
 
 from app.core.admin_security import get_current_platform_user, require_admin
 from app.database import get_db
-from app.models.audit_log import AuditLog
-from app.models.numbers_users import NumberUser
-from app.models.suscripcion import Suscripcion
-from app.models.cuenta_vip import acumular_cuenta_vip
 from app.models.cliente import Cliente
+from app.models.suscripcion import Suscripcion
 from app.core import scheduler as _scheduler_module
-from app.services.numbers import assign_number, notificar_nuevo_numero_vip
+from app.services.suscripciones import renovar_cliente
 
 router = APIRouter(prefix="/admin/suscripciones", tags=["Admin Suscripciones"])
 
@@ -101,91 +95,34 @@ def renovar(
         raise HTTPException(status_code=404, detail="Suscripción no encontrada")
 
     cliente = db.get(Cliente, sus.cliente_id)
-    now = datetime.now(timezone.utc)
+    if cliente is None:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    # 1. Inactivar todas las suscripciones anteriores del cliente (vencidas y la que se está renovando)
-    db.query(Suscripcion).filter(
-        Suscripcion.cliente_id == sus.cliente_id,
-    ).update({"activa": False}, synchronize_session="fetch")
+    if cliente.tipo_cliente != 1:
+        raise HTTPException(status_code=400, detail="Solo se puede renovar clientes de tipo 1")
 
-    # 2. Crear nueva suscripción sumando 1 mes desde el fin actual si aún está vigente,
-    #    o desde ahora si ya venció (así no se pierden los días restantes).
-    fin_actual = sus.fin if sus.fin.tzinfo else sus.fin.replace(tzinfo=timezone.utc)
-    base_fin = fin_actual if fin_actual > now else now
-    nueva_fin = base_fin + relativedelta(months=1)
-    nueva = Suscripcion(
-        cliente_id=sus.cliente_id,
-        inicio=now,
-        fin=nueva_fin,
-        activa=True,
-    )
-    db.add(nueva)
-
-    # 3. Asegurar que el cliente quede marcado como VIP y habilitado
-    if cliente:
-        era_vip = cliente.vip
-        if not cliente.vip:
-            cliente.vip = True
-        cliente.enabled = True
-
-    # 4. Asignar números si no tiene (o vencieron), sin esperar al cron
-    if cliente:
-        today = datetime.now(ZoneInfo("America/Bogota")).date()
-
-        free_row = db.execute(
-            _select(NumberUser).where(
-                NumberUser.id_user == cliente.id,
-                NumberUser.type == "free",
-            )
-        ).scalar_one_or_none()
-        if free_row is None or free_row.valid_until < today:
-            assign_number(db, cliente.id, "free")
-
-        vip_row = db.execute(
-            _select(NumberUser).where(
-                NumberUser.id_user == cliente.id,
-                NumberUser.type == "vip",
-            )
-        ).scalar_one_or_none()
-        if vip_row is None or vip_row.valid_until < today:
-            nueva_vip = assign_number(db, cliente.id, "vip")
-            if cliente.celular:
-                celular_wp = f"{cliente.codigo_pais or '57'}{cliente.celular}"
-                notificar_nuevo_numero_vip(celular_wp, nueva_vip.number, nueva_vip.valid_until)
-
-    acumular_cuenta_vip(db)
-
-    # Asignar boletas de rifa si hay una activa y el cliente aplica
-    if cliente:
-        from app.services.rifas import asignar_boletas_por_suscripcion
-        asignar_boletas_por_suscripcion(db, cliente, nueva.id)
-
-    db.add(AuditLog(
+    nueva, era_vip = renovar_cliente(
+        db=db,
+        cliente=cliente,
         platform_user_id=user.id,
         usuario=user.usuario,
-        action="RENOVAR",
-        entity="suscripciones",
-        entity_id=str(suscripcion_id),
-        detail={
-            "cliente_id": str(sus.cliente_id),
-            "nombre": cliente.nombre if cliente else "",
-            "nueva_inicio": now.isoformat(),
-            "nueva_fin": nueva_fin.isoformat(),
-        },
-    ))
+        audit_action="RENOVAR",
+        audit_entity="suscripciones",
+        audit_entity_id=str(suscripcion_id),
+    )
 
     db.commit()
     db.refresh(nueva)
 
-    if cliente and not era_vip:
+    if not era_vip:
         from app.core.live_events import publish_event
         publish_event("nuevo_vip", {"nombre": cliente.nombre})
 
     return SuscripcionOut(
         id=nueva.id,
         cliente_id=nueva.cliente_id,
-        nombre=cliente.nombre if cliente else "",
-        celular=cliente.celular if cliente else "",
+        nombre=cliente.nombre,
+        celular=cliente.celular,
         inicio=nueva.inicio,
         fin=nueva.fin,
         activa=nueva.activa,

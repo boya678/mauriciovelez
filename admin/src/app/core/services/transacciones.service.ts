@@ -8,6 +8,7 @@ export interface ClienteInfo {
   vip: boolean | null;
   activo: boolean | null;
   tipo_nombre: string | null;
+  tipo_cliente: number | null;
 }
 
 export interface Transaccion {
@@ -39,4 +40,17 @@ export class TransaccionesService {
     if (fecha) params = params.set('fecha', fecha);
     return this.http.get<PagedTransacciones>(this.base, { params });
   }
+
+  eliminar(id: string) {
+    return this.http.post<{ ok: boolean }>(`${this.base}/${id}/eliminar`, {});
+  }
+
+  renovar(id: string) {
+    return this.http.post<{ ok: boolean; cliente: string; nueva_fin: string }>(`${this.base}/${id}/renovar`, {});
+  }
+
+  enviarMensaje(id: string, texto: string) {
+    return this.http.post<{ ok: boolean }>(`${this.base}/${id}/mensaje`, { texto });
+  }
 }
+

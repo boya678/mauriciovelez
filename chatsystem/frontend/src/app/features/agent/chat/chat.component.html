@@ -55,6 +55,13 @@
               @if (msg.content && msg.content !== '[imagen]') {
                 <p class="bubble-caption">{{ msg.content }}</p>
               }
+            } @else if (msg.message_type === 'sticker' && msg.media_content) {
+              <img
+                class="bubble-img"
+                [src]="'data:' + (msg.media_mime_type || 'image/webp') + ';base64,' + msg.media_content"
+                alt="sticker"
+                (click)="openImg($event)"
+              />
             } @else if (msg.message_type === 'audio' && msg.media_content) {
               <audio
                 class="bubble-audio"
@@ -110,14 +117,43 @@
         </div>
       }
       <div class="chat-input-area">
+        <label class="attach-btn" title="Enviar imagen">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            (change)="onImageSelected($event)"
+            [disabled]="sending() || mediaSending() || recording()"
+          />
+          <span class="material-icons">image</span>
+        </label>
+        @if (!recording()) {
+          <button
+            class="btn btn-secondary mic-btn"
+            (click)="startRecording()"
+            [disabled]="sending() || mediaSending()"
+            title="Grabar audio"
+          >
+            <span class="material-icons">mic</span>
+          </button>
+        } @else {
+          <button
+            class="btn btn-danger mic-btn"
+            (click)="stopRecording()"
+            [disabled]="mediaSending()"
+            title="Detener y enviar audio"
+          >
+            <span class="material-icons">stop</span>
+          </button>
+        }
         <textarea
           class="form-control chat-textarea"
           placeholder="Escribe un mensaje… (Enter para enviar)"
           [(ngModel)]="newMessage"
           (keydown)="onEnter($event)"
           rows="2"
+          [disabled]="recording()"
         ></textarea>
-        <button class="btn btn-primary send-btn" (click)="send()" [disabled]="sending() || !newMessage.trim()">
+        <button class="btn btn-primary send-btn" (click)="send()" [disabled]="sending() || mediaSending() || recording() || !newMessage.trim()">
           {{ sending() ? '…' : '➤' }}
         </button>
       </div>
