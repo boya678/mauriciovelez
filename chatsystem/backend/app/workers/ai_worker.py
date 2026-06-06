@@ -409,39 +409,53 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 "token": tenant.whatsapp_token if tenant else "",
             }
             interactive = result.get("interactive_payload")
-
-            # If the pending image was NOT handled by the tool this turn (queue
-            # still has the image) and the LLM didn't emit a menu payload,
-            # force-inject the tenant menu so the user always sees buttons,
-            # regardless of what the LLM chose to include in its reply.
-            if not interactive and has_pending_image:
-                still_pending = await redis.lindex(pending_image_key, 0)
-                if still_pending:
-                    raw_menu = (getattr(tenant, "image_menu_payload", None) or "").strip() if tenant else ""
-                    if raw_menu:
-                        try:
-                            from app.agents.nodes import parse_menu_reply as _pmr
-                            import json as _json_fi
-                            interactive = _pmr(raw_menu)
-                            if interactive:
-                                parsed_body = _json_fi.loads(raw_menu).get("body", "")
-                                if parsed_body and not result["bot_reply"]:
-                                    result = dict(result)
-                                    result["bot_reply"] = parsed_body
-                                    bot_msg.content = parsed_body
-                                logger.info(
-                                    "Force-injected image menu for conv %s (still pending, LLM skipped menu)",
-                                    conversation_id,
-                                )
-                        except Exception as _fi_err:
-                            logger.warning("Could not force-inject image menu: %s", _fi_err)
-
             if interactive:
                 import json as _json
                 outgoing_payload["interactive_payload"] = _json.dumps(interactive)
 
             await xadd(redis, OUTGOING_STREAM, outgoing_payload)
             logger.info("Bot replied to conv %s", conversation_id)
+
+            # If the image is still pending (LLM answered but didn't call the
+            # tool), send a second message with only the interactive menu so
+            # the user always sees the buttons regardless of what the LLM said.
+            if has_pending_image and not interactive:
+                still_pending = await redis.lindex(pending_image_key, 0)
+                if still_pending:
+                    raw_menu = (getattr(tenant, "image_menu_payload", None) or "").strip() if tenant else ""
+                    if raw_menu:
+                        try:
+                            from app.agents.nodes import parse_menu_reply as _pmr
+                            import json as _json_menu
+                            menu_interactive = _pmr(raw_menu)
+                            if menu_interactive:
+                                menu_msg = Message(
+                                    id=uuid.uuid4(),
+                                    conversation_id=conversation_id,
+                                    sender_type=SenderType.BOT,
+                                    content="",
+                                    status=MessageStatus.PROCESSED,
+                                    created_at=now,
+                                )
+                                async with AsyncSessionLocal() as menu_db:
+                                    menu_db.add(menu_msg)
+                                    await menu_db.commit()
+                                await xadd(redis, OUTGOING_STREAM, {
+                                    "tenant_id": tenant_id,
+                                    "tenant_slug": tenant_slug,
+                                    "phone": phone,
+                                    "message_id": str(menu_msg.id),
+                                    "content": "",
+                                    "phone_id": tenant.whatsapp_phone_id if tenant else "",
+                                    "token": tenant.whatsapp_token if tenant else "",
+                                    "interactive_payload": _json_menu.dumps(menu_interactive),
+                                })
+                                logger.info(
+                                    "Sent follow-up image menu for conv %s (image still pending)",
+                                    conversation_id,
+                                )
+                        except Exception as _menu_err:
+                            logger.warning("Could not send follow-up image menu: %s", _menu_err)
 
             # Record token usage
             t_in  = result.get("tokens_in",  0)

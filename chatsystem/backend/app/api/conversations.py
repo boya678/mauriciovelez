@@ -334,7 +334,7 @@ class SendMessageBody(BaseModel):
 
 
 ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
-ALLOWED_AUDIO_MIME_TYPES = {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/webm"}
+ALLOWED_AUDIO_MIME_TYPES = {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/webm", "video/webm"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_AUDIO_BYTES = 16 * 1024 * 1024
 
@@ -458,10 +458,15 @@ async def send_media_message(
 
     raw_mime_type = (file.content_type or "").lower().strip()
     mime_type = raw_mime_type.split(";", 1)[0].strip()
-    if not mime_type or mime_type == "application/octet-stream":
-        filename = (file.filename or "").lower().strip()
-        ext = filename.rsplit(".", 1)[-1] if "." in filename else ""
-        mime_type = EXTENSION_TO_MIME.get(ext, mime_type)
+    # Always try extension fallback if the mime type is unrecognized or generic.
+    if (
+        not mime_type
+        or mime_type == "application/octet-stream"
+        or (mime_type not in ALLOWED_IMAGE_MIME_TYPES and mime_type not in ALLOWED_AUDIO_MIME_TYPES)
+    ):
+        _filename = (file.filename or "").lower().strip()
+        _ext = _filename.rsplit(".", 1)[-1] if "." in _filename else ""
+        mime_type = EXTENSION_TO_MIME.get(_ext, mime_type)
     if mime_type in ALLOWED_IMAGE_MIME_TYPES:
         message_type = "image"
         max_bytes = MAX_IMAGE_BYTES

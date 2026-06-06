@@ -100,7 +100,6 @@
             <tr>
               <th>Lotería</th>
               <th>Número</th>
-              <th>Ganadores software</th>
             </tr>
           </thead>
           <tbody>
@@ -113,14 +112,6 @@
                   </span>
                 </td>
                 <td class="num num-big">{{ r.resultado }}</td>
-                <td>
-                  @if (r.total_aciertos > 0) {
-                    <span class="badge badge--gold">{{ r.total_aciertos }}</span>
-                  } @else {
-                    <span class="mono dim">—</span>
-                  }
-                </td>
-
               </tr>
             }
           </tbody>

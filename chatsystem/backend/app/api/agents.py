@@ -158,14 +158,19 @@ class PromptSettings(BaseModel):
 @router.get("/settings", response_model=PromptSettings)
 async def get_settings(
     tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_db),
     _=Depends(require_admin),
 ):
     """Returns editable tenant settings (system prompt)."""
+    from app.models.tenant import Tenant
+    t = await db.scalar(select(Tenant).where(Tenant.id == tenant.id))
+    if not t:
+        raise HTTPException(status_code=404, detail="Tenant not found")
     return PromptSettings(
-        ai_system_prompt=tenant.ai_system_prompt,
-        whatsapp_template_name=tenant.whatsapp_template_name,
-        whatsapp_template_language=tenant.whatsapp_template_language,
-        image_menu_payload=tenant.image_menu_payload,
+        ai_system_prompt=t.ai_system_prompt,
+        whatsapp_template_name=t.whatsapp_template_name,
+        whatsapp_template_language=t.whatsapp_template_language,
+        image_menu_payload=t.image_menu_payload,
     )
 
 

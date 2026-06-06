@@ -98,6 +98,21 @@ async def _process_entry(entry_id: str, data: dict) -> None:
             media_bytes = base64.b64decode(media_content)
             mime = str(media_mime_type or "audio/ogg")
             filename = str(media_filename or "audio.ogg")
+            # WhatsApp does not support audio/webm or video/webm.
+            # Convert to ogg/opus before uploading.
+            if "webm" in mime:
+                try:
+                    import io as _io
+                    from pydub import AudioSegment as _AS
+                    _audio = _AS.from_file(_io.BytesIO(media_bytes), format="webm")
+                    _buf = _io.BytesIO()
+                    _audio.export(_buf, format="ogg", codec="libopus")
+                    media_bytes = _buf.getvalue()
+                    mime = "audio/ogg"
+                    filename = (filename.rsplit(".", 1)[0] if "." in filename else filename) + ".ogg"
+                    logger.info("Converted webm audio to ogg for msg %s", message_id)
+                except Exception as _conv_err:
+                    logger.warning("Audio webm→ogg conversion failed for msg %s: %s", message_id, _conv_err)
             media_id = await upload_media(phone_id, token, media_bytes, mime, filename)
             await send_audio_message(
                 phone_id=phone_id,

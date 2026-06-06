@@ -79,8 +79,8 @@ async def assign_agent(
 ) -> Agent | None:
     """
     Find best available agent and assign conversation.
-    Assignment does NOT require the agent to be online —
-    any active agent with capacity will do.
+    Only assigns to agents that are currently ONLINE (presence key in Redis)
+    and have capacity (active_count < max_concurrent_chats).
     Returns the Agent or None if none available.
     """
     conv_id_str = str(conversation_id)
@@ -111,13 +111,16 @@ async def assign_agent(
             logger.info("No agents configured for tenant %s", tenant_id)
             return None
 
-        # 2. Rotate through agents until we find one with capacity
+        # 2. Rotate through agents until we find one online with capacity
         for _ in range(queue_len):
             agent_id = await redis.rpoplpush(q, q)
             if not agent_id:
                 break
 
-            # 3. Check DB capacity (no online/presence check — assign regardless)
+            # 3. Check presence (only assign to online agents)
+            if not await is_online(redis, tenant_id, agent_id):
+                continue
+
             agent_uuid = uuid.UUID(agent_id)
             result = await db.execute(
                 select(Agent).where(

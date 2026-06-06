@@ -31,5 +31,8 @@ python-multipart>=0.0.9
 # pgvector Python client
 pgvector>=0.3.0
 
+# Audio conversion (webm→ogg for WhatsApp compatibility)
+pydub>=0.25.0
+
 # WebSockets (bundled with uvicorn[standard], listed for clarity)
 websockets>=12.0

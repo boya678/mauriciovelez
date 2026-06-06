@@ -393,21 +393,13 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
                 "explícitamente que la imagen no tiene relación → llama a "
                 "'guardar_descripcion_imagen' con description='descartada'.\n"
                 "  3. Si el usuario envió un mensaje que NO tiene relación con "
-                "la imagen (cambia de tema) → responde su consulta brevemente "
-                "y al final añade un mensaje como: '⚠️ Es importante que me "
-                "indiques para qué fue la imagen que enviaste — por favor "
-                "selecciona una opción:' y muéstrale de nuevo el menú"
-            )
-            if image_menu_payload:
-                block_image += (
-                    f" usando exactamente este JSON:\n{image_menu_payload}"
-                )
-            else:
-                block_image += (
-                    " preguntándole amablemente para qué fue la imagen."
-                )
-            block_image += (
-                "\nNO inventes ni asumas la descripción — espera la selección "
+                "la imagen (cambia de tema) → responde su consulta con "
+                "normalidad y al final añade UNA sola frase recordatoria, "
+                "por ejemplo: '⚠️ Recuerda que aún necesito saber para qué "
+                "fue la imagen que enviaste.'\n"
+                "NUNCA generes JSON ni menús en tu respuesta — el sistema "
+                "enviará el menú de opciones automáticamente.\n"
+                "NO inventes ni asumas la descripción — espera la selección "
                 "o respuesta explícita del usuario."
             )
 
