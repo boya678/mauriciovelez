@@ -51,14 +51,39 @@ async def list_conversations(
     db: AsyncSession = Depends(get_tenant_db),
     _agent=Depends(require_agent),
 ):
-    q = select(Conversation).where(Conversation.tenant_id == tenant.id)
-    if status_filter:
-        q = q.where(Conversation.status == status_filter)
-    q = q.order_by(Conversation.updated_at.desc())
-    q = q.offset((page - 1) * page_size).limit(page_size)
-    result = await db.scalars(q)
-    convs = result.all()
-    return [ConversationOut.model_validate(c) for c in convs]
+    from sqlalchemy import text as _text
+    schema = tenant.schema
+    offset = (page - 1) * page_size
+    status_clause = "AND c.status = :status" if status_filter else ""
+    rows = (await db.execute(
+        _text(f"""
+            SELECT c.id, c.tenant_id, c.phone, c.status, c.assigned_agent_id,
+                   c.created_at, c.updated_at, c.closed_at, c.last_user_message_at,
+                   ct.tags
+            FROM {schema}.conversations c
+            LEFT JOIN {schema}.contactos ct ON ct.id = c.phone
+            WHERE c.tenant_id = :tenant_id {status_clause}
+            ORDER BY c.updated_at DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        {"tenant_id": str(tenant.id), "status": status_filter, "limit": page_size, "offset": offset},
+    )).mappings().all()
+
+    return [
+        ConversationOut(
+            id=r["id"],
+            tenant_id=r["tenant_id"],
+            phone=r["phone"],
+            status=r["status"],
+            assigned_agent_id=r["assigned_agent_id"],
+            created_at=r["created_at"],
+            updated_at=r["updated_at"],
+            closed_at=r["closed_at"],
+            last_user_message_at=r["last_user_message_at"],
+            tags=r["tags"],
+        )
+        for r in rows
+    ]
 
 
 # ── Start outbound conversation ───────────────────────────────────────────────

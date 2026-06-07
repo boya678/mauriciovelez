@@ -1,11 +1,15 @@
 import logging
+import re
 import unicodedata
 import uuid
 from datetime import date, datetime, timezone
 
 import httpx
+import psycopg2
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from psycopg2 import sql
+from psycopg2.extras import execute_batch
 from zoneinfo import ZoneInfo
 
 from app.core.config import settings
@@ -26,6 +30,8 @@ LOTERIAS_API = "https://portal.supergirosnortedelvalle.com/api/resultados"
 
 logger = logging.getLogger(__name__)
 
+CONTACT_TAG_KEYS = {"vip", "tipo_cliente", "estado", "nombre", "codigo_vip"}
+
 
 def _normalizar(texto: str) -> str:
     """Convierte a mayúsculas y elimina tildes/diacríticos."""
@@ -40,6 +46,51 @@ def _loterias_evitar() -> set[str]:
     if not raw:
         return set()
     return {_normalizar(n.strip()) for n in raw.split(",") if n.strip()}
+
+
+def _phone_key(value: str | None) -> str:
+    if not value:
+        return ""
+    digits = re.sub(r"\D", "", value)
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
+def _sanitize_tag_value(value: str | None) -> str:
+    if value is None:
+        return ""
+    sanitized = str(value).replace(",", " ").strip()
+    return re.sub(r"\s+", " ", sanitized)
+
+
+def _merge_contact_tags(
+    existing_tags: str | None,
+    vip: str,
+    tipo_cliente: str,
+    estado: str,
+    nombre: str,
+    codigo_vip: str,
+) -> str:
+    tags = existing_tags or ""
+    parsed: list[tuple[str | None, str]] = []
+    for part in tags.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        if ":" in token:
+            key, value = token.split(":", 1)
+            parsed.append((key.strip().lower(), f"{key.strip()}:{value.strip()}"))
+        else:
+            parsed.append((None, token))
+
+    kept = [raw for key, raw in parsed if key not in CONTACT_TAG_KEYS]
+    kept.extend([
+        f"vip:{vip}",
+        f"tipo_cliente:{tipo_cliente}",
+        f"estado:{estado}",
+        f"nombre:{nombre}",
+        f"codigo_vip:{codigo_vip}",
+    ])
+    return ",".join(kept)
 
 _scheduler = BackgroundScheduler(timezone="UTC")
 
@@ -404,6 +455,108 @@ def _reasignar_numeros_vencidos() -> None:
         db.close()
 
 
+def _sincronizar_tags_contactos() -> None:
+    """
+    Sincroniza en DB2 (tabla contactos.tags) el estado de cada número con datos de DB1:
+    - vip: si/no
+    - tipo_cliente: entero
+    - estado: activo/inactivo/no_cliente
+    - nombre: nombre del cliente
+    - codigo_vip: código del cliente
+    """
+    print("[CRON contactos] Inicio")
+    if not settings.DATABASE_URL_2:
+        logger.warning("CRON_CONTACTOS omitido: DATABASE_URL_2 no está configurada")
+        return
+
+    db = SessionLocal()
+    conn2 = None
+    try:
+        clientes_rows = (
+            db.query(
+                Cliente.celular,
+                Cliente.vip,
+                Cliente.tipo_cliente,
+                Cliente.enabled,
+                Cliente.nombre,
+                Cliente.codigo_vip,
+            )
+            .all()
+        )
+
+        clientes_by_phone: dict[str, tuple[str, str, str, str, str]] = {}
+        for celular, vip, tipo_cliente, enabled, nombre, codigo_vip in clientes_rows:
+            k = _phone_key(celular)
+            if not k:
+                continue
+            vip_tag = "si" if bool(vip) else "no"
+            tipo_tag = str(tipo_cliente if tipo_cliente is not None else "")
+            estado_tag = "activo" if bool(enabled) else "inactivo"
+            nombre_tag = _sanitize_tag_value(nombre)
+            codigo_vip_tag = _sanitize_tag_value(codigo_vip)
+            clientes_by_phone[k] = (vip_tag, tipo_tag, estado_tag, nombre_tag, codigo_vip_tag)
+
+        conn2 = psycopg2.connect(settings.DATABASE_URL_2)
+        conn2.autocommit = False
+
+        with conn2.cursor() as cur:
+            cur.execute(
+                sql.SQL("SELECT id, tags FROM {}.contactos").format(
+                    sql.Identifier(settings.DATABASE_SCHEMA_2)
+                )
+            )
+            contactos = cur.fetchall()
+
+            updates: list[tuple[str, str]] = []
+            activos = inactivos = no_cliente = 0
+            for contacto_id, tags in contactos:
+                k = _phone_key(contacto_id)
+                if k in clientes_by_phone:
+                    vip_tag, tipo_tag, estado_tag, nombre_tag, codigo_vip_tag = clientes_by_phone[k]
+                else:
+                    vip_tag, tipo_tag, estado_tag, nombre_tag, codigo_vip_tag = "no", "", "no_cliente", "", ""
+
+                if estado_tag == "activo":
+                    activos += 1
+                elif estado_tag == "inactivo":
+                    inactivos += 1
+                else:
+                    no_cliente += 1
+
+                new_tags = _merge_contact_tags(tags, vip_tag, tipo_tag, estado_tag, nombre_tag, codigo_vip_tag)
+                if (tags or "") != new_tags:
+                    updates.append((new_tags, contacto_id))
+
+            if updates:
+                update_sql = sql.SQL("UPDATE {}.contactos SET tags = %s WHERE id = %s").format(
+                    sql.Identifier(settings.DATABASE_SCHEMA_2)
+                ).as_string(conn2)
+                execute_batch(cur, update_sql, updates, page_size=1000)
+
+        conn2.commit()
+        print(
+            f"[CRON contactos] Fin — contactos={len(contactos)} actualizados={len(updates)} "
+            f"activos={activos} inactivos={inactivos} no_cliente={no_cliente}"
+        )
+        logger.info(
+            "Cron contactos: %d contactos, %d actualizados (activos=%d inactivos=%d no_cliente=%d)",
+            len(contactos),
+            len(updates),
+            activos,
+            inactivos,
+            no_cliente,
+        )
+    except Exception:
+        if conn2 is not None:
+            conn2.rollback()
+        print("[CRON contactos] ERROR")
+        logger.exception("Error en cron _sincronizar_tags_contactos")
+    finally:
+        if conn2 is not None:
+            conn2.close()
+        db.close()
+
+
 def _parse_cron(expr: str) -> CronTrigger:
     """Parsea una expresión cron de 5 campos y retorna un CronTrigger en hora Colombia."""
     minuto, hora, dom, mes, dow = expr.split()
@@ -433,10 +586,20 @@ def start() -> None:
         replace_existing=True,
         misfire_grace_time=3600,
     )
+    _scheduler.add_job(
+        _sincronizar_tags_contactos,
+        trigger=_parse_cron(settings.CRON_CONTACTOS),
+        id="contactos_tags",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
     _scheduler.start()
     logger.info(
-        "Scheduler iniciado (hora Colombia) — vip_check '%s' | numeros '%s' | loterias '%s'",
-        settings.CRON_VIP_CHECK, settings.CRON_NUMEROS, settings.CRON_LOTERIAS,
+        "Scheduler iniciado (hora Colombia) — vip_check '%s' | numeros '%s' | loterias '%s' | contactos '%s'",
+        settings.CRON_VIP_CHECK,
+        settings.CRON_NUMEROS,
+        settings.CRON_LOTERIAS,
+        settings.CRON_CONTACTOS,
     )
 
 

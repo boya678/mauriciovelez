@@ -70,6 +70,9 @@
             <div class="conv-meta">
               <span class="conv-phone">{{ conv.phone }}</span>
               <span class="conv-time">{{ formatDate(conv.updated_at) }}</span>
+              @if (conv.tags) {
+                <span class="conv-tags">{{ conv.tags }}</span>
+              }
             </div>
             <span class="badge {{ STATUS_BADGE[conv.status] }}">
               {{ STATUS_LABELS[conv.status] }}

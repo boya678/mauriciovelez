@@ -97,6 +97,14 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             )
             db.add(conv)
             await db.flush()
+            # Register new phone in contactos (ignore if already exists)
+            await db.execute(
+                __import__("sqlalchemy", fromlist=["text"]).text(
+                    f"INSERT INTO {schema}.contactos (id, tags, created_at) "
+                    f"VALUES (:phone, '', NOW()) ON CONFLICT (id) DO NOTHING"
+                ),
+                {"phone": phone},
+            )
         else:
             # Keep existing ownership/status; just refresh timestamps.
             new_values: dict = {"updated_at": now, "last_user_message_at": now}

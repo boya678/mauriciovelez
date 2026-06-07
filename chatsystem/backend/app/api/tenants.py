@@ -69,6 +69,12 @@ CREATE TABLE IF NOT EXISTS {schema}.assignments (
     released_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS {schema}.contactos (
+    id VARCHAR(30) PRIMARY KEY,
+    tags TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_conv_status ON {schema}.conversations(status);
 CREATE INDEX IF NOT EXISTS idx_conv_phone ON {schema}.conversations(phone);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON {schema}.messages(conversation_id);

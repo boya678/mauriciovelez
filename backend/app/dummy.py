@@ -6,6 +6,7 @@ Uso:
     py app/dummy.py --fecha 2026-04-10           # loterias de una fecha concreta
     py app/dummy.py --solo numeros               # solo reasignacion
     py app/dummy.py --solo loterias              # solo loterias
+    py app/dummy.py --solo contactos             # solo sync de tags en contactos
 """
 import sys
 import os
@@ -48,7 +49,7 @@ while i < len(args):
 # ── Importar las funciones internas del scheduler ────────────────────────────
 from datetime import date
 from app.database import SessionLocal
-from app.core.scheduler import _reasignar_numeros_vencidos, _procesar_loterias
+from app.core.scheduler import _reasignar_numeros_vencidos, _procesar_loterias, _sincronizar_tags_contactos
 
 # ── Correr ───────────────────────────────────────────────────────────────────
 if solo is None or solo == "numeros":
@@ -61,5 +62,10 @@ if solo is None or solo == "loterias":
     print(f"\n▶  Procesando loterias ({label})...")
     _procesar_loterias(fecha)
     print("✔  Loterias procesadas.")
+
+if solo is None or solo == "contactos":
+    print("\n▶  Sincronizando tags de contactos...")
+    _sincronizar_tags_contactos()
+    print("✔  Contactos sincronizados.")
 
 print("\nDone.\n")

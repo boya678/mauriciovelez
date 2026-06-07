@@ -10,6 +10,9 @@
     <div class="chat-header">
       <div class="chat-header-info">
         <span class="phone"><span class="material-icons" style="font-size:1em;vertical-align:middle">smartphone</span> {{ conv.phone }}</span>
+        @if (conv.tags) {
+          <span class="conv-tags">{{ conv.tags }}</span>
+        }
         <span class="badge badge-{{ conv.status === 'human_active' ? 'green' : conv.status === 'waiting_human' ? 'yellow' : 'blue' }}">
           {{ conv.status === 'human_active' ? 'Con agente' : conv.status === 'waiting_human' ? 'Esperando' : 'Bot activo' }}
         </span>
