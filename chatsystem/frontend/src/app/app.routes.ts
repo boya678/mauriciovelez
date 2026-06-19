@@ -44,6 +44,11 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/admin/tools/tools.component').then(m => m.ToolsComponent),
           },
+          {
+            path: 'contactos',
+            loadComponent: () =>
+              import('./features/admin/contactos/contactos.component').then(m => m.ContactosComponent),
+          },
           { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
         ],
       },
