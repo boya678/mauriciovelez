@@ -29,6 +29,8 @@ class BannerOut(BaseModel):
     tipo: str
     texto: Optional[str]
     audiencia: str
+    zona: str
+    video_url: Optional[str]
     activo: bool
     inicio: datetime
     fin: datetime
@@ -52,6 +54,8 @@ def _to_out(b: Banner) -> BannerOut:
         tipo=b.tipo,
         texto=b.texto,
         audiencia=b.audiencia,
+        zona=b.zona,
+        video_url=b.video_url,
         activo=b.activo,
         inicio=b.inicio,
         fin=b.fin,
@@ -119,17 +123,21 @@ def list_banners(
 async def create_banner(
     tipo: str = Form(...),
     audiencia: str = Form(...),
+    zona: str = Form("portal"),
     inicio: datetime = Form(...),
     fin: datetime = Form(...),
     texto: Optional[str] = Form(None),
+    video_url: Optional[str] = Form(None),
     imagen: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
 ):
-    if tipo not in ("texto", "imagen"):
-        raise HTTPException(status_code=422, detail="tipo debe ser 'texto' o 'imagen'.")
+    if tipo not in ("texto", "imagen", "video"):
+        raise HTTPException(status_code=422, detail="tipo debe ser 'texto', 'imagen' o 'video'.")
     if audiencia not in ("todos", "vip"):
         raise HTTPException(status_code=422, detail="audiencia debe ser 'todos' o 'vip'.")
+    if zona not in ("portal", "login"):
+        raise HTTPException(status_code=422, detail="zona debe ser 'portal' o 'login'.")
     if fin <= inicio:
         raise HTTPException(status_code=422, detail="La fecha de fin debe ser posterior al inicio.")
 
@@ -139,6 +147,9 @@ async def create_banner(
     if tipo == "texto":
         if not texto or not texto.strip():
             raise HTTPException(status_code=422, detail="El campo 'texto' es requerido para tipo 'texto'.")
+    elif tipo == "video":
+        if not video_url or not video_url.strip():
+            raise HTTPException(status_code=422, detail="El campo 'video_url' es requerido para tipo 'video'.")
     else:
         if not imagen:
             raise HTTPException(status_code=422, detail="Se debe adjuntar una imagen para tipo 'imagen'.")
@@ -153,6 +164,8 @@ async def create_banner(
         imagen_data=imagen_data,
         imagen_mime=imagen_mime,
         audiencia=audiencia,
+        zona=zona,
+        video_url=video_url if tipo == "video" else None,
         activo=True,
         inicio=inicio,
         fin=fin,
@@ -169,9 +182,11 @@ async def update_banner(
     banner_id: str,
     tipo: str = Form(...),
     audiencia: str = Form(...),
+    zona: str = Form("portal"),
     inicio: datetime = Form(...),
     fin: datetime = Form(...),
     texto: Optional[str] = Form(None),
+    video_url: Optional[str] = Form(None),
     imagen: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     _user=Depends(get_current_platform_user),
@@ -179,15 +194,18 @@ async def update_banner(
     b = db.query(Banner).filter(Banner.id == banner_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Banner no encontrado.")
-    if tipo not in ("texto", "imagen"):
-        raise HTTPException(status_code=422, detail="tipo debe ser 'texto' o 'imagen'.")
+    if tipo not in ("texto", "imagen", "video"):
+        raise HTTPException(status_code=422, detail="tipo debe ser 'texto', 'imagen' o 'video'.")
     if audiencia not in ("todos", "vip"):
         raise HTTPException(status_code=422, detail="audiencia debe ser 'todos' o 'vip'.")
+    if zona not in ("portal", "login"):
+        raise HTTPException(status_code=422, detail="zona debe ser 'portal' o 'login'.")
     if fin <= inicio:
         raise HTTPException(status_code=422, detail="La fecha de fin debe ser posterior al inicio.")
 
     b.tipo = tipo
     b.audiencia = audiencia
+    b.zona = zona
     b.inicio = inicio
     b.fin = fin
 
@@ -195,6 +213,14 @@ async def update_banner(
         if not texto or not texto.strip():
             raise HTTPException(status_code=422, detail="El campo 'texto' es requerido para tipo 'texto'.")
         b.texto = texto
+        b.imagen_data = None
+        b.imagen_mime = None
+        b.video_url = None
+    elif tipo == "video":
+        if not video_url or not video_url.strip():
+            raise HTTPException(status_code=422, detail="El campo 'video_url' es requerido para tipo 'video'.")
+        b.video_url = video_url
+        b.texto = None
         b.imagen_data = None
         b.imagen_mime = None
     else:
@@ -205,6 +231,7 @@ async def update_banner(
             b.imagen_data = imagen_data
             b.imagen_mime = imagen_mime
         b.texto = None
+        b.video_url = None
 
     db.commit()
     db.refresh(b)
@@ -237,3 +264,47 @@ def delete_banner(
         raise HTTPException(status_code=404, detail="Banner no encontrado.")
     db.delete(b)
     db.commit()
+
+
+# ── Endpoint público (sin auth) ───────────────────────────────────────────────────
+
+public_router = APIRouter(prefix="/banners", tags=["Banners"])
+
+
+class BannerPublicoOut(BaseModel):
+    id: str
+    tipo: str
+    texto: str | None
+    imagen_src: str | None
+    video_url: str | None
+
+
+@public_router.get("/publico", response_model=BannerPublicoOut | None)
+def get_banner_publico(db: Session = Depends(get_db)):
+    """Devuelve el banner activo de zona='login' vigente en este momento (sin autenticación)."""
+    import base64
+    now = datetime.now(timezone.utc)
+    b = (
+        db.query(Banner)
+        .filter(
+            Banner.zona == "login",
+            Banner.activo == True,
+            Banner.inicio <= now,
+            Banner.fin >= now,
+        )
+        .order_by(Banner.created_at.desc())
+        .first()
+    )
+    if not b:
+        return None
+    imagen_src = None
+    if b.imagen_data and b.imagen_mime:
+        b64 = base64.b64encode(b.imagen_data).decode()
+        imagen_src = f"data:{b.imagen_mime};base64,{b64}"
+    return BannerPublicoOut(
+        id=str(b.id),
+        tipo=b.tipo,
+        texto=b.texto,
+        imagen_src=imagen_src,
+        video_url=b.video_url,
+    )

@@ -4,9 +4,11 @@ import { environment } from '../../../environments/environment';
 
 export interface BannerItem {
   id: string;
-  tipo: 'texto' | 'imagen';
+  tipo: 'texto' | 'imagen' | 'video';
   texto: string | null;
   audiencia: 'todos' | 'vip';
+  zona: 'portal' | 'login';
+  video_url: string | null;
   activo: boolean;
   inicio: string;
   fin: string;

@@ -19,10 +19,47 @@
 
     <!-- Marca -->
     <div class="brand">
-      <div class="brand-icon">♦</div>
       <h1 class="brand-title gold-text">MAURICIO VELEZ</h1>
-      <p class="brand-sub">Portal de Clientes</p>
+      <p class="brand-sub">Gana con el método de Mauricio Vélez</p>
     </div>
+
+    <p class="login-hint">Si es tu primera vez te registramos. Si ya eres cliente, simplemente entras.</p>
+
+    <!-- Banner público -->
+    @if (bannerPublico()) {
+      <div class="banner-pub">
+        @if (bannerPublico()!.tipo === 'imagen' && bannerPublico()!.imagen_src) {
+          <img [src]="bannerPublico()!.imagen_src" class="banner-pub__img" alt="Banner" />
+        } @else if (bannerPublico()!.tipo === 'video' && bannerVideoSrc) {
+          <div class="banner-pub__video-wrap">
+            <iframe
+              [src]="bannerVideoSrc"
+              class="banner-pub__video"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+        } @else if (bannerPublico()!.texto) {
+          <div class="banner-pub__text-wrap">
+            <span class="material-icons-round">campaign</span>
+            <p class="banner-pub__text">{{ bannerPublico()!.texto }}</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Ganadores hoy -->
+    @if (ganadoresHoy() !== null && ganadoresHoy()! > 0) {
+      <div class="proof-hero">
+        <span class="proof-hero__num">{{ ganadoresHoy() }}</span>
+        <span class="proof-hero__label">ganador{{ ganadoresHoy() === 1 ? '' : 'es' }} hoy con el software</span>
+        <a [href]="wwwUrl" target="_blank" rel="noopener" class="proof-hero__link">
+          <span class="material-icons-round">bar_chart</span>
+          Ver resultados de hoy
+        </a>
+      </div>
+    }
 
     <!-- Formulario -->
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate autocomplete="off">
@@ -86,9 +123,10 @@
           <span class="spinner"></span>
           <span>Cargando…</span>
         } @else {
-          <span>Entrar al Portal</span>
+          <span>Entrar o registrarme gratis</span>
         }
       </button>
+
 
     </form>
   </div>

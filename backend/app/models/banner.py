@@ -20,8 +20,10 @@ class Banner(Base):
     imagen_mime: Mapped[str | None] = mapped_column(String(50), nullable=True)
     audiencia: Mapped[str] = mapped_column(String(10), nullable=False, default="todos")  # todos | vip
     activo: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    zona: Mapped[str] = mapped_column(String(10), nullable=False, default="portal")   # portal | login
     inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     fin: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    video_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -22,8 +22,10 @@ export class BannersComponent implements OnInit {
   editId: string | null = null;
 
   // Form fields
-  fTipo: 'texto' | 'imagen' = 'texto';
+  fTipo: 'texto' | 'imagen' | 'video' = 'texto';
   fTexto = '';
+  fVideoUrl = '';
+  fZona: 'portal' | 'login' = 'portal';
   fAudiencia: 'todos' | 'vip' = 'todos';
   fInicio = '';
   fFin = '';
@@ -47,6 +49,8 @@ export class BannersComponent implements OnInit {
     this.editId = null;
     this.fTipo = 'texto';
     this.fTexto = '';
+    this.fVideoUrl = '';
+    this.fZona = 'portal';
     this.fAudiencia = 'todos';
     this.fInicio = '';
     this.fFin = '';
@@ -61,6 +65,8 @@ export class BannersComponent implements OnInit {
     this.editId = b.id;
     this.fTipo = b.tipo;
     this.fTexto = b.texto ?? '';
+    this.fVideoUrl = b.video_url ?? '';
+    this.fZona = b.zona;
     this.fAudiencia = b.audiencia;
     this.fInicio = utcToColLocal(b.inicio);
     this.fFin = utcToColLocal(b.fin);
@@ -119,14 +125,17 @@ export class BannersComponent implements OnInit {
     if (!this.fInicio || !this.fFin) { this.errorMsg.set('Las fechas de inicio y fin son requeridas.'); return; }
     if (new Date(this.fFin) <= new Date(this.fInicio)) { this.errorMsg.set('La fecha de fin debe ser posterior al inicio.'); return; }
     if (this.fTipo === 'texto' && !this.fTexto.trim()) { this.errorMsg.set('El texto del banner no puede estar vacío.'); return; }
+    if (this.fTipo === 'video' && !this.fVideoUrl.trim()) { this.errorMsg.set('El link del video no puede estar vacío.'); return; }
     if (this.fTipo === 'imagen' && !this.editId && !this.fFile) { this.errorMsg.set('Debe seleccionar una imagen.'); return; }
 
     const form = new FormData();
     form.append('tipo', this.fTipo);
+    form.append('zona', this.fZona);
     form.append('audiencia', this.fAudiencia);
     form.append('inicio', colLocalToUtc(this.fInicio));
     form.append('fin', colLocalToUtc(this.fFin));
     if (this.fTipo === 'texto') form.append('texto', this.fTexto);
+    if (this.fTipo === 'video') form.append('video_url', this.fVideoUrl);
     if (this.fTipo === 'imagen' && this.fFile) form.append('imagen', this.fFile);
 
     this.saving.set(true);
@@ -160,5 +169,9 @@ export class BannersComponent implements OnInit {
 
   audienciaLabel(a: string): string {
     return a === 'vip' ? 'Solo VIP' : 'Todos';
+  }
+
+  zonaLabel(z: string): string {
+    return z === 'login' ? 'Público (Login)' : 'Portal';
   }
 }

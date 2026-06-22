@@ -16,6 +16,7 @@
         <thead>
           <tr>
             <th>Estado</th>
+            <th>Zona</th>
             <th>Tipo</th>
             <th>Contenido</th>
             <th>Audiencia</th>
@@ -36,12 +37,15 @@
                   <span class="badge-inactivo">○ Inactivo</span>
                 }
               </td>
+              <td><span class="zona-badge zona-{{ b.zona }}">{{ zonaLabel(b.zona) }}</span></td>
               <td>
                 <span class="tipo-badge tipo-{{ b.tipo }}">{{ b.tipo }}</span>
               </td>
               <td class="contenido-cell">
                 @if (b.tipo === 'texto') {
                   {{ b.texto | slice:0:60 }}{{ (b.texto?.length ?? 0) > 60 ? '…' : '' }}
+                } @else if (b.tipo === 'video') {
+                  <span class="text-muted">{{ b.video_url | slice:0:40 }}…</span>
                 } @else {
                   <span class="text-muted">imagen adjunta</span>
                 }
@@ -81,6 +85,19 @@
 
       <div class="modal-body form-grid">
 
+        <!-- Zona -->
+        <div class="form-row">
+          <label>Zona</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" [(ngModel)]="fZona" value="portal" /> Portal (usuarios logueados)
+            </label>
+            <label class="radio-label">
+              <input type="radio" [(ngModel)]="fZona" value="login" /> Público (Login)
+            </label>
+          </div>
+        </div>
+
         <!-- Tipo -->
         <div class="form-row">
           <label>Tipo</label>
@@ -91,6 +108,11 @@
             <label class="radio-label">
               <input type="radio" [(ngModel)]="fTipo" value="imagen" /> Imagen
             </label>
+            @if (fZona === 'login') {
+              <label class="radio-label">
+                <input type="radio" [(ngModel)]="fTipo" value="video" /> Video
+              </label>
+            }
           </div>
         </div>
 
@@ -118,6 +140,13 @@
           <div class="form-row form-row--full">
             <label>Texto del banner</label>
             <textarea [(ngModel)]="fTexto" rows="4" placeholder="Escribe el mensaje del banner…"></textarea>
+          </div>
+        } @else if (fTipo === 'video') {
+          <div class="form-row form-row--full">
+            <label>Link del video
+              <span class="hint">YouTube, Vimeo u otro link embebible</span>
+            </label>
+            <input type="url" [(ngModel)]="fVideoUrl" placeholder="https://www.youtube.com/watch?v=..." />
           </div>
         } @else {
           <div class="form-row form-row--full">

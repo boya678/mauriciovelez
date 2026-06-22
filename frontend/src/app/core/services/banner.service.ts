@@ -6,9 +6,10 @@ import { environment } from '../../../environments/environment';
 
 export interface BannerPublico {
   id: string;
-  tipo: 'texto' | 'imagen';
+  tipo: 'texto' | 'imagen' | 'video';
   texto: string | null;
   imagen_src: string | null;
+  video_url: string | null;
   audiencia: string;
 }
 
@@ -20,6 +21,12 @@ export class BannerService {
     const params = new HttpParams().set('vip', esVip ? 'true' : 'false');
     return this.http
       .get<BannerPublico | null>(`${environment.apiUrl}/banners/activo`, { params })
+      .pipe(catchError(() => of(null)));
+  }
+
+  getBannerPublico(): Observable<BannerPublico | null> {
+    return this.http
+      .get<BannerPublico | null>(`${environment.apiUrl}/banners/publico`)
       .pipe(catchError(() => of(null)));
   }
 }
