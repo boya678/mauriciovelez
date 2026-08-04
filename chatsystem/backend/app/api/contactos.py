@@ -22,6 +22,8 @@ router = APIRouter(prefix="/contactos", tags=["contactos"])
 
 class ContactOut(BaseModel):
     phone: str
+    bsuid: str | None = None
+    username: str | None = None
     tags: str
 
 
@@ -48,13 +50,13 @@ async def export_contacts_excel(
 ):
     schema = tenant.schema
     rows = (await db.execute(
-        text(f"SELECT id, tags FROM {schema}.contactos ORDER BY id")
+        text(f"SELECT id, bsuid, username, tags FROM {schema}.contactos ORDER BY id")
     )).fetchall()
 
     # Parse all tags and collect unique keys (columns)
-    parsed = [(r[0], _parse_tags(r[1] or "")) for r in rows]
+    parsed = [(r[0], r[1], r[2], _parse_tags(r[3] or "")) for r in rows]
     key_set: set[str] = set()
-    for _, tags in parsed:
+    for _, _, _, tags in parsed:
         key_set.update(tags.keys())
     keys = sorted(key_set)
 
@@ -64,14 +66,14 @@ async def export_contacts_excel(
     ws.title = "Contactos"
 
     # Header row
-    headers = ["Teléfono"] + keys
+    headers = ["Teléfono", "BSUID", "Usuario"] + keys
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True)
 
     # Data rows — all values as text to avoid Excel reformatting
-    for phone, tags in parsed:
-        row = [str(phone)] + [str(tags.get(k, "")) for k in keys]
+    for phone, bsuid, username, tags in parsed:
+        row = [str(phone), bsuid or "", username or ""] + [str(tags.get(k, "")) for k in keys]
         ws.append(row)
         # Force every cell in this row to text format
         for cell in ws[ws.max_row]:
@@ -102,16 +104,16 @@ async def list_contacts(
 
     if search:
         sql = text(
-            f"SELECT id, tags FROM {schema}.contactos "
-            f"WHERE id ILIKE :q OR tags ILIKE :q "
+            f"SELECT id, bsuid, username, tags FROM {schema}.contactos "
+            f"WHERE id ILIKE :q OR tags ILIKE :q OR username ILIKE :q OR bsuid ILIKE :q "
             f"ORDER BY id LIMIT :limit OFFSET :offset"
         )
         rows = await db.execute(sql, {"q": f"%{search}%", "limit": page_size, "offset": offset})
     else:
         sql = text(
-            f"SELECT id, tags FROM {schema}.contactos "
+            f"SELECT id, bsuid, username, tags FROM {schema}.contactos "
             f"ORDER BY id LIMIT :limit OFFSET :offset"
         )
         rows = await db.execute(sql, {"limit": page_size, "offset": offset})
 
-    return [ContactOut(phone=r[0], tags=r[1] or "") for r in rows.fetchall()]
+    return [ContactOut(phone=r[0], bsuid=r[1], username=r[2], tags=r[3] or "") for r in rows.fetchall()]

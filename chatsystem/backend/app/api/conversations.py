@@ -33,7 +33,7 @@ from app.schemas.conversation import (
     ConversationOut,
 )
 from app.schemas.message import MessageOut
-from app.services.whatsapp import send_template_message, send_text_message
+from app.services.whatsapp import send_template_message, send_text_message, send_request_contact_info
 from app.websocket.manager import manager
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -350,6 +350,51 @@ async def close_conversation(
         "conversation_id": str(conversation_id),
     })
     return ConversationOut.model_validate(conv)
+
+
+# ── pedir_contacto ────────────────────────────────────────────────────────────
+
+@router.post("/{conversation_id}/pedir-contacto")
+async def pedir_contacto(
+    conversation_id: uuid.UUID,
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    agent=Depends(require_agent),
+):
+    """Send a REQUEST_CONTACT_INFO interactive message to a BSUID user.
+
+    Only useful when the conversation has no real phone number yet
+    (phone field is a BSUID). Once the user taps the button, Meta sends
+    a contacts webhook that triggers updating conversation.phone with
+    the real number.
+    """
+    conv = await db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant.id,
+        )
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Only send if phone is still a BSUID (contains ".").
+    # Once we have the real phone there's no need to ask again.
+    if "." not in (conv.phone or ""):
+        raise HTTPException(
+            status_code=400,
+            detail="Phone number already known — no need to request contact info",
+        )
+
+    try:
+        await send_request_contact_info(
+            phone_id=tenant.whatsapp_phone_id,
+            token=tenant.whatsapp_token,
+            to=conv.phone,  # may be BSUID or real phone; _to_field() handles both
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"WhatsApp error: {exc}")
+
+    return {"status": "sent"}
 
 
 # ── Agent sends message ───────────────────────────────────────────────────────

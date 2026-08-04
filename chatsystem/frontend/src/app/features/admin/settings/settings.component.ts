@@ -15,6 +15,7 @@ export class SettingsComponent implements OnInit {
   templateName = '';
   templateLanguage = 'es';
   imageMenuPayload = '';
+  pedirContactoTemplate = '';
   loading = signal(true);
   saving = signal(false);
   saved = signal(false);
@@ -37,6 +38,7 @@ export class SettingsComponent implements OnInit {
         this.templateName = s.whatsapp_template_name ?? '';
         this.templateLanguage = s.whatsapp_template_language ?? 'es';
         this.imageMenuPayload = s.image_menu_payload ?? '';
+        this.pedirContactoTemplate = s.pedir_contacto_template ?? '';
         this.loading.set(false);
       },
       error: () => {
@@ -60,6 +62,7 @@ export class SettingsComponent implements OnInit {
       whatsapp_template_name: this.templateName || null,
       whatsapp_template_language: this.templateLanguage || null,
       image_menu_payload: this.imageMenuPayload || null,
+      pedir_contacto_template: this.pedirContactoTemplate || null,
     }).subscribe({
       next: () => {
         this.saving.set(false);

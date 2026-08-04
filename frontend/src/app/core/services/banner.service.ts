@@ -13,6 +13,12 @@ export interface BannerPublico {
   audiencia: string;
 }
 
+export interface GanadoresStats {
+  hoy: number;
+  mes: number;
+  anio: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BannerService {
   constructor(private http: HttpClient) {}
@@ -27,6 +33,12 @@ export class BannerService {
   getBannerPublico(): Observable<BannerPublico | null> {
     return this.http
       .get<BannerPublico | null>(`${environment.apiUrl}/banners/publico`)
+      .pipe(catchError(() => of(null)));
+  }
+
+  getGanadoresStats(): Observable<GanadoresStats | null> {
+    return this.http
+      .get<GanadoresStats>(`${environment.apiUrl}/public/loterias/stats`)
       .pipe(catchError(() => of(null)));
   }
 }

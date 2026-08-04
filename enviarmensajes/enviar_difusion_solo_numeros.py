@@ -13,7 +13,7 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
 API_URL = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
 
-EXCEL_FILE = os.path.join(os.path.dirname(__file__), "Difusion VIP rifa.xlsx")
+EXCEL_FILE = os.path.join(os.path.dirname(__file__), "24072026.xlsx")
 BODY_FILE = os.path.join(os.path.dirname(__file__), "body-sinparamas.json")
 
 MAX_CONCURRENT = 60

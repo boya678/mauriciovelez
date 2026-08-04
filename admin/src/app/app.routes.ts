@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -60,6 +61,11 @@ export const routes: Routes = [
       {
         path: 'transacciones',
         loadComponent: () => import('./features/transacciones/transacciones.component').then(m => m.TransaccionesComponent),
+      },
+      {
+        path: 'comprobantes',
+        loadComponent: () => import('./features/comprobantes/comprobantes.component').then(m => m.ComprobantesComponent),
+        canActivate: [adminGuard],
       },
     ],
   },

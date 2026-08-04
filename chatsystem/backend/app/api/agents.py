@@ -153,6 +153,7 @@ class PromptSettings(BaseModel):
     whatsapp_template_name: str | None = None
     whatsapp_template_language: str | None = None
     image_menu_payload: str | None = None
+    pedir_contacto_template: str | None = None
 
 
 @router.get("/settings", response_model=PromptSettings)
@@ -171,6 +172,7 @@ async def get_settings(
         whatsapp_template_name=t.whatsapp_template_name,
         whatsapp_template_language=t.whatsapp_template_language,
         image_menu_payload=t.image_menu_payload,
+        pedir_contacto_template=t.pedir_contacto_template,
     )
 
 
@@ -191,6 +193,7 @@ async def update_settings(
     t.whatsapp_template_name = body.whatsapp_template_name
     t.whatsapp_template_language = body.whatsapp_template_language
     t.image_menu_payload = body.image_menu_payload
+    t.pedir_contacto_template = body.pedir_contacto_template
     await db.commit()
     # Broadcast invalidation to every backend process via Redis Pub/Sub.
     redis = await get_redis()
@@ -200,6 +203,7 @@ async def update_settings(
         whatsapp_template_name=t.whatsapp_template_name,
         whatsapp_template_language=t.whatsapp_template_language,
         image_menu_payload=t.image_menu_payload,
+        pedir_contacto_template=t.pedir_contacto_template,
     )
 
 

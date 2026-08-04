@@ -1,0 +1,101 @@
+====================================================================
+CONTEXTO - Protocolo WhatsApp Business API: Usernames / BSUID
+====================================================================
+Fecha: 2026-08-03
+
+--- QUE ES ESTO ---
+Meta esta habilitando que los usuarios de WhatsApp oculten su numero de
+telefono y se identifiquen con un "username" (ej. @janetmorelo) en vez
+de su numero. Cuando esto pasa, el webhook de WhatsApp deja de mandar el
+campo "from" (numero) en los mensajes entrantes, y en su lugar manda un
+identificador nuevo llamado BSUID (Business-Scoped User ID).
+
+Doc oficial de Meta:
+https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+
+--- EJEMPLO REAL DE PAYLOAD ENTRANTE (usuario con username activado) ---
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "1807106036856251",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "573136398171",   // numero DEL NEGOCIO, no del remitente
+              "phone_number_id": "797041733485861"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Morelo Puche",
+                  "username": "janetmorelo"              // username SIN "@"
+                },
+                "user_id": "CO.1949266959121697"          // BSUID
+              }
+            ],
+            "messages": [
+              {
+                "from_user_id": "CO.1949266959121697",    // BSUID (reemplaza a "from")
+                "id": "wamid.HBgTQ08uMTk0OTI2Njk1OTEyMTY5NxUUABIYFDNBRDQxRkFFNzkwMUU3NTMyQUQzAA==",
+                "timestamp": "1785771901",
+                "type": "image",
+                "image": { "mime_type": "image/jpeg", "sha256": "...", "id": "...", "url": "..." }
+                // NOTA: no hay campo "from" (numero) en este mensaje.
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+
+Puntos clave del payload:
+- "messages[0].from"          -> se OMITE si el usuario activo username y no
+                                  aplican las excepciones de los 30 dias /
+                                  contact book (ver doc oficial, seccion
+                                  "Phone numbers").
+- "messages[0].from_user_id"  -> BSUID. Formato: <ISO country code>.<alfanumerico>,
+                                  ej "CO.1949266959121697". SIEMPRE viene,
+                                  tenga o no username activado.
+- "contacts[0].profile.username" -> el username SIN "@". Solo viene si el
+                                  usuario lo activo.
+- "contacts[0].user_id"        -> mismo BSUID que from_user_id.
+- "metadata.display_phone_number" / "metadata.phone_number_id" -> son del
+                                  NEGOCIO (receptor), no del remitente. No
+                                  sirven para identificar quien escribe.
+
+--- COMO RESPONDER (enviar mensajes) a un BSUID ---
+El endpoint de envio sigue siendo el mismo:
+  POST https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages
+
+Body normal (con numero):
+{
+  "messaging_product": "whatsapp",
+  "to": "<NUMERO_USUARIO>",
+  "type": "text",
+  "text": { "body": "..." }
+}
+
+Body para responder por BSUID (sin numero disponible):
+{
+  "messaging_product": "whatsapp",
+  "recipient": "<BSUID>",       // en vez de "to"
+  "type": "text",
+  "text": { "body": "..." }
+}
+
+Reglas:
+- Se puede mandar "to" y "recipient" juntos; si ambos vienen, "to"
+  (numero) tiene prioridad.
+- Para mandar SOLO por BSUID: omitir "to" y usar solo "recipient".
+- Soportado por Meta desde julio 2026 (antes de eso, enviar a BSUID
+  fallaba con error 131062).
+- No todos los tipos de mensaje soportan BSUID como destinatario (ciertos
+  templates de autenticacion tipo one-tap/zero-tap/copy-code requieren
+  numero real).
+====================================================================

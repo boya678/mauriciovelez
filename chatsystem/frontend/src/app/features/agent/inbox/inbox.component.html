@@ -66,9 +66,15 @@
             [class.selected]="selectedId() === conv.id"
             (click)="selectConversation(conv.id)"
           >
-            <div class="conv-avatar">{{ conv.phone.slice(-2) }}</div>
+            <div class="conv-avatar">{{ (conv.username || conv.phone).slice(-2) }}</div>
             <div class="conv-meta">
-              <span class="conv-phone">{{ conv.phone }}</span>
+              <span class="conv-phone">
+                @if (conv.username) {
+                  <span class="material-icons" style="font-size:0.9em;vertical-align:middle">alternate_email</span>{{ conv.username }}
+                } @else {
+                  {{ conv.phone }}
+                }
+              </span>
               <span class="conv-time">{{ formatDate(conv.updated_at) }}</span>
               @if (conv.tags) {
                 <span class="conv-tags">{{ conv.tags }}</span>

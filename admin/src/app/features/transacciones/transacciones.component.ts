@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TransaccionesService, Transaccion } from '../../core/services/transacciones.service';
+import { TransaccionesService, Transaccion, ChequeoResult } from '../../core/services/transacciones.service';
 
 @Component({
   selector: 'app-transacciones',
@@ -38,11 +38,46 @@ export class TransaccionesComponent implements OnInit {
   modalLoading = signal(false);
   modalError = signal('');
 
+  // Modal chequear
+  modalChequeo = signal<Transaccion | null>(null);
+  chequeoResult = signal<ChequeoResult | null>(null);
+  chequeoLoading = signal(false);
+  chequeoError = signal('');
+  registrarLoading = signal(false);
+  registrarExito = signal('');
+  comprobanteManual = '';
+  descripcionManual = '';
+  reprocesarLoading = signal(false);
+  reprocesarResult = signal<{ accion: string; detalle: string | null } | null>(null);
+
   constructor(private svc: TransaccionesService) {}
 
   ngOnInit() {
     this.fecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
     this.load();
+  }
+
+  private getApiErrorMessage(err: any, fallback: string): string {
+    const detail = err?.error?.detail;
+
+    if (typeof detail === 'string' && detail.trim()) {
+      if (detail.includes('chequear o reprocesar')) {
+        return `${detail}. Abre "Chequear" y luego intenta renovar.`;
+      }
+      if (detail.includes('falta número de comprobante')) {
+        return `${detail}. Primero ejecuta "Chequear" o "Reprocesar".`;
+      }
+      if (detail.includes('falta hash de imagen')) {
+        return `${detail}. Reprocesa la imagen para generar el hash.`;
+      }
+      return detail;
+    }
+
+    if (Array.isArray(detail)) {
+      return detail.map((d: any) => d?.msg || d?.message || String(d)).join(' | ') || fallback;
+    }
+
+    return err?.message || fallback;
   }
 
   load() {
@@ -144,7 +179,7 @@ export class TransaccionesComponent implements OnInit {
       },
       error: (err) => {
         this.actionLoading.set(null);
-        this.modalRenovarError.set(err?.error?.detail || 'Error al renovar la suscripción');
+        this.modalRenovarError.set(this.getApiErrorMessage(err, 'Error al renovar la suscripción'));
       },
     });
   }
@@ -175,6 +210,79 @@ export class TransaccionesComponent implements OnInit {
       error: (err) => {
         this.modalLoading.set(false);
         this.modalError.set(err?.error?.detail || 'Error al enviar el mensaje');
+      },
+    });
+  }
+
+  // ── Chequear comprobante ───────────────────────────────────────────────────
+
+  onChequear(t: Transaccion) {
+    this.modalChequeo.set(t);
+    this.chequeoResult.set(null);
+    this.chequeoError.set('');
+    this.registrarExito.set('');
+    this.chequeoLoading.set(true);
+    this.svc.chequear(t.id).subscribe({
+      next: (res) => { this.chequeoLoading.set(false); this.chequeoResult.set(res); },
+      error: (err) => { this.chequeoLoading.set(false); this.chequeoError.set(err?.error?.detail || 'Error al consultar'); },
+    });
+  }
+
+  closeModalChequeo() {
+    this.modalChequeo.set(null);
+    this.chequeoResult.set(null);
+    this.chequeoError.set('');
+    this.registrarExito.set('');
+    this.comprobanteManual = '';
+    this.descripcionManual = '';
+    this.reprocesarResult.set(null);
+  }
+
+  onReprocesar() {
+    const t = this.modalChequeo();
+    if (!t) return;
+    this.reprocesarLoading.set(true);
+    this.reprocesarResult.set(null);
+    this.chequeoError.set('');
+    this.registrarExito.set('');
+    this.svc.reprocesar(t.id).subscribe({
+      next: (res) => {
+        this.reprocesarLoading.set(false);
+        this.reprocesarResult.set({ accion: res.accion, detalle: res.detalle });
+        // Refrescar el chequeo con los nuevos datos
+        const prev = this.chequeoResult();
+        if (prev) this.chequeoResult.set({
+          ...prev,
+          analizado_por_ia: true,
+          es_comprobante: res.es_comprobante,
+          comprobante_num: res.comprobante_num,
+          monto_extraido: res.monto_extraido,
+          ya_procesado: res.accion === 'ya_procesado' || res.accion === 'renovado' || res.accion === 'cliente_creado',
+        });
+      },
+      error: (err) => {
+        this.reprocesarLoading.set(false);
+        this.chequeoError.set(err?.error?.detail || 'Error al reprocesar');
+      },
+    });
+  }
+
+  onRegistrarComprobante() {
+    const t = this.modalChequeo();
+    if (!t) return;
+    this.registrarLoading.set(true);
+    this.chequeoError.set('');
+    this.svc.registrarComprobante(t.id, this.comprobanteManual || undefined, this.descripcionManual).subscribe({
+      next: (res) => {
+        this.registrarLoading.set(false);
+        this.registrarExito.set(`Comprobante '${res.comprobante_num}' registrado para ${res.celular}`);
+        // Actualizar el resultado para reflejar que ya está procesado
+        const prev = this.chequeoResult();
+        if (prev) this.chequeoResult.set({ ...prev, ya_procesado: true, procesado_para_celular: res.celular });
+      },
+      error: (err) => {
+        this.registrarLoading.set(false);
+        this.chequeoError.set(err?.error?.detail || 'Error al registrar comprobante');
       },
     });
   }

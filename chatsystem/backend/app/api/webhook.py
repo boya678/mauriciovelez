@@ -150,9 +150,14 @@ async def receive_webhook(
 
     for msg_data in messages:
         phone = msg_data.get("phone_number") or msg_data.get("phone", "")
+        bsuid = msg_data.get("bsuid", "")
+        # Use BSUID as stable conversation identifier when available.
+        # This ensures the conversation thread is stable even after the user
+        # shares their real phone number via pedir_contacto.
+        stable_id = bsuid or phone
         conversation_id = uuid.uuid5(
             uuid.NAMESPACE_URL,
-            f"{tenant.id}:{phone}",
+            f"{tenant.id}:{stable_id}",
         )
         await xadd(redis, MESSAGES_STREAM, {
             "tenant_id": str(tenant.id),
@@ -160,11 +165,14 @@ async def receive_webhook(
             "conversation_id": str(conversation_id),
             "external_id": msg_data.get("external_id", ""),
             "phone": phone,
+            "bsuid": bsuid,
+            "username": msg_data.get("username", ""),
+            "real_phone": msg_data.get("real_phone", ""),
             "content": msg_data.get("content", ""),
             "message_type": msg_data.get("message_type", "text"),
             "media_id": msg_data.get("media_id", ""),
             "received_at": datetime.now(timezone.utc).isoformat(),
         })
-        logger.info("Queued incoming msg from %s (conv %s)", phone, conversation_id)
+        logger.info("Queued incoming msg from %s bsuid=%s (conv %s)", phone, bsuid or "-", conversation_id)
 
     return {"status": "ok"}

@@ -1,29 +1,6 @@
 <div class="login-page">
 
-  <!-- Partículas flotantes -->
-  <div class="particles" aria-hidden="true">
-    @for (p of particles; track $index) {
-      <span
-        class="particle"
-        [style.left]="p.left"
-        [style.font-size]="p.size"
-        [style.animation-duration]="p.duration"
-        [style.animation-delay]="p.delay"
-        [style.opacity]="p.opacity"
-      >{{ p.symbol }}</span>
-    }
-  </div>
-
-  <!-- Tarjeta de login -->
-  <div class="login-card">
-
-    <!-- Marca -->
-    <div class="brand">
-      <h1 class="brand-title gold-text">MAURICIO VELEZ</h1>
-      <p class="brand-sub">Gana con el método de Mauricio Vélez</p>
-    </div>
-
-    <p class="login-hint">Si es tu primera vez te registramos. Si ya eres cliente, simplemente entras.</p>
+  <div class="login-wrap">
 
     <!-- Banner público -->
     @if (bannerPublico()) {
@@ -49,17 +26,46 @@
       </div>
     }
 
-    <!-- Ganadores hoy -->
-    @if (ganadoresHoy() !== null && ganadoresHoy()! > 0) {
-      <div class="proof-hero">
-        <span class="proof-hero__num">{{ ganadoresHoy() }}</span>
-        <span class="proof-hero__label">ganador{{ ganadoresHoy() === 1 ? '' : 'es' }} hoy con el software</span>
-        <a [href]="wwwUrl" target="_blank" rel="noopener" class="proof-hero__link">
-          <span class="material-icons-round">bar_chart</span>
-          Ver resultados de hoy
-        </a>
+    <!-- Recuadro de ganadores (separado del login) -->
+    @if (statsGanadores() !== null) {
+      <div class="stats-card">
+        <div class="stats-card__item">
+          <span class="stats-card__num">{{ statsGanadores()!.hoy }}</span>
+          <span class="stats-card__label">
+            <span class="material-icons-round">today</span>
+            Hoy
+          </span>
+        </div>
+        <div class="stats-card__divider"></div>
+        <div class="stats-card__item">
+          <span class="stats-card__num">{{ statsGanadores()!.mes }}</span>
+          <span class="stats-card__label">
+            <span class="material-icons-round">calendar_month</span>
+            Este mes
+          </span>
+        </div>
+        <div class="stats-card__divider"></div>
+        <div class="stats-card__item">
+          <span class="stats-card__num">{{ statsGanadores()!.anio }}</span>
+          <span class="stats-card__label">
+            <span class="material-icons-round">emoji_events</span>
+            Este año
+          </span>
+        </div>
+        <p class="stats-card__caption">ganadores con el software de Mauricio Vélez</p>
       </div>
     }
+
+    <!-- Tarjeta de login -->
+    <div class="login-card">
+
+    <!-- Marca -->
+    <div class="brand">
+      <h1 class="brand-title gold-text">MAURICIO VELEZ</h1>
+      <p class="brand-sub">Gana con el método de Mauricio Vélez</p>
+    </div>
+
+    <p class="login-hint">Si es tu primera vez te registramos. Si ya eres cliente, simplemente entras.</p>
 
     <!-- Formulario -->
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate autocomplete="off">
@@ -129,7 +135,8 @@
 
 
     </form>
-  </div>
+    </div><!-- /login-card -->
+  </div><!-- /login-wrap -->
 
 </div>
 

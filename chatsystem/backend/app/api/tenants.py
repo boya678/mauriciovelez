@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS {schema}.conversations (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
     phone VARCHAR(30) NOT NULL,
+    username VARCHAR(100),
+    bsuid VARCHAR(150),
     status VARCHAR(30) NOT NULL DEFAULT 'new',
     assigned_agent_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -71,9 +73,12 @@ CREATE TABLE IF NOT EXISTS {schema}.assignments (
 
 CREATE TABLE IF NOT EXISTS {schema}.contactos (
     id VARCHAR(30) PRIMARY KEY,
+    bsuid VARCHAR(150) NULL,
+    username VARCHAR(100) NULL,
     tags TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS ix_contactos_bsuid ON {schema}.contactos (bsuid) WHERE bsuid IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_conv_status ON {schema}.conversations(status);
 CREATE INDEX IF NOT EXISTS idx_conv_phone ON {schema}.conversations(phone);

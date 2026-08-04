@@ -4,13 +4,14 @@ Rate-limiting: aplicado en el ingress de K8s (20 req/min por IP).
 """
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import redis
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.database import get_db
@@ -19,9 +20,13 @@ from app.models.numero_acierto import NumeroAcierto
 
 logger = logging.getLogger(__name__)
 
+COL_TZ = ZoneInfo("America/Bogota")
+
 CACHE_TTL_PAST  = 600   # 10 min para fechas pasadas
 CACHE_TTL_TODAY = 60    # 60 s para hoy (los aciertos se registran con delay)
 CACHE_TTL_WEEK  = 3600  # 1 h para el resumen semanal
+CACHE_TTL_MES   = 300   # 5 min para el mes actual
+CACHE_TTL_ANIO  = 1800  # 30 min para el año actual
 
 router = APIRouter(prefix="/public/loterias", tags=["Público - Loterías"])
 
@@ -50,6 +55,12 @@ class GanadoresSemanaOut(BaseModel):
     dias: int
 
 
+class GanadoresStatsOut(BaseModel):
+    hoy: int
+    mes: int
+    anio: int
+
+
 @router.get("/resultados", response_model=list[ResultadoPublicOut])
 def get_resultados_publicos(
     fecha: date = Query(..., description="Fecha en formato YYYY-MM-DD"),
@@ -61,7 +72,7 @@ def get_resultados_publicos(
     Hoy usa TTL 60s; fechas pasadas 600s.
     """
     cache_key = f"public:loterias:{fecha}"
-    ttl = CACHE_TTL_TODAY if fecha == date.today() else CACHE_TTL_PAST
+    ttl = CACHE_TTL_TODAY if fecha == datetime.now(COL_TZ).date() else CACHE_TTL_PAST
 
     # ── Intentar cache ─────────────────────────────────────────────────────────
     try:
@@ -121,7 +132,7 @@ def get_ganadores_semana(db: Session = Depends(get_db)):
     except Exception:
         logger.warning("Redis no disponible — consultando DB directamente")
 
-    desde = date.today() - timedelta(days=6)
+    desde = datetime.now(COL_TZ).date() - timedelta(days=6)
     total: int = (
         db.query(func.count(NumeroAcierto.id))
         .join(LoteriaResultado, NumeroAcierto.resultado_id == LoteriaResultado.id)
@@ -133,6 +144,48 @@ def get_ganadores_semana(db: Session = Depends(get_db)):
 
     try:
         _get_redis().setex(cache_key, CACHE_TTL_WEEK, json.dumps(result.model_dump()))
+    except Exception:
+        logger.warning("Redis no disponible — respuesta no cacheada")
+
+    return result
+
+
+@router.get("/stats", response_model=GanadoresStatsOut)
+def get_ganadores_stats(db: Session = Depends(get_db)):
+    """
+    Ganadores con el software: hoy / mes actual / año actual.
+    TTL Redis: hoy=60s, mes=300s, año=1800s.
+    """
+    hoy = datetime.now(COL_TZ).date()
+    cache_key = f"public:loterias:stats:{hoy}"
+
+    try:
+        cached = _get_redis().get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        logger.warning("Redis no disponible — consultando DB directamente")
+
+    def _count(desde: date, hasta: date) -> int:
+        return (
+            db.query(func.count(NumeroAcierto.id))
+            .join(LoteriaResultado, NumeroAcierto.resultado_id == LoteriaResultado.id)
+            .filter(LoteriaResultado.fecha >= desde, LoteriaResultado.fecha <= hasta)
+            .scalar()
+        ) or 0
+
+    inicio_mes  = hoy.replace(day=1)
+    inicio_anio = hoy.replace(month=1, day=1)
+
+    result = GanadoresStatsOut(
+        hoy=_count(hoy, hoy),
+        mes=_count(inicio_mes, hoy),
+        anio=_count(inicio_anio, hoy),
+    )
+
+    # TTL más corto entre los tres (hoy es el más volátil)
+    try:
+        _get_redis().setex(cache_key, CACHE_TTL_TODAY, json.dumps(result.model_dump()))
     except Exception:
         logger.warning("Redis no disponible — respuesta no cacheada")
 

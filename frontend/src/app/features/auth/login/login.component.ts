@@ -1,21 +1,10 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { environment } from '../../../../environments/environment';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
-import { BannerService, BannerPublico } from '../../../core/services/banner.service';
-
-interface Particle {
-  symbol: string;
-  left: string;
-  size: string;
-  duration: string;
-  delay: string;
-  opacity: string;
-}
+import { BannerService, BannerPublico, GanadoresStats } from '../../../core/services/banner.service';
 
 @Component({
   selector: 'app-login',
@@ -28,7 +17,6 @@ export class LoginComponent implements OnInit {
   form!: FormGroup;
   loading = signal(false);
   errorMsg = signal('');
-  particles: Particle[] = [];
   recordar = false;
 
   bannerPublico = signal<BannerPublico | null>(null);
@@ -64,7 +52,7 @@ export class LoginComponent implements OnInit {
     { code: '56',  label: 'CHL+56' },
   ];
 
-  ganadoresHoy = signal<number | null>(null);
+  statsGanadores = signal<GanadoresStats | null>(null);
   readonly wwwUrl = 'https://www.mauricioveleznumerologo.com';
 
   // Estado modal OTP
@@ -80,13 +68,10 @@ export class LoginComponent implements OnInit {
     this.form.get('celular')!.updateValueAndValidity();
   }
 
-  private readonly symbols = ['♦', '★', '$', '✦', '♠', '♣', '♥', '7', '♞', '⬡'];
-
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
     private router: Router,
-    private http: HttpClient,
     private sanitizer: DomSanitizer,
     private bannerService: BannerService,
   ) {}
@@ -102,8 +87,7 @@ export class LoginComponent implements OnInit {
       nombre: [saved?.nombre ?? '', [Validators.required, Validators.minLength(2)]],
       celular: [saved?.celular ?? '', [Validators.required, Validators.pattern(/^\d{7,15}$/)]],
     });
-    this.buildParticles();
-    this.cargarGanadoresHoy();
+    this.cargarStats();
     this.cargarBannerPublico();
   }
 
@@ -128,27 +112,11 @@ export class LoginComponent implements OnInit {
     return url;
   }
 
-  private cargarGanadoresHoy(): void {
-    // Fecha hoy en hora Colombia (UTC-5)
-    const hoy = new Date(Date.now() - 5 * 3600 * 1000).toISOString().split('T')[0];
-    this.http.get<{ total_aciertos: number }[]>(
-      `${environment.apiUrl}/public/loterias/resultados`,
-      { params: { fecha: hoy } }
-    ).subscribe({
-      next: res => this.ganadoresHoy.set(res.reduce((s, r) => s + (r.total_aciertos ?? 0), 0)),
-      error: () => this.ganadoresHoy.set(null),
+  private cargarStats(): void {
+    this.bannerService.getGanadoresStats().subscribe({
+      next: stats => this.statsGanadores.set(stats),
+      error: () => this.statsGanadores.set(null),
     });
-  }
-
-  private buildParticles(): void {
-    this.particles = Array.from({ length: 24 }, (_, i) => ({
-      symbol: this.symbols[i % this.symbols.length],
-      left: `${(i / 24) * 100 + (Math.random() - 0.5) * 6}%`,
-      size: `${10 + Math.random() * 22}px`,
-      duration: `${7 + Math.random() * 11}s`,
-      delay: `${Math.random() * 10}s`,
-      opacity: `${0.12 + Math.random() * 0.45}`,
-    }));
   }
 
   private loadSaved(): { nombre: string; celular: string } | null {

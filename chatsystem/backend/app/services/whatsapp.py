@@ -12,6 +12,18 @@ logger = logging.getLogger(__name__)
 WA_API_BASE = "https://graph.facebook.com/v20.0"
 
 
+def _to_field(phone_or_bsuid: str) -> dict:
+    """Return {"to": ...} for phone numbers or {"recipient": ...} for BSUIDs.
+
+    A BSUID has the form <COUNTRY_CODE>.<alphanumeric>, e.g. "CO.1949266959121697".
+    Regular phone numbers contain only digits (and optionally a leading '+').
+    The dot is the distinguishing character.
+    """
+    if "." in phone_or_bsuid:
+        return {"recipient": phone_or_bsuid}
+    return {"to": phone_or_bsuid}
+
+
 async def send_text_message(
     phone_id: str,
     token: str,
@@ -22,7 +34,7 @@ async def send_text_message(
     url = f"{WA_API_BASE}/{phone_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        **_to_field(to),
         "type": "text",
         "text": {"body": text},
     }
@@ -49,7 +61,7 @@ async def send_template_message(
     url = f"{WA_API_BASE}/{phone_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        **_to_field(to),
         "type": "template",
         "template": {
             "name": template_name,
@@ -84,7 +96,7 @@ async def send_interactive_message(
     url = f"{WA_API_BASE}/{phone_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        **_to_field(to),
         "type": "interactive",
         "interactive": interactive,
     }
@@ -96,6 +108,42 @@ async def send_interactive_message(
         )
     if resp.status_code >= 400:
         logger.error("WhatsApp interactive send failed %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def send_request_contact_info(
+    phone_id: str,
+    token: str,
+    to: str,
+    body_text: str = "Para brindarte un mejor servicio, necesitamos tu número de teléfono. Por favor compártelo tocando el botón.",
+) -> dict:
+    """Send a REQUEST_CONTACT_INFO interactive message (pedir_contacto utility).
+
+    `to` can be a phone number or a BSUID — _to_field() handles both.
+    When the user taps the button, Meta sends a 'contacts' webhook with their
+    real phone number.
+    """
+    url = f"{WA_API_BASE}/{phone_id}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        **_to_field(to),
+        "type": "interactive",
+        "interactive": {
+            "type": "request_contact_info",
+            "body": {"text": body_text},
+            "action": {"name": "request_contact_info"},
+        },
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+    if resp.status_code >= 400:
+        logger.error("pedir_contacto send failed %s: %s", resp.status_code, resp.text)
     resp.raise_for_status()
     return resp.json()
 
@@ -140,7 +188,7 @@ async def send_image_message(
         image_obj["caption"] = caption
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        **_to_field(to),
         "type": "image",
         "image": image_obj,
     }
@@ -166,7 +214,7 @@ async def send_audio_message(
     url = f"{WA_API_BASE}/{phone_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        **_to_field(to),
         "type": "audio",
         "audio": {"id": media_id},
     }
@@ -260,12 +308,52 @@ def parse_incoming_message(payload: dict) -> list[dict]:
                 else:
                     content = f"[{msg_type}]"
 
-                entry_data: dict = {
-                    "phone_number": msg.get("from"),
+                # Sender identification: prefer phone number ("from"),
+                # fall back to BSUID ("from_user_id") when user hides their number.
+                phone_from = msg.get("from")
+                bsuid = msg.get("from_user_id", "")
+                sender_id = phone_from or bsuid or ""
+
+                # Resolve username from the contacts array in this change block
+                contacts_map: dict[str, str] = {
+                    c.get("user_id", ""): c.get("profile", {}).get("username", "")
+                    for c in value.get("contacts", [])
+                    if c.get("user_id")
+                }
+                username = contacts_map.get(bsuid, "") if bsuid else ""
+
+                # Handle contacts message type (user shared phone via pedir_contacto)
+                if msg_type == "contacts":
+                    shared = msg.get("contacts", [])
+                    real_phone = ""
+                    for sc in shared:
+                        phones = sc.get("phones", [])
+                        if phones:
+                            real_phone = phones[0].get("wa_id") or phones[0].get("phone", "")
+                            if real_phone:
+                                break
+                    entry_data: dict = {
+                        "phone_number": sender_id,
+                        "bsuid": bsuid,
+                        "external_id": msg.get("id"),
+                        "content": f"[contacto_compartido:{real_phone}]" if real_phone else "[contacto_compartido]",
+                        "message_type": "contacts",
+                        "real_phone": real_phone,
+                    }
+                    if username:
+                        entry_data["username"] = username
+                    messages.append(entry_data)
+                    continue
+
+                entry_data = {
+                    "phone_number": sender_id,
+                    "bsuid": bsuid,
                     "external_id": msg.get("id"),
                     "content": content,
                     "message_type": msg_type,
                 }
+                if username:
+                    entry_data["username"] = username
                 if media_id:
                     entry_data["media_id"] = media_id
                 messages.append(entry_data)

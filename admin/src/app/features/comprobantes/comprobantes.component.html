@@ -1,0 +1,107 @@
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">
+      <span class="material-icons-round">receipt_long</span>
+      Comprobantes VIP
+    </h1>
+    <span class="badge-total">{{ total() }} registros</span>
+    <button class="btn-export btn-sm" (click)="exportar()" [disabled]="exporting()">
+      <span class="material-icons-round">download</span>
+      {{ exporting() ? 'Exportando...' : 'Exportar Excel' }}
+    </button>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filtros">
+    <div class="filtro-group">
+      <label>Fecha</label>
+      <input type="date" [(ngModel)]="filtroFecha" (change)="buscar()" />
+    </div>
+    <div class="filtro-group">
+      <label>Nro. Comprobante</label>
+      <input type="text" [(ngModel)]="filtroComprobante" placeholder="Buscar..." (keyup.enter)="buscar()" />
+    </div>
+    <button class="btn-primary btn-sm" (click)="buscar()">
+      <span class="material-icons-round">search</span> Buscar
+    </button>
+    <button class="btn-ghost btn-sm" (click)="limpiar()">
+      <span class="material-icons-round">clear</span> Limpiar
+    </button>
+  </div>
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="alert-error">{{ error() }}</div>
+  }
+
+  <!-- Tabla -->
+  <div class="table-wrap">
+    @if (loading()) {
+      <div class="loading-row">Cargando...</div>
+    } @else if (items().length === 0) {
+      <div class="empty-row">No hay comprobantes registrados.</div>
+    } @else {
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Nro. Comprobante</th>
+            <th>Celular</th>
+            <th>Monto</th>
+            <th>Message ID</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of items(); track c.id) {
+            <tr>
+              <td>{{ c.created_at | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td class="mono">{{ c.comprobante_num }}</td>
+              <td>{{ c.celular }}</td>
+              <td class="monto">$ {{ c.monto | number:'1.0-0' }}</td>
+              <td>{{ c.descripcion }}</td>
+              <td class="mono small">{{ c.message_id }}</td>
+              <td>
+                <button class="btn-icon btn-danger" title="Eliminar" (click)="abrirConfirmDelete(c)">
+                  <span class="material-icons-round">delete</span>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <!-- Paginación -->
+  @if (pages() > 1) {
+    <div class="paginacion">
+      <button class="btn-ghost btn-sm" [disabled]="page === 1" (click)="irPagina(page - 1)">‹ Anterior</button>
+      @for (p of pagesArray(); track p) {
+        <button class="btn-page" [class.active]="p === page" (click)="irPagina(p)">{{ p }}</button>
+      }
+      <button class="btn-ghost btn-sm" [disabled]="page === pages()" (click)="irPagina(page + 1)">Siguiente ›</button>
+    </div>
+  }
+</div>
+
+<!-- Modal confirmar borrado -->
+@if (confirmDelete()) {
+  <div class="overlay" (click)="$event.target === $event.currentTarget && cancelarDelete()">
+    <div class="modal-confirm" role="dialog">
+      <span class="material-icons-round modal-icon warn">warning</span>
+      <h3>¿Eliminar comprobante?</h3>
+      <p>
+        Comprobante <strong>{{ confirmDelete()!.comprobante_num }}</strong><br>
+        Celular: <strong>{{ confirmDelete()!.celular }}</strong>
+      </p>
+      <p class="warn-text">Al eliminar, este comprobante podrá volver a procesarse automáticamente.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" (click)="cancelarDelete()">Cancelar</button>
+        <button class="btn-danger" [disabled]="deleting()" (click)="confirmarDelete()">
+          @if (deleting()) { Eliminando... } @else { Eliminar }
+        </button>
+      </div>
+    </div>
+  </div>
+}

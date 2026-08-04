@@ -46,4 +46,8 @@ export class ConversationsService {
   reopen(id: string) {
     return this.http.post<Conversation>(`${environment.apiUrl}/api/v1/conversations/${id}/reopen`, {});
   }
+
+  pedirContacto(id: string) {
+    return this.http.post<{ status: string }>(`${environment.apiUrl}/api/v1/conversations/${id}/pedir-contacto`, {});
+  }
 }

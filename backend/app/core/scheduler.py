@@ -1,8 +1,12 @@
+import base64
+import hashlib
+import json
 import logging
 import re
 import unicodedata
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
 import httpx
 import psycopg2
@@ -10,19 +14,33 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from psycopg2 import sql
 from psycopg2.extras import execute_batch
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from zoneinfo import ZoneInfo
 
 from app.core.config import settings
-from app.database import SessionLocal
+from app.database import SessionLocal, _SessionChat
 from app.models.cliente import Cliente
+from app.models.comprobante_vip import ComprobanteVip
 from app.models.contacto import Contacto
+from app.models.cuenta_vip import acumular_cuenta_vip
 from app.models.loteria_resultado import LoteriaResultado
+from app.models.mensajes_ia_procesado import MensajeIaProcesado
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
 from app.models.suscripcion import Suscripcion
-from app.services.numbers import assign_number, notificar_nuevo_numero_free, notificar_nuevo_numero_vip
+from app.models.transaccion_procesada import TransaccionProcesada
 from app.services.notification_queue import push
+from app.services.numbers import (
+    assign_number,
+    notificar_codigo_asignado,
+    notificar_nuevo_numero_free,
+    notificar_nuevo_numero_vip,
+)
+from app.services.chat_phone_resolver import resolve_real_phone_from_identifier
+from app.services.suscripciones import renovar_cliente
+from app.services.vision_ia import analizar_imagen_con_ia
 from app.core.live_events import publish_event
 
 COLOMBIA_TZ = ZoneInfo("America/Bogota")
@@ -557,6 +575,302 @@ def _sincronizar_tags_contactos() -> None:
         db.close()
 
 
+# ── Procesamiento automático de pagos via IA ─────────────────────────────────
+
+def _strip_cc(phone: str) -> str:
+    """Quita el código de país y devuelve los 10 dígitos locales colombianos."""
+    digits = re.sub(r"\D", "", phone)
+    if len(digits) == 12 and digits.startswith("57"):
+        return digits[2:]
+    if len(digits) > 10:
+        return digits[-10:]
+    return digits
+
+
+def _is_valid_local_phone(phone: str | None) -> bool:
+    return bool(phone and re.fullmatch(r"\d{10}", phone))
+
+
+def _analizar_imagen_con_ia(base64_img: str, mime_type: str) -> dict:
+    """Wrapper local — delega al servicio compartido."""
+    return analizar_imagen_con_ia(base64_img, mime_type)
+
+
+def _crear_cliente_vip(db, celular_local: str, celular_wp: str) -> Cliente:
+    """Crea un cliente nuevo tipo VIP (tipo_cliente=1, vip=True) y dispara
+    todas las notificaciones, igual que el endpoint admin/clientes POST."""
+    _seq = db.execute(text("SELECT nextval('seq_vip_codigo')")).scalar()
+    codigo_vip = f"{_seq:05d}"
+
+    nuevo = Cliente(
+        id=uuid.uuid4(),
+        nombre=celular_local,          # nombre temporal = celular hasta que lo complete
+        celular=celular_local,
+        codigo_pais="57",
+        vip=True,
+        enabled=True,
+        tipo_cliente=1,
+        codigo_vip=codigo_vip,
+        saldo=0,
+    )
+    db.add(nuevo)
+    db.flush()
+
+    free = assign_number(db, nuevo.id, "free")
+    from dateutil.relativedelta import relativedelta
+    now = datetime.now(timezone.utc)
+    db.add(Suscripcion(
+        cliente_id=nuevo.id,
+        inicio=now,
+        fin=now + relativedelta(months=1),
+        activa=True,
+    ))
+    acumular_cuenta_vip(db)
+    vip_num = assign_number(db, nuevo.id, "vip")
+    db.flush()
+    db.commit()
+
+    notificar_nuevo_numero_free(celular_wp, free.number, free.valid_until)
+    notificar_nuevo_numero_vip(celular_wp, vip_num.number, vip_num.valid_until)
+    notificar_codigo_asignado(celular_wp, 1, codigo_vip)
+    publish_event("nuevo_cliente", {"nombre": nuevo.nombre})
+    return nuevo
+
+
+def _marcar_mensaje_procesada(db, msg_id: uuid.UUID) -> None:
+    """Oculta el mensaje del listado admin (igual que _marcar_procesada en admin_transacciones)."""
+    existente = db.execute(
+        select(TransaccionProcesada).where(TransaccionProcesada.id_externo == msg_id)
+    ).scalar_one_or_none()
+    if existente is None:
+        db.add(TransaccionProcesada(id_externo=msg_id, estado=False))
+    else:
+        existente.estado = False
+    db.commit()
+
+
+def _procesar_pagos_automatico() -> None:
+    """
+    Cada CRON_PAGOS:
+    1. Consulta imágenes de hoy en chat DB no analizadas aún por la IA.
+    2. Llama a Azure OpenAI Vision para cada una.
+    3. Si es comprobante con monto == VIP_AMOUNT:
+       - Intenta insertar en comprobantes_vip (UNIQUE en comprobante_num).
+       - Si inserta OK  → renueva o crea cliente VIP y oculta el mensaje.
+       - Si duplicado   → solo oculta el mensaje, no renueva.
+    4. Si ocurre cualquier error → print en consola, NO se marca nada.
+    """
+    if not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_API_KEY:
+        print("[CRON pagos] Azure OpenAI no configurado, saltando.")
+        return
+    if _SessionChat is None:
+        print("[CRON pagos] Chat DB no configurada, saltando.")
+        return
+
+    hoy = datetime.now(COLOMBIA_TZ).date()
+    schema = settings.DATABASE_SCHEMA_2
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
+        print(f"[CRON pagos] Schema inválido: {schema}")
+        return
+
+    print(f"[CRON pagos] Inicio — {hoy}")
+
+    db = SessionLocal()
+    chat_db = _SessionChat()
+    try:
+        # ── 1. Mensajes con imagen de hoy ───────────────────────────────────
+        rows = chat_db.execute(text(f"""
+            SELECT
+                m.id,
+                m.media_content,
+                m.media_mime_type,
+                c.phone
+            FROM {schema}.messages m
+            JOIN {schema}.conversations c ON c.id = m.conversation_id
+            WHERE m.message_type = 'image'
+              AND (m.created_at AT TIME ZONE 'America/Bogota')::date = :fecha
+              AND m.media_content IS NOT NULL
+            ORDER BY m.created_at ASC
+        """), {"fecha": hoy}).mappings().all()
+
+        # ── 2. Filtrar los ya analizados (solo contra los IDs de hoy) ─────────
+        today_ids = [r["id"] for r in rows]
+        ya_procesados: set[uuid.UUID] = set()
+        if today_ids:
+            ya_procesados = set(
+                db.execute(
+                    select(MensajeIaProcesado.message_id).where(
+                        MensajeIaProcesado.message_id.in_(today_ids)
+                    )
+                ).scalars().all()
+            )
+
+        pendientes = [r for r in rows if r["id"] not in ya_procesados]
+        print(f"[CRON pagos] {len(pendientes)} imágenes pendientes de análisis")
+
+        for row in pendientes:
+            msg_id: uuid.UUID = row["id"]
+            base64_img: str = row["media_content"]
+            mime_type: str = row["media_mime_type"] or "image/jpeg"
+            phone_orig: str = row["phone"] or ""
+            phone_resuelto = resolve_real_phone_from_identifier(chat_db, schema, phone_orig) or phone_orig
+            celular_local = _strip_cc(phone_resuelto)
+            celular_wp = re.sub(r"\D", "", phone_resuelto) or f"57{celular_local}"
+
+            # ── Hash SHA-256 de la imagen (bytes reales, no el string base64) ──
+            try:
+                image_bytes = base64.b64decode(base64_img)
+                image_hash = hashlib.sha256(image_bytes).hexdigest()
+            except Exception as exc:
+                print(f"[CRON pagos] ERROR calculando hash msg={msg_id}: {exc}")
+                continue
+
+            # ── Chequeo extra: ¿ya procesamos esta imagen física antes? ─────────
+            hash_ya_procesado = db.execute(
+                select(MensajeIaProcesado).where(MensajeIaProcesado.image_hash == image_hash)
+            ).scalars().first()
+
+            if hash_ya_procesado:
+                # Misma imagen, distinto message_id — registrar sin llamar a la IA
+                print(f"[CRON pagos] msg={msg_id}: imagen ya procesada (hash={image_hash[:8]}...) — marcando sin IA")
+                try:
+                    db.add(MensajeIaProcesado(
+                        message_id=msg_id,
+                        es_comprobante=hash_ya_procesado.es_comprobante,
+                        monto_extraido=hash_ya_procesado.monto_extraido,
+                        comprobante_num=hash_ya_procesado.comprobante_num,
+                        image_hash=image_hash,
+                    ))
+                    db.commit()
+                except Exception as exc:
+                    db.rollback()
+                    print(f"[CRON pagos] ERROR marcando duplicado hash msg={msg_id}: {exc}")
+                # Ocultar el mensaje también
+                try:
+                    _marcar_mensaje_procesada(db, msg_id)
+                except Exception as exc:
+                    print(f"[CRON pagos] ERROR ocultando mensaje hash-dup msg={msg_id}: {exc}")
+                continue
+
+            # ── 3. Llamada a la IA ─────────────────────────────────────────────
+            try:
+                resultado_ia = _analizar_imagen_con_ia(base64_img, mime_type)
+            except Exception as exc:
+                print(f"[CRON pagos] ERROR IA msg={msg_id}: {exc}")
+                continue  # no marcamos nada, se reintentará
+
+            es_comprobante: bool = bool(resultado_ia.get("es_comprobante"))
+            comprobante_num = resultado_ia.get("comprobante_num") or None
+            monto_raw = resultado_ia.get("monto")
+            monto = Decimal(str(monto_raw)) if monto_raw is not None else None
+
+            # ── 4. Registrar que ya se analizó (independiente del resultado) ───
+            try:
+                db.add(MensajeIaProcesado(
+                    message_id=msg_id,
+                    es_comprobante=es_comprobante,
+                    monto_extraido=monto,
+                    comprobante_num=comprobante_num,
+                    image_hash=image_hash,
+                ))
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                print(f"[CRON pagos] ERROR guardando MensajeIaProcesado msg={msg_id}: {exc}")
+                continue
+
+            # ── 5. ¿Aplica para renovación? ────────────────────────────────────
+            if not es_comprobante:
+                print(f"[CRON pagos] msg={msg_id}: no es comprobante, ignorado")
+                continue
+
+            if monto is None or int(monto) != settings.VIP_AMOUNT:
+                print(f"[CRON pagos] msg={msg_id}: monto {monto} != {settings.VIP_AMOUNT}, ignorado")
+                continue
+
+            if not comprobante_num:
+                print(f"[CRON pagos] msg={msg_id}: comprobante sin número extraído, ignorado")
+                continue
+
+            if not _is_valid_local_phone(celular_local):
+                print(
+                    f"[CRON pagos] msg={msg_id}: identificador sin celular resoluble "
+                    f"(raw='{phone_orig}', resolved='{phone_resuelto}'), ignorado"
+                )
+                continue
+
+            # ── 6. Intentar registrar comprobante único ─────────────────────────
+            comprobante_nuevo = False
+            try:
+                db.add(ComprobanteVip(
+                    comprobante_num=comprobante_num,
+                    celular=celular_local,
+                    monto=monto,
+                    descripcion="pago vip",
+                    message_id=msg_id,
+                    image_hash=image_hash,
+                ))
+                db.commit()
+                comprobante_nuevo = True
+            except IntegrityError:
+                db.rollback()
+                print(f"[CRON pagos] msg={msg_id} celular={celular_local}: comprobante '{comprobante_num}' ya procesado antes — solo se oculta")
+            except Exception as exc:
+                db.rollback()
+                print(f"[CRON pagos] ERROR insertando ComprobanteVip msg={msg_id}: {exc}")
+                continue
+
+            # ── 7. Ocultar mensaje del admin ───────────────────────────────────
+            try:
+                _marcar_mensaje_procesada(db, msg_id)
+            except Exception as exc:
+                print(f"[CRON pagos] ERROR ocultando mensaje msg={msg_id}: {exc}")
+                continue
+
+            if not comprobante_nuevo:
+                continue  # duplicado: ya ocultamos, no renovamos
+
+            # ── 8. Renovar o crear cliente ─────────────────────────────────────
+            try:
+                cliente = db.execute(
+                    select(Cliente).where(Cliente.celular == celular_local)
+                ).scalar_one_or_none()
+
+                if cliente:
+                    if cliente.tipo_cliente != 1:
+                        print(f"[CRON pagos] msg={msg_id}: cliente {celular_local} tipo {cliente.tipo_cliente}, no se renueva")
+                        continue
+                    nueva_sus, era_vip = renovar_cliente(
+                        db=db,
+                        cliente=cliente,
+                        platform_user_id=None,  # proceso automático
+                        usuario="sistema_pagos",
+                        audit_action="RENOVAR_PAGO_AUTO",
+                        audit_entity="comprobantes_vip",
+                        audit_entity_id=str(msg_id),
+                    )
+                    db.commit()
+                    if not era_vip:
+                        publish_event("nuevo_vip", {"nombre": cliente.nombre})
+                    print(f"[CRON pagos] msg={msg_id}: renovado cliente {celular_local} hasta {nueva_sus.fin.date()}")
+                else:
+                    nuevo_cli = _crear_cliente_vip(db, celular_local, celular_wp)
+                    print(f"[CRON pagos] msg={msg_id}: cliente nuevo VIP creado {celular_local} id={nuevo_cli.id}")
+
+            except Exception as exc:
+                db.rollback()
+                print(f"[CRON pagos] ERROR en renovación/creación msg={msg_id} celular={celular_local}: {exc}")
+                continue
+
+    except Exception as exc:
+        print(f"[CRON pagos] ERROR general: {exc}")
+        logger.exception("Error en _procesar_pagos_automatico")
+    finally:
+        chat_db.close()
+        db.close()
+        print(f"[CRON pagos] Fin — {hoy}")
+
+
 def _parse_cron(expr: str) -> CronTrigger:
     """Parsea una expresión cron de 5 campos y retorna un CronTrigger en hora Colombia."""
     minuto, hora, dom, mes, dow = expr.split()
@@ -593,13 +907,21 @@ def start() -> None:
         replace_existing=True,
         misfire_grace_time=3600,
     )
+    _scheduler.add_job(
+        _procesar_pagos_automatico,
+        trigger=_parse_cron(settings.CRON_PAGOS),
+        id="pagos_automatico",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
     _scheduler.start()
     logger.info(
-        "Scheduler iniciado (hora Colombia) — vip_check '%s' | numeros '%s' | loterias '%s' | contactos '%s'",
+        "Scheduler iniciado (hora Colombia) — vip_check '%s' | numeros '%s' | loterias '%s' | contactos '%s' | pagos '%s'",
         settings.CRON_VIP_CHECK,
         settings.CRON_NUMEROS,
         settings.CRON_LOTERIAS,
         settings.CRON_CONTACTOS,
+        settings.CRON_PAGOS,
     )
 
 

@@ -28,7 +28,7 @@ from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import Message, MessageStatus, SenderType
 from app.models.tenant import Tenant
 from app.services.audio_transcription import transcribe_audio_bytes
-from app.services.whatsapp import download_media
+from app.services.whatsapp import download_media, send_request_contact_info, send_template_message
 from app.services.message_stats import record_messages
 from app.redis.client import get_redis
 from app.redis.streams import (
@@ -57,6 +57,9 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
     conversation_id = uuid.UUID(data["conversation_id"])
     external_id = data.get("external_id", "")
     phone = str(data.get("phone", ""))
+    bsuid = data.get("bsuid", "") or None
+    username = data.get("username", "") or None
+    real_phone = data.get("real_phone", "") or None  # from contacts webhook
     content = data.get("content", "")
     message_type = data.get("message_type", "text")
     media_id = data.get("media_id", "")
@@ -85,11 +88,19 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             select(Conversation).where(Conversation.id == conversation_id)
         )
         now = datetime.now(timezone.utc)
+
+        # Load tenant early — needed for pedir_contacto and media download
+        tenant = await db.scalar(
+            select(Tenant).where(Tenant.id == uuid.UUID(tenant_id))
+        )
+
         if conv is None:
             conv = Conversation(
                 id=conversation_id,
                 tenant_id=uuid.UUID(tenant_id),
                 phone=phone,
+                username=username,
+                bsuid=bsuid,
                 status=ConversationStatus.BOT_ACTIVE,
                 created_at=now,
                 updated_at=now,
@@ -97,17 +108,81 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             )
             db.add(conv)
             await db.flush()
-            # Register new phone in contactos (ignore if already exists)
-            await db.execute(
-                __import__("sqlalchemy", fromlist=["text"]).text(
-                    f"INSERT INTO {schema}.contactos (id, tags, created_at) "
-                    f"VALUES (:phone, '', NOW()) ON CONFLICT (id) DO NOTHING"
-                ),
-                {"phone": phone},
-            )
+
+            if bsuid:
+                # BSUID user: check if we already have their phone in contactos
+                existing = await db.scalar(
+                    __import__("sqlalchemy", fromlist=["text"]).text(
+                        f"SELECT id FROM {schema}.contactos WHERE bsuid = :bsuid LIMIT 1"
+                    ),
+                    {"bsuid": bsuid},
+                )
+                if not existing:
+                    # No phone on file yet — ask the user every new conversation
+                    if tenant and tenant.whatsapp_phone_id and tenant.whatsapp_token:
+                        try:
+                            if tenant.pedir_contacto_template:
+                                # Use the Meta-approved template configured in admin
+                                await send_template_message(
+                                    phone_id=tenant.whatsapp_phone_id,
+                                    token=tenant.whatsapp_token,
+                                    to=phone,
+                                    template_name=tenant.pedir_contacto_template,
+                                    language=tenant.whatsapp_template_language or "es",
+                                )
+                            else:
+                                # Fallback: request_contact_info interactive message
+                                await send_request_contact_info(
+                                    phone_id=tenant.whatsapp_phone_id,
+                                    token=tenant.whatsapp_token,
+                                    to=phone,
+                                )
+                            logger.info(
+                                "pedir_contacto sent automatically for conv %s bsuid=%s",
+                                conversation_id, bsuid,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "pedir_contacto auto-send failed for conv %s: %s",
+                                conversation_id, exc,
+                            )
+            else:
+                # Regular phone user — upsert contactos with phone + username
+                await db.execute(
+                    __import__("sqlalchemy", fromlist=["text"]).text(
+                        f"INSERT INTO {schema}.contactos (id, username, tags, created_at) "
+                        f"VALUES (:phone, :username, '', NOW()) "
+                        f"ON CONFLICT (id) DO UPDATE SET "
+                        f"username = COALESCE(EXCLUDED.username, {schema}.contactos.username)"
+                    ),
+                    {"phone": phone, "username": username},
+                )
         else:
             # Keep existing ownership/status; just refresh timestamps.
             new_values: dict = {"updated_at": now, "last_user_message_at": now}
+            # Update username if we received one and it differs
+            if username and conv.username != username:
+                new_values["username"] = username
+            # Update bsuid if not set yet
+            if bsuid and not conv.bsuid:
+                new_values["bsuid"] = bsuid
+            # contacts webhook (pedir_contacto response): save phone in contactos
+            # but do NOT change conv.phone — we always reply via BSUID
+            if real_phone:
+                logger.info(
+                    "pedir_contacto response: saving phone %s for bsuid=%s (conv %s)",
+                    real_phone, bsuid or "-", conversation_id,
+                )
+                await db.execute(
+                    __import__("sqlalchemy", fromlist=["text"]).text(
+                        f"INSERT INTO {schema}.contactos (id, bsuid, username, tags, created_at) "
+                        f"VALUES (:phone, :bsuid, :username, '', NOW()) "
+                        f"ON CONFLICT (id) DO UPDATE SET "
+                        f"bsuid = COALESCE(EXCLUDED.bsuid, {schema}.contactos.bsuid), "
+                        f"username = COALESCE(EXCLUDED.username, {schema}.contactos.username)"
+                    ),
+                    {"phone": real_phone, "bsuid": bsuid, "username": username},
+                )
             # Reopen CLOSED conversations so the bot answers again when the
             # user comes back after the agent (or auto-close) shut it down.
             # We don't touch HUMAN_ACTIVE / WAITING_HUMAN — those stay with
@@ -137,10 +212,11 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
 
         if media_id:
             try:
-                # Load tenant token to authenticate against Meta API
-                tenant = await db.scalar(
-                    select(Tenant).where(Tenant.id == uuid.UUID(tenant_id))
-                )
+                # Reuse tenant loaded above
+                if not tenant:
+                    tenant = await db.scalar(
+                        select(Tenant).where(Tenant.id == uuid.UUID(tenant_id))
+                    )
                 if tenant and tenant.whatsapp_token:
                     raw_bytes, mime = await download_media(media_id, tenant.whatsapp_token)
                     media_content = base64.b64encode(raw_bytes).decode("ascii")

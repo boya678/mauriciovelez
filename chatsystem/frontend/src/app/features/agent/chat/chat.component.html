@@ -9,7 +9,14 @@
     <!-- Header -->
     <div class="chat-header">
       <div class="chat-header-info">
-        <span class="phone"><span class="material-icons" style="font-size:1em;vertical-align:middle">smartphone</span> {{ conv.phone }}</span>
+        <span class="phone">
+          @if (conv.username) {
+            <span class="material-icons" style="font-size:1em;vertical-align:middle">alternate_email</span>{{ conv.username }}
+            <span class="bsuid-sub">{{ conv.phone }}</span>
+          } @else {
+            <span class="material-icons" style="font-size:1em;vertical-align:middle">smartphone</span> {{ conv.phone }}
+          }
+        </span>
         @if (conv.tags) {
           <span class="conv-tags">{{ conv.tags }}</span>
         }
@@ -18,6 +25,11 @@
         </span>
       </div>
       <div class="chat-header-actions">
+        @if (isBsuid()) {
+          <button class="btn btn-outline-info btn-sm" (click)="pedirContacto()" title="Pedir número de teléfono real al usuario">
+            <span class="material-icons" style="font-size:1em;vertical-align:middle">contact_phone</span> Pedir contacto
+          </button>
+        }
         @if (canTake) {
           <button class="btn btn-primary" (click)="take()">Tomar conversación</button>
         }

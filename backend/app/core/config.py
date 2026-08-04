@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     # Base de datos secundaria (chat)
     DATABASE_URL_2: str = ""
     DATABASE_SCHEMA_2: str = "t_mauriciovelez"
+    # Azure OpenAI (vision para pagos automáticos)
+    AZURE_OPENAI_ENDPOINT: str = ""
+    AZURE_OPENAI_API_KEY: str = ""
+    AZURE_OPENAI_DEPLOYMENT: str = "gpt-4.1-mini"
+    AZURE_OPENAI_TEMPERATURE: float = 0.0
+    VIP_AMOUNT: int = 30000
+    CRON_PAGOS: str = "*/10 * * * *"
 
     model_config = SettingsConfigDict(
         env_file=".env",

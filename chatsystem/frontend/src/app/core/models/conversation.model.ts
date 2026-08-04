@@ -8,6 +8,8 @@ export type ConversationStatus =
 export interface Conversation {
   id: string;
   phone: string;
+  username: string | null;
+  bsuid: string | null;
   status: ConversationStatus;
   assigned_agent_id: string | null;
   tenant_id: string;

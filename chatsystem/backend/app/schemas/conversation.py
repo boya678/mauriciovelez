@@ -11,6 +11,8 @@ class ConversationOut(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     phone: str
+    username: str | None = None
+    bsuid: str | None = None
     status: ConversationStatus
     assigned_agent_id: uuid.UUID | None = None
     created_at: datetime

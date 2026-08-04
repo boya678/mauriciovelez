@@ -9,6 +9,7 @@ export interface TenantSettings {
   whatsapp_template_name: string | null;
   whatsapp_template_language: string | null;
   image_menu_payload: string | null;
+  pedir_contacto_template: string | null;
 }
 
 export interface KnowledgeStatus {

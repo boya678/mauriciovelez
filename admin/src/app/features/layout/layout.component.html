@@ -49,6 +49,12 @@
         <span class="nav-icon material-icons-round">photo_library</span>
         @if (sidebarOpen()) { <span>Transacciones</span> }
       </a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin/comprobantes" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon material-icons-round">receipt_long</span>
+          @if (sidebarOpen()) { <span>Comprobantes</span> }
+        </a>
+      }
       <a routerLink="/live" routerLinkActive="active" class="nav-item">
         <span class="nav-icon material-icons-round">live_tv</span>
         @if (sidebarOpen()) { <span>En Vivo</span> }

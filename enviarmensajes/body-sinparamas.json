@@ -3,18 +3,18 @@
   "to": "573215332978",
   "type": "template",
   "template": {
-    "name": "rifa_esco",
+    "name": "28000",
     "language": {
-      "code": "es_CO"
+      "code": "es"
     },
     "components": [
-      {
+       {
         "type": "header",
         "parameters": [
           {
             "type": "image",
             "image": {
-              "link": "https://res.cloudinary.com/dfpy0exz1/image/upload/v1780426421/imagen_mkw6ct.jpg" 
+              "link": "https://res.cloudinary.com/dfpy0exz1/image/upload/v1785004395/28000_y0fjst.jpg" 
             }
           }
         ]

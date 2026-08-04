@@ -29,6 +29,15 @@ export interface PagedTransacciones {
   items: Transaccion[];
 }
 
+export interface ChequeoResult {
+  analizado_por_ia: boolean;
+  es_comprobante: boolean | null;
+  comprobante_num: string | null;
+  monto_extraido: number | null;
+  ya_procesado: boolean;
+  procesado_para_celular: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransaccionesService {
   private base = `${environment.apiUrl}/admin/transacciones`;
@@ -51,6 +60,27 @@ export class TransaccionesService {
 
   enviarMensaje(id: string, texto: string) {
     return this.http.post<{ ok: boolean }>(`${this.base}/${id}/mensaje`, { texto });
+  }
+
+  chequear(id: string) {
+    return this.http.get<ChequeoResult>(`${this.base}/${id}/chequear`);
+  }
+
+  registrarComprobante(id: string, comprobante_num_manual: string | undefined, descripcion: string) {
+    return this.http.post<{ ok: boolean; comprobante_num: string; celular: string }>(
+      `${this.base}/${id}/registrar-comprobante`,
+      { comprobante_num_manual: comprobante_num_manual || undefined, descripcion }
+    );
+  }
+
+  reprocesar(id: string) {
+    return this.http.post<{
+      es_comprobante: boolean;
+      comprobante_num: string | null;
+      monto_extraido: number | null;
+      accion: string;
+      detalle: string | null;
+    }>(`${this.base}/${id}/reprocesar`, {});
   }
 }
 

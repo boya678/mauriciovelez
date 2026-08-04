@@ -53,6 +53,22 @@
           ></textarea>
         </div>
 
+        <div class="field-group">
+          <label for="pedirContactoMessage">Plantilla pedir contacto</label>
+          <p class="field-hint">
+            Nombre exacto de la plantilla aprobada en Meta que se envía al usuario BSUID
+            para solicitarle su número de teléfono. Si está vacío se usa el mensaje
+            interactivo <code>request_contact_info</code> por defecto.
+          </p>
+          <input
+            id="pedirContactoMessage"
+            type="text"
+            [(ngModel)]="pedirContactoTemplate"
+            [disabled]="saving()"
+            placeholder="pedir_numero"
+          />
+        </div>
+
         @if (error()) {
           <div class="alert alert-error">{{ error() }}</div>
         }

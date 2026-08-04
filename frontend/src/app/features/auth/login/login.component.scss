@@ -8,35 +8,101 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow-x: hidden;   /* oculta partículas horizontales */
-  overflow-y: auto;     /* permite scroll si la tarjeta no cabe */
-  padding-block: 2rem;  /* respiro vertical en pantallas pequeñas */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-block: 2rem;
   position: relative;
 }
 
-// ── PARTICLES ─────────────────────────────────────────────────
-.particles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
+// ── LOGIN WRAP (columna: stats + card) ─────────────────────────
+.login-wrap {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: min(440px, 92vw);
 }
 
-.particle {
-  position: absolute;
-  bottom: -40px;
-  color: var(--gold-bright);
-  animation: float-up linear infinite;
-  text-shadow: 0 0 10px var(--gold-mid);
-  will-change: transform, opacity;
-  user-select: none;
+// ── STATS CARD ─────────────────────────────────────────────────
+.stats-card {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 215, 0, 0.10) 0%,
+    rgba(45, 10, 94, 0.78) 100%
+  );
+  border: 1px solid rgba(255, 215, 0, 0.32);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(16px);
+  padding: 1rem 0.5rem 0.6rem;
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 0, 0.06),
+    0 4px 20px rgba(0, 0, 0, 0.45);
+  animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  &__item {
+    flex: 1 1 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 0.5rem;
+  }
+
+  &__divider {
+    width: 1px;
+    height: 2.5rem;
+    background: rgba(255, 215, 0, 0.25);
+    align-self: center;
+  }
+
+  &__num {
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gold-bright);
+    line-height: 1;
+    text-shadow: 0 0 18px rgba(255, 215, 0, 0.55);
+  }
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+
+    .material-icons-round {
+      font-size: 0.85rem;
+      color: var(--gold-mid);
+    }
+  }
+
+  &__caption {
+    width: 100%;
+    text-align: center;
+    font-size: 0.65rem;
+    color: rgba(255, 215, 0, 0.5);
+    margin: 0.4rem 0 0;
+    letter-spacing: 0.04em;
+  }
 }
 
 // ── CARD ──────────────────────────────────────────────────────
 .login-card {
   position: relative;
   z-index: 10;
-  width: min(440px, 92vw);
+  width: 100%;
   padding: 2.75rem 2.25rem 2.25rem;
   background: linear-gradient(
     148deg,
@@ -290,7 +356,7 @@ form {
 
 // ── BANNER PÚBLICO ────────────────────────────────────────────
 .banner-pub {
-  margin-bottom: 1.25rem;
+  width: 100%;
   border-radius: var(--radius-md);
   overflow: hidden;
   animation: fade-in-up 0.35s ease-out both;
@@ -321,10 +387,7 @@ form {
     display: flex;
     align-items: flex-start;
     gap: 0.6rem;
-    padding: 0.9rem 1rem;
-    background: rgba(255, 215, 0, 0.06);
-    border: 1px solid rgba(255, 215, 0, 0.2);
-    border-radius: var(--radius-md);
+    padding: 0;
 
     .material-icons-round {
       font-size: 1.2rem;
@@ -339,55 +402,6 @@ form {
     font-size: 0.88rem;
     line-height: 1.55;
     margin: 0;
-  }
-}
-
-// ── PROOF HERO ────────────────────────────────────────────────
-.proof-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  margin-bottom: 1.5rem;
-  padding: 1.1rem 1rem;
-  background: rgba(255, 215, 0, 0.07);
-  border: 1px solid rgba(255, 215, 0, 0.22);
-  border-radius: var(--radius-md);
-  animation: fade-in-up 0.35s ease-out both;
-
-  &__num {
-    font-size: 3rem;
-    font-weight: 700;
-    color: var(--gold-bright);
-    font-family: 'Cinzel', serif;
-    line-height: 1;
-    text-shadow: 0 0 24px rgba(255, 215, 0, 0.45);
-  }
-
-  &__label {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  &__link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    margin-top: 0.6rem;
-    color: var(--gold-mid);
-    font-size: 0.8rem;
-    text-decoration: none;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
-    padding-bottom: 1px;
-    transition: var(--transition);
-
-    .material-icons-round { font-size: 0.95rem; }
-
-    &:hover { color: var(--gold-bright); border-color: var(--gold-bright); }
   }
 }
 

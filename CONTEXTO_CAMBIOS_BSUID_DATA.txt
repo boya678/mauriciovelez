@@ -1,0 +1,200 @@
+====================================================================
+CONTEXTO - Cambios en datos / modelo por soporte BSUID
+====================================================================
+Fecha actualización: 2026-08-04
+Relacionado con: CONTEXTO_WHATSAPP_PROTOCOLO_BSUID.txt
+
+====================================================================
+PRINCIPIOS DEL DISEÑO
+====================================================================
+1. conversations.phone almacena SIEMPRE el identificador de envío:
+   - número real  (ej. "573001234567")   → campo "to" en la API de Meta
+   - BSUID        (ej. "CO.194926695…")  → campo "recipient" en la API
+   El helper _to_field() en whatsapp.py distingue por la presencia de "."
+
+2. Se NUNCA actualiza conv.phone con el número real obtenido de pedir_contacto.
+   El BSUID es el identificador permanente para enviar. El teléfono real
+   es solo metadata de negocio guardada en la tabla contactos.
+
+3. contactos.id = teléfono real (clave de negocio)
+   contactos.bsuid = BSUID vinculado (índice único)
+   Buscar "¿ya tenemos el teléfono de este BSUID?" = SELECT id FROM contactos WHERE bsuid=?
+
+4. pedir_contacto se envía automáticamente al inicio de cada conversación
+   nueva con BSUID, MIENTRAS el BSUID no tenga entrada en contactos.
+   Una vez el usuario comparte su número → entra en contactos → nunca más se pide.
+
+====================================================================
+MIGRACIONES
+====================================================================
+
+--- MIGRACION 0015 ---
+Archivo : chatsystem/backend/alembic/versions/0015_add_username_to_conversations.py
+Accion  : ALTER TABLE {schema}.conversations ADD COLUMN IF NOT EXISTS username VARCHAR(100) NULL
+Aplica a: todos los schemas t_* existentes
+
+--- MIGRACION 0016 ---
+Archivo : chatsystem/backend/alembic/versions/0016_add_bsuid_to_conversations.py
+Accion  : ALTER TABLE {schema}.conversations ADD COLUMN IF NOT EXISTS bsuid VARCHAR(150) NULL
+          CREATE INDEX IF NOT EXISTS ix_conv_bsuid ON {schema}.conversations (bsuid)
+Aplica a: todos los schemas t_*
+
+--- MIGRACION 0017 ---
+Archivo : chatsystem/backend/alembic/versions/0017_add_bsuid_username_to_contactos.py
+Acciones:
+  ALTER TABLE {schema}.contactos ADD COLUMN IF NOT EXISTS bsuid VARCHAR(150) NULL
+  CREATE UNIQUE INDEX IF NOT EXISTS ix_contactos_bsuid ON {schema}.contactos (bsuid) WHERE bsuid IS NOT NULL
+  ALTER TABLE {schema}.contactos ADD COLUMN IF NOT EXISTS username VARCHAR(100) NULL
+Aplica a: todos los schemas t_*
+
+--- MIGRACION 0018 ---
+Archivo : chatsystem/backend/alembic/versions/0018_add_pedir_contacto_message_to_tenants.py
+Accion  : ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pedir_contacto_message TEXT NULL
+Nota    : si NULL, el worker usa el texto hardcodeado por defecto en send_request_contact_info()
+
+====================================================================
+MODELOS SQLAlchemy
+====================================================================
+
+--- conversations ---
+Archivo : chatsystem/backend/app/models/conversation.py
+Campos nuevos:
+  username : Mapped[str | None] = mapped_column(String(100), nullable=True)
+  bsuid    : Mapped[str | None] = mapped_column(String(150), nullable=True)
+
+--- tenants (public) ---
+Archivo : chatsystem/backend/app/models/tenant.py
+Campo nuevo:
+  pedir_contacto_message : Mapped[str | None] = mapped_column(Text, nullable=True)
+
+====================================================================
+DDL NUEVOS TENANTS
+====================================================================
+Archivo : chatsystem/backend/app/api/tenants.py
+Cambios en TENANT_DDL:
+  - conversations incluye: username VARCHAR(100), bsuid VARCHAR(150)
+  - contactos incluye: bsuid VARCHAR(150) NULL, username VARCHAR(100) NULL
+  - CREATE UNIQUE INDEX ix_contactos_bsuid ON {schema}.contactos (bsuid) WHERE bsuid IS NOT NULL
+
+====================================================================
+SCHEMAS PYDANTIC
+====================================================================
+
+--- ConversationOut / ConversationDetail ---
+Archivo : chatsystem/backend/app/schemas/conversation.py
+Campos nuevos: username: str | None = None
+               bsuid: str | None = None
+Expuesto por: GET /conversations, GET /conversations/{id}
+
+--- PromptSettings (tenant settings) ---
+Archivo : chatsystem/backend/app/api/agents.py  (clase PromptSettings)
+Campo nuevo: pedir_contacto_message: str | None = None
+Endpoints: GET /agents/settings, PUT /agents/settings
+
+====================================================================
+LÓGICA DE WEBHOOK (entrada)
+====================================================================
+Archivo : chatsystem/backend/app/api/webhook.py
+Cambios:
+  - Extrae bsuid = from_user_id del mensaje
+  - stable_id = bsuid OR phone  →  conversation_id = uuid5(tenant.id:stable_id)
+    Esto hace que el hilo sea estable aunque el teléfono sea desconocido.
+  - Payload del stream incluye campos: bsuid, real_phone (en webhook contacts)
+
+Archivo : chatsystem/backend/app/services/whatsapp.py
+Cambios en parse_incoming_message:
+  - Extrae phone_from (campo "from") y bsuid (campo "from_user_id") por separado
+  - sender_id = phone_from OR bsuid
+  - Maneja message_type "contacts": extrae real_phone de contacts[0].phones[0]
+    y lo pone en campo "real_phone" del dict retornado; content = "[contacto_compartido:PHONE]"
+  - Retorna bsuid en el dict de cada mensaje
+Nueva función:
+  send_request_contact_info(phone_id, token, to, body_text) → POST /messages
+    type: interactive / interactive.type: request_contact_info
+    _to_field(to) maneja BSUID automáticamente
+
+====================================================================
+LÓGICA DE INGESTION (message_ingestion.py)
+====================================================================
+Archivo : chatsystem/backend/app/workers/message_ingestion.py
+
+CONVERSACIÓN NUEVA con BSUID:
+  1. Crea conv con phone=BSUID, bsuid=BSUID
+  2. Consulta: SELECT id FROM {schema}.contactos WHERE bsuid = :bsuid
+     - Si NO existe → llama send_request_contact_info() automáticamente
+       usando tenant.pedir_contacto_message si está configurado, sino texto por defecto
+     - Si existe → no hace nada (ya tenemos su teléfono)
+
+CONVERSACIÓN NUEVA con teléfono real:
+  - Inserta en contactos (id=phone, username=username) ON CONFLICT DO UPDATE username
+
+MENSAJE EN CONVERSACIÓN EXISTENTE:
+  - Actualiza username si cambió
+  - Actualiza bsuid si no estaba guardado
+  - Si message_type == "contacts" (respuesta al pedir_contacto):
+      INSERT INTO contactos (id=real_phone, bsuid=bsuid, username=username)
+      ON CONFLICT (id) DO UPDATE SET bsuid, username
+      → NO modifica conv.phone
+
+====================================================================
+API REST - NUEVO ENDPOINT
+====================================================================
+Archivo : chatsystem/backend/app/api/conversations.py
+Endpoint: POST /conversations/{id}/pedir-contacto
+  - Requiere agente autenticado
+  - Valida que conv.phone contenga "." (es BSUID); si no → HTTP 400
+  - Llama send_request_contact_info(phone_id, token, conv.phone)
+  - Permite que el agente dispare manualmente si quiere, además del automático
+
+====================================================================
+FRONTEND
+====================================================================
+
+--- Modelo ---
+Archivo : chatsystem/frontend/src/app/core/models/conversation.model.ts
+Campos nuevos: username: string | null
+               bsuid: string | null
+
+--- Servicio conversaciones ---
+Archivo : chatsystem/frontend/src/app/core/services/conversations.service.ts
+Método nuevo: pedirContacto(id) → POST /{id}/pedir-contacto
+
+--- TenantSettings interface ---
+Archivo : chatsystem/frontend/src/app/core/services/agents-api.service.ts
+Campo nuevo: pedir_contacto_message: string | null
+
+--- Chat header (chat.component) ---
+Archivo : chatsystem/frontend/src/app/features/agent/chat/chat.component.html
+  - Muestra "@username" con BSUID/teléfono en gris como subtítulo cuando hay username
+  - Botón "Pedir contacto" visible solo cuando isBsuid() == true
+    (conv.phone contiene ".") — botón manual de respaldo
+Archivo : chatsystem/frontend/src/app/features/agent/chat/chat.component.ts
+  - isBsuid(): boolean → conv.phone.includes(".")
+  - pedirContacto(): llama al servicio, muestra alert de confirmación
+
+--- Inbox ---
+Archivo : chatsystem/frontend/src/app/features/agent/inbox/inbox.component.html
+  - Muestra "@username" con icono alternate_email cuando hay username
+  - Si no hay username, muestra el identificador (phone o BSUID)
+
+--- Settings admin ---
+Archivo : chatsystem/frontend/src/app/features/admin/settings/settings.component.html
+  - Nuevo campo "Mensaje pedir_contacto" (textarea)
+Archivo : chatsystem/frontend/src/app/features/admin/settings/settings.component.ts
+  - pedirContactoMessage = '' vinculado al campo
+
+--- Contactos admin ---
+Archivo : chatsystem/frontend/src/app/features/admin/contactos/contactos.component.*
+  - Lista y exporta contactos con columnas: teléfono, BSUID, usuario, tags (keys separados)
+  - Excel export: columnas Teléfono, BSUID, Usuario + una columna por cada tag key
+
+====================================================================
+NOTAS OPERATIVAS
+====================================================================
+- Deploy: .\build-deploy.ps1 -Target backend  (desde chatsystem/)
+- Las migraciones 0015..0018 se ejecutan automáticamente en el startup de alembic
+- La búsqueda en contactos por BSUID usa el índice parcial ix_contactos_bsuid
+- El campo conversaciones.phone sigue siendo VARCHAR(30); los BSUIDs
+  como "CO.1949266959121697" tienen 20 chars → caben holgados
+====================================================================
+

@@ -325,6 +325,20 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
+  pedirContacto(): void {
+    const id = this.conversationId();
+    if (!id) return;
+    this.conversationsService.pedirContacto(id).subscribe({
+      next: () => alert('Solicitud de contacto enviada.'),
+      error: (err) => alert('Error al enviar solicitud: ' + (err?.error?.detail ?? err.message)),
+    });
+  }
+
+  /** Returns true when the conversation phone is still a BSUID (contains ".") */
+  isBsuid(): boolean {
+    return (this.conversation()?.phone ?? '').includes('.');
+  }
+
   bubbleClass(msg: Message): string {
     if (msg.sender_type === 'user') return 'bubble bubble-user';
     if (msg.sender_type === 'bot') return 'bubble bubble-bot';
