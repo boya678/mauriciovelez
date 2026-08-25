@@ -3,7 +3,7 @@
   "to": "573215332978",
   "type": "template",
   "template": {
-    "name": "ganadornumgratisok23",
+    "name": "boletas_moto",
     "language": {
       "code": "es_CO"
     },
@@ -13,8 +13,8 @@
         "parameters": [
           {
             "type": "image",
-            "video": {
-              "link": "https://res.cloudinary.com/dfpy0exz1/video/upload/v1777579891/video_30_04_vyw22l.mp4" 
+            "image": {
+              "link": "https://res.cloudinary.com/dfpy0exz1/image/upload/v1786485720/WhatsApp_Image_2026-08-11_at_4.26.49_PM_pmbwsj.jpg" 
             }
           }
         ]

@@ -105,6 +105,26 @@
   &.row-agent { justify-content: flex-start; }
 }
 
+.date-separator {
+  text-align: center;
+  margin: 8px 0 4px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  position: relative;
+
+  &::before, &::after {
+    content: '';
+    display: inline-block;
+    width: 60px;
+    height: 1px;
+    background: #e2e8f0;
+    vertical-align: middle;
+    margin: 0 8px;
+  }
+}
+
 .bubble {
   max-width: 72%;
   padding: 9px 13px;

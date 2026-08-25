@@ -39,6 +39,11 @@ from app.services.numbers import (
     notificar_nuevo_numero_vip,
 )
 from app.services.chat_phone_resolver import resolve_real_phone_from_identifier
+from app.services.servicios_config import (
+    get_conferencia_config,
+    get_conferencia_vip_config,
+    get_numero_relampago_config,
+)
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 from app.core.live_events import publish_event
@@ -706,6 +711,9 @@ def _procesar_pagos_automatico() -> None:
             )
 
         pendientes = [r for r in rows if r["id"] not in ya_procesados]
+        conferencia_cfg = get_conferencia_config(db)
+        conferencia_vip_cfg = get_conferencia_vip_config(db)
+        relampago_cfg = get_numero_relampago_config(db)
         print(f"[CRON pagos] {len(pendientes)} imágenes pendientes de análisis")
 
         for row in pendientes:
@@ -784,10 +792,6 @@ def _procesar_pagos_automatico() -> None:
                 print(f"[CRON pagos] msg={msg_id}: no es comprobante, ignorado")
                 continue
 
-            if monto is None or int(monto) != settings.VIP_AMOUNT:
-                print(f"[CRON pagos] msg={msg_id}: monto {monto} != {settings.VIP_AMOUNT}, ignorado")
-                continue
-
             if not comprobante_num:
                 print(f"[CRON pagos] msg={msg_id}: comprobante sin número extraído, ignorado")
                 continue
@@ -799,6 +803,44 @@ def _procesar_pagos_automatico() -> None:
                 )
                 continue
 
+            cliente_actual = db.execute(
+                select(Cliente).where(Cliente.celular == celular_local)
+            ).scalar_one_or_none()
+            es_vip_activo = bool(cliente_actual and cliente_actual.vip and cliente_actual.enabled)
+
+            is_conferencia_vip = bool(
+                conferencia_vip_cfg.activo
+                and conferencia_vip_cfg.valor > 0
+                and conferencia_vip_cfg.fecha_aviso
+                and conferencia_vip_cfg.link_youtube
+                and monto is not None
+                and int(monto) == conferencia_vip_cfg.valor
+                and es_vip_activo
+            )
+            is_relampago = bool(
+                relampago_cfg.activo
+                and relampago_cfg.valor > 0
+                and monto is not None
+                and int(monto) == relampago_cfg.valor
+            )
+            is_conferencia = bool(
+                conferencia_cfg.activo
+                and conferencia_cfg.valor > 0
+                and conferencia_cfg.fecha_aviso
+                and conferencia_cfg.link_youtube
+                and monto is not None
+                and int(monto) == conferencia_cfg.valor
+            )
+
+            if not is_conferencia_vip and not is_conferencia and not is_relampago and (monto is None or int(monto) != settings.VIP_AMOUNT):
+                print(
+                    f"[CRON pagos] msg={msg_id}: monto {monto} no coincide con VIP ({settings.VIP_AMOUNT}) "
+                    f"ni relampago ({relampago_cfg.valor if relampago_cfg.activo else 'inactivo'}) "
+                    f"ni conferencia ({conferencia_cfg.valor if conferencia_cfg.activo else 'inactivo'}) "
+                    f"ni conferencia_vip ({conferencia_vip_cfg.valor if conferencia_vip_cfg.activo else 'inactivo'}), ignorado"
+                )
+                continue
+
             # ── 6. Intentar registrar comprobante único ─────────────────────────
             comprobante_nuevo = False
             try:
@@ -806,7 +848,12 @@ def _procesar_pagos_automatico() -> None:
                     comprobante_num=comprobante_num,
                     celular=celular_local,
                     monto=monto,
-                    descripcion="pago vip",
+                    descripcion=(
+                        "conferencia_vip" if is_conferencia_vip
+                        else "conferencia" if is_conferencia
+                        else "numero_relampago" if is_relampago
+                        else "pago vip"
+                    ),
                     message_id=msg_id,
                     image_hash=image_hash,
                 ))
@@ -829,6 +876,60 @@ def _procesar_pagos_automatico() -> None:
 
             if not comprobante_nuevo:
                 continue  # duplicado: ya ocultamos, no renovamos
+
+            if is_conferencia_vip:
+                if settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
+                    try:
+                        push(
+                            "notificar_conferencia",
+                            celular_wp,
+                            {
+                                "fecha_aviso": conferencia_vip_cfg.fecha_aviso,
+                                "link_youtube": conferencia_vip_cfg.link_youtube,
+                            },
+                        )
+                    except Exception as exc:
+                        print(f"[CRON pagos] ERROR notificando conferencia_vip msg={msg_id}: {exc}")
+                print(
+                    f"[CRON pagos] msg={msg_id}: registrado como conferencia_vip "
+                    f"(monto={monto}, link={conferencia_vip_cfg.link_youtube})"
+                )
+                continue
+
+            if is_conferencia:
+                if settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
+                    try:
+                        push(
+                            "notificar_conferencia",
+                            celular_wp,
+                            {
+                                "fecha_aviso": conferencia_cfg.fecha_aviso,
+                                "link_youtube": conferencia_cfg.link_youtube,
+                            },
+                        )
+                    except Exception as exc:
+                        print(f"[CRON pagos] ERROR notificando conferencia msg={msg_id}: {exc}")
+                print(
+                    f"[CRON pagos] msg={msg_id}: registrado como conferencia "
+                    f"(monto={monto}, link={conferencia_cfg.link_youtube})"
+                )
+                continue
+
+            if is_relampago:
+                if relampago_cfg.numero and settings.WHATSAPP_NOTIFICAR_RELAMPAGO:
+                    try:
+                        push(
+                            "notificar_relampago",
+                            celular_wp,
+                            {"texto": relampago_cfg.numero},
+                        )
+                    except Exception as exc:
+                        print(f"[CRON pagos] ERROR notificando relampago msg={msg_id}: {exc}")
+                print(
+                    f"[CRON pagos] msg={msg_id}: registrado como numero_relampago "
+                    f"(monto={monto}, numero={relampago_cfg.numero or 'sin_numero'}, celular={celular_wp})"
+                )
+                continue
 
             # ── 8. Renovar o crear cliente ─────────────────────────────────────
             try:

@@ -133,6 +133,36 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
             ]},
         ])
 
+    elif type == "notificar_relampago":
+        if not settings.WHATSAPP_NOTIFICAR_RELAMPAGO:
+            logger.warning("WHATSAPP_NOTIFICAR_RELAMPAGO no configurado")
+            return
+        texto = str(params.get("texto", "Notificacion relampago"))
+        _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_RELAMPAGO, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": texto},
+            ]},
+        ])
+
+    elif type == "notificar_conferencia":
+        if not settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
+            logger.warning("WHATSAPP_NOTIFICAR_CONFERENCIA no configurado")
+            return
+        fecha = str(params.get("fecha_aviso", ""))
+        link = str(params.get("link_youtube", ""))
+        if not fecha:
+            logger.warning("notificar_conferencia sin fecha_aviso")
+            return
+        if not link:
+            logger.warning("notificar_conferencia sin link_youtube")
+            return
+        _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_CONFERENCIA, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": fecha},
+                {"type": "text", "text": link},
+            ]},
+        ])
+
     else:
         logger.warning("Tipo de notificación desconocido: %s", type)
 

@@ -24,6 +24,7 @@ from app.routers import admin_rifas
 from app.routers import rifas
 from app.routers import admin_transacciones
 from app.routers import admin_comprobantes
+from app.routers import admin_servicios
 from app.core import scheduler
 from app.core import notification_worker
 
@@ -69,6 +70,7 @@ app.include_router(admin_rifas.router)
 app.include_router(rifas.router)
 app.include_router(admin_transacciones.router)
 app.include_router(admin_comprobantes.router)
+app.include_router(admin_servicios.router)
 
 
 @app.get("/health")

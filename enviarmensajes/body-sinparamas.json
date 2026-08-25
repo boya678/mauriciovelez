@@ -3,22 +3,11 @@
   "to": "573215332978",
   "type": "template",
   "template": {
-    "name": "28000",
+    "name": "conferencia_23",
     "language": {
-      "code": "es"
+      "code": "es_co"
     },
     "components": [
-       {
-        "type": "header",
-        "parameters": [
-          {
-            "type": "image",
-            "image": {
-              "link": "https://res.cloudinary.com/dfpy0exz1/image/upload/v1785004395/28000_y0fjst.jpg" 
-            }
-          }
-        ]
-      },
       {
         "type": "body",
         "parameters": [

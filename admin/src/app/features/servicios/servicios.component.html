@@ -1,0 +1,147 @@
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">
+      <span class="material-icons-round">build_circle</span>
+      Servicios
+    </h1>
+    <span class="badge-admin">Solo admin</span>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  }
+  @if (ok()) {
+    <div class="alert alert-ok">{{ ok() }}</div>
+  }
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Número relámpago</h2>
+        <p>Procesa comprobantes por un monto configurable y notifica por plantilla WhatsApp.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="config.activo" />
+      </label>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando configuración...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label>Valor</label>
+          <input type="number" min="0" step="1" [(ngModel)]="config.valor" placeholder="30000" />
+          <small>Monto exacto que activa el proceso.</small>
+        </div>
+
+        <div class="field">
+          <label>Número relámpago</label>
+          <input type="text" [(ngModel)]="config.numero" placeholder="3574-4475" />
+          <small>Este valor se envía al cliente que haga match usando WHATSAPP_NOTIFICAR_RELAMPAGO.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="savingRelampago()" (click)="guardarRelampago()">
+          @if (savingRelampago()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+    }
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Conferencia</h2>
+        <p>Procesa comprobantes por monto y notifica al cliente con un link de YouTube.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="conferencia.activo" />
+      </label>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando configuración...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label>Valor</label>
+          <input type="number" min="0" step="1" [(ngModel)]="conferencia.valor" placeholder="30000" />
+          <small>Monto exacto que activa el proceso de conferencia.</small>
+        </div>
+
+        <div class="field">
+          <label>Fecha aviso</label>
+          <input
+            type="text"
+            [(ngModel)]="conferencia.fecha_aviso"
+            placeholder="domingo 12 de julio a las 3 pm"
+          />
+          <small>Este valor será el parámetro 1 de la plantilla.</small>
+        </div>
+
+        <div class="field">
+          <label>Link de YouTube</label>
+          <input type="text" [(ngModel)]="conferencia.link_youtube" placeholder="https://youtube.com/..." />
+          <small>Este valor será el parámetro 2 usando WHATSAPP_NOTIFICAR_CONFERENCIA.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="savingConferencia()" (click)="guardarConferencia()">
+          @if (savingConferencia()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+    }
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Conferencia VIP</h2>
+        <p>Igual a Conferencia, pero solo aplica si el cliente que paga es VIP activo.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="conferenciaVip.activo" />
+      </label>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando configuración...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label>Valor</label>
+          <input type="number" min="0" step="1" [(ngModel)]="conferenciaVip.valor" placeholder="30000" />
+          <small>Monto exacto que activa el proceso, solo para clientes VIP activos.</small>
+        </div>
+
+        <div class="field">
+          <label>Fecha aviso</label>
+          <input
+            type="text"
+            [(ngModel)]="conferenciaVip.fecha_aviso"
+            placeholder="domingo 12 de julio a las 3 pm"
+          />
+          <small>Este valor será el parámetro 1 de la plantilla.</small>
+        </div>
+
+        <div class="field">
+          <label>Link de YouTube</label>
+          <input type="text" [(ngModel)]="conferenciaVip.link_youtube" placeholder="https://youtube.com/..." />
+          <small>Este valor será el parámetro 2 usando WHATSAPP_NOTIFICAR_CONFERENCIA.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="savingConferenciaVip()" (click)="guardarConferenciaVip()">
+          @if (savingConferenciaVip()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+    }
+  </section>
+</div>

@@ -352,7 +352,31 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    const d = new Date(iso);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    const time = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    if (isToday) return time;
+    if (isYesterday) return `ayer ${time}`;
+    return d.toLocaleDateString('es', { day: 'numeric', month: 'short' }) + ' ' + time;
+  }
+
+  formatDateSeparator(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return 'Hoy';
+    if (d.toDateString() === yesterday.toDateString()) return 'Ayer';
+    return d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  showDateSeparator(msgs: any[], index: number): boolean {
+    if (index === 0) return true;
+    const prev = new Date(msgs[index - 1].created_at).toDateString();
+    const curr = new Date(msgs[index].created_at).toDateString();
+    return prev !== curr;
   }
 
   parseInteractive(content: string): any | null {

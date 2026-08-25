@@ -21,6 +21,7 @@ from app.models.tipo_cliente import TipoCliente
 from app.models.transaccion_procesada import TransaccionProcesada
 from app.services.chat_phone_resolver import resolve_real_phone_for_message, resolve_real_phone_from_identifier
 from app.services.notification_queue import push as _push_notif
+from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 
@@ -355,7 +356,7 @@ class ReprocesarOut(BaseModel):
     es_comprobante: bool
     comprobante_num: Optional[str]
     monto_extraido: Optional[float]
-    accion: str   # renovado | cliente_creado | ya_procesado | monto_incorrecto | no_es_comprobante | sin_numero
+    accion: str   # renovado | cliente_creado | relampago_registrado | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | no_es_comprobante | sin_numero
     detalle: Optional[str] = None
 
 
@@ -439,10 +440,42 @@ def reprocesar_con_ia(
         return ReprocesarOut(es_comprobante=False, comprobante_num=None,
                              monto_extraido=monto_float, accion="no_es_comprobante")
 
-    if monto is None or int(monto) != settings.VIP_AMOUNT:
+    conferencia_cfg = get_conferencia_config(db)
+    conferencia_vip_cfg = get_conferencia_vip_config(db)
+    relampago_cfg = get_numero_relampago_config(db)
+    cliente_actual = db.execute(
+        select(Cliente).where(Cliente.celular == phone_local)
+    ).scalar_one_or_none()
+    es_vip_activo = bool(cliente_actual and cliente_actual.vip and cliente_actual.enabled)
+
+    is_conferencia_vip = bool(
+        conferencia_vip_cfg.activo
+        and conferencia_vip_cfg.valor > 0
+        and conferencia_vip_cfg.fecha_aviso
+        and conferencia_vip_cfg.link_youtube
+        and monto is not None
+        and int(monto) == conferencia_vip_cfg.valor
+        and es_vip_activo
+    )
+    is_relampago = bool(
+        relampago_cfg.activo
+        and relampago_cfg.valor > 0
+        and monto is not None
+        and int(monto) == relampago_cfg.valor
+    )
+    is_conferencia = bool(
+        conferencia_cfg.activo
+        and conferencia_cfg.valor > 0
+        and conferencia_cfg.fecha_aviso
+        and conferencia_cfg.link_youtube
+        and monto is not None
+        and int(monto) == conferencia_cfg.valor
+    )
+
+    if not is_conferencia_vip and not is_conferencia and not is_relampago and (monto is None or int(monto) != settings.VIP_AMOUNT):
         return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
                              monto_extraido=monto_float, accion="monto_incorrecto",
-                             detalle=f"Monto extraído: {monto_float}, esperado: {settings.VIP_AMOUNT}")
+                             detalle=f"Monto extraído: {monto_float}, esperado VIP: {settings.VIP_AMOUNT}")
 
     if not comprobante_num:
         return ReprocesarOut(es_comprobante=True, comprobante_num=None,
@@ -469,7 +502,12 @@ def reprocesar_con_ia(
             comprobante_num=comprobante_num,
             celular=phone_local,
             monto=monto,
-            descripcion="pago vip",
+            descripcion=(
+                "conferencia_vip" if is_conferencia_vip
+                else "conferencia" if is_conferencia
+                else "numero_relampago" if is_relampago
+                else "pago vip"
+            ),
             message_id=id,
             image_hash=image_hash,
         ))
@@ -480,7 +518,13 @@ def reprocesar_con_ia(
             entity="comprobantes_vip",
             entity_id=str(id),
             detail={"comprobante_num": comprobante_num, "celular": phone_local,
-                    "monto": float(monto), "origen": "reprocesar"},
+                    "monto": float(monto), "origen": "reprocesar",
+                    "descripcion": (
+                        "conferencia_vip" if is_conferencia_vip
+                        else "conferencia" if is_conferencia
+                        else "numero_relampago" if is_relampago
+                        else "pago vip"
+                    )},
         ))
         db.flush()
     except Exception:
@@ -489,6 +533,63 @@ def reprocesar_con_ia(
         return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
                              monto_extraido=monto_float, accion="ya_procesado",
                              detalle="Comprobante ya existente (detectado por hash)")
+
+    if is_conferencia_vip:
+        db.commit()
+        _marcar_procesada(db, id)
+        if conferencia_vip_cfg.link_youtube and settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
+            _push_notif(
+                "notificar_conferencia",
+                celular_wp,
+                {
+                    "fecha_aviso": conferencia_vip_cfg.fecha_aviso,
+                    "link_youtube": conferencia_vip_cfg.link_youtube,
+                },
+            )
+        return ReprocesarOut(
+            es_comprobante=True,
+            comprobante_num=comprobante_num,
+            monto_extraido=monto_float,
+            accion="conferencia_vip_registrada",
+            detalle="Registrado como conferencia_vip y notificado al cliente VIP",
+        )
+
+    if is_conferencia:
+        db.commit()
+        _marcar_procesada(db, id)
+        if conferencia_cfg.link_youtube and settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
+            _push_notif(
+                "notificar_conferencia",
+                celular_wp,
+                {
+                    "fecha_aviso": conferencia_cfg.fecha_aviso,
+                    "link_youtube": conferencia_cfg.link_youtube,
+                },
+            )
+        return ReprocesarOut(
+            es_comprobante=True,
+            comprobante_num=comprobante_num,
+            monto_extraido=monto_float,
+            accion="conferencia_registrada",
+            detalle="Registrado como conferencia y notificado al cliente",
+        )
+
+    if is_relampago:
+        db.commit()
+        _marcar_procesada(db, id)
+        if relampago_cfg.numero and settings.WHATSAPP_NOTIFICAR_RELAMPAGO:
+            _push_notif(
+                "notificar_relampago",
+                celular_wp,
+                {"texto": relampago_cfg.numero},
+            )
+        return ReprocesarOut(
+            es_comprobante=True,
+            comprobante_num=comprobante_num,
+            monto_extraido=monto_float,
+            accion="relampago_registrado",
+            detalle=f"Registrado como numero_relampago y notificado al cliente con numero {relampago_cfg.numero or 'sin_numero'}",
+        )
 
     # ── 6. Renovar o crear cliente ────────────────────────────────────────────
     cliente = db.execute(

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     WHATSAPP_VENCIMIENTO_VIP: str = "recordatorio_vencimiento_vip"
     WHATSAPP_CONTACTO_TRANSACCIONES: str = ""
     WHATSAPP_NOTIFICAR_RENOVACION: str = ""
+    WHATSAPP_NOTIFICAR_RELAMPAGO: str = ""
+    WHATSAPP_NOTIFICAR_CONFERENCIA: str = ""
     # Cron hora Colombia (minuto hora dom mes dow)
     CRON_NUMEROS: str = "0 8 * * *"        # reasignación de números 08:00 COL
     CRON_VIP_CHECK: str = "0 22 * * *"     # desactivar VIP vencidos 22:00 COL

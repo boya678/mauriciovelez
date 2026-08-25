@@ -109,7 +109,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             db.add(conv)
             await db.flush()
 
-            if bsuid:
+            if bsuid and message_type != "contacts":
                 # BSUID user: check if we already have their phone in contactos
                 existing = await db.scalar(
                     __import__("sqlalchemy", fromlist=["text"]).text(

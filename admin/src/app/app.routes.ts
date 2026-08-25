@@ -67,6 +67,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/comprobantes/comprobantes.component').then(m => m.ComprobantesComponent),
         canActivate: [adminGuard],
       },
+      {
+        path: 'servicios',
+        loadComponent: () => import('./features/servicios/servicios.component').then(m => m.ServiciosComponent),
+        canActivate: [adminGuard],
+      },
     ],
   },
   {
