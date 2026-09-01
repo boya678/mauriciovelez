@@ -23,6 +23,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.agents.graph import run_graph
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal, make_tenant_session
 from app.db.tenant import set_tenant_schema
 from app.models.conversation import Conversation, ConversationStatus
@@ -53,6 +54,23 @@ BLOCK_MS = 2000
 # Generous: reasoning models (gpt-5-mini) can take 60-120s per turn. Avoid
 # autoclaiming entries that are still being processed by the original consumer.
 AUTOCLAIM_IDLE_MS = 240_000
+
+
+def _ensure_handoff_notice(reply: str | None) -> str:
+    text = (reply or "").strip()
+    lowered = text.lower()
+    mentions_person = any(
+        term in lowered
+        for term in ("agente", "asesor", "persona del equipo", "equipo humano")
+    )
+    mentions_action = any(
+        term in lowered
+        for term in ("transfer", "atender", "comunicar", "pasar")
+    )
+    if mentions_person and mentions_action:
+        return text
+    notice = settings.HUMAN_HANDOFF_NOTICE_TEXT
+    return f"{text}\n\n{notice}" if text else notice
 
 
 async def _load_history(db, conversation_id: uuid.UUID) -> tuple[list[dict], int]:
@@ -277,6 +295,11 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             )
             tools = list(tools) + [save_img_tool]
 
+        # All configuration/history needed by the graph is now loaded. End the
+        # read transaction before waiting on Azure OpenAI or external tools so
+        # it cannot retain table locks if a model call stalls.
+        await db.commit()
+
         now = datetime.now(timezone.utc)
 
         # Run LangGraph with the real USER turn count so cache refresh and
@@ -292,6 +315,42 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             has_pending_image=has_pending_image,
             image_menu_payload=(tenant.image_menu_payload if tenant else None),
         )
+
+        # Inference can take more than a minute. Re-read and lock the row so an
+        # agent takeover or closure that happened meanwhile wins over stale AI.
+        conv = await db.scalar(
+            select(Conversation)
+            .where(Conversation.id == conversation_id)
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
+        if conv is None or conv.status not in (
+            ConversationStatus.BOT_ACTIVE,
+            ConversationStatus.NEW,
+        ):
+            await db.execute(
+                update(Message)
+                .where(Message.id == message_id)
+                .values(status=MessageStatus.PROCESSED)
+            )
+            await db.commit()
+            logger.info(
+                "Discarded stale AI result for conv %s after status changed to %s",
+                conversation_id,
+                conv.status if conv else "missing",
+            )
+            return
+
+        if (
+            not str(result.get("bot_reply") or "").strip()
+            and not result.get("interactive_payload")
+        ):
+            logger.error("Empty AI response for conv %s; escalating with notice", conversation_id)
+            result = {
+                **result,
+                "bot_reply": "No pude completar tu solicitud automáticamente.",
+                "needs_escalation": True,
+            }
 
         # On the very first bot response after an image arrives (attempts==1),
         # override whatever the LLM replied with the deterministic tenant menu.
@@ -320,26 +379,18 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                     logger.warning("Could not parse tenant image_menu_payload: %s", _menu_err)
 
         if result["needs_escalation"]:
-            # Always send a farewell message — never transfer silently
-            farewell_text = result.get("bot_reply") or "Voy a transferirte con un agente humano. Un momento por favor."
+            # The outgoing worker completes the handoff only after Meta accepts
+            # this notice. A failed send must never become a silent transfer.
+            farewell_text = _ensure_handoff_notice(result.get("bot_reply"))
             farewell = Message(
                 id=uuid.uuid4(),
                 conversation_id=conversation_id,
                 sender_type=SenderType.BOT,
                 content=farewell_text,
-                status=MessageStatus.PROCESSED,
+                status=MessageStatus.PENDING,
                 created_at=now,
             )
             db.add(farewell)
-            await xadd(redis, OUTGOING_STREAM, {
-                "tenant_id": tenant_id,
-                "tenant_slug": tenant_slug,
-                "phone": phone,
-                "message_id": str(farewell.id),
-                "content": farewell_text,
-                "phone_id": tenant.whatsapp_phone_id if tenant else "",
-                "token": tenant.whatsapp_token if tenant else "",
-            })
 
             # Mark the triggering user message as processed so it doesn't stay stuck.
             await db.execute(
@@ -347,21 +398,37 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 .where(Message.id == message_id)
                 .values(status=MessageStatus.PROCESSED)
             )
-
-            # Update conversation status
-            await db.execute(
-                update(Conversation)
-                .where(Conversation.id == conversation_id)
-                .values(status=ConversationStatus.WAITING_HUMAN, updated_at=now)
-            )
             await db.commit()
 
-            await xadd(redis, HUMAN_ASSIGN_STREAM, {
-                "tenant_id": tenant_id,
-                "tenant_slug": tenant_slug,
-                "conversation_id": str(conversation_id),
-                "phone": phone,
-            })
+            try:
+                await xadd(redis, OUTGOING_STREAM, {
+                    "tenant_id": tenant_id,
+                    "tenant_slug": tenant_slug,
+                    "conversation_id": str(conversation_id),
+                    "phone": phone,
+                    "message_id": str(farewell.id),
+                    "content": farewell_text,
+                    "phone_id": tenant.whatsapp_phone_id if tenant else "",
+                    "token": tenant.whatsapp_token if tenant else "",
+                    "handoff_after_send": True,
+                })
+            except Exception:
+                await db.execute(
+                    update(Message)
+                    .where(Message.id == farewell.id)
+                    .values(status=MessageStatus.ERROR)
+                )
+                await db.execute(
+                    update(Message)
+                    .where(Message.id == message_id)
+                    .values(status=MessageStatus.PROCESSING)
+                )
+                await db.commit()
+                logger.exception(
+                    "Could not publish handoff reply for conv %s; restored AI entry",
+                    conversation_id,
+                )
+                raise
 
             # Record token usage for the classifier + farewell LLM calls
             t_in  = result.get("tokens_in",  0)
@@ -373,13 +440,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 except Exception:
                     logger.warning("Failed to record tokens for tenant %s", tenant_id)
 
-            # Notify agents via WebSocket
-            await manager.publish(tenant_slug, {
-                "type": "conversation_waiting",
-                "conversation_id": str(conversation_id),
-                "phone": phone,
-            })
-            logger.info("Escalated conv %s → WAITING_HUMAN", conversation_id)
+            logger.info("Queued handoff notice for conv %s", conversation_id)
 
         else:
             # Bot reply
@@ -388,7 +449,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 conversation_id=conversation_id,
                 sender_type=SenderType.BOT,
                 content=result["bot_reply"],
-                status=MessageStatus.PROCESSED,
+                status=MessageStatus.PENDING,
                 created_at=now,
             )
             db.add(bot_msg)
@@ -413,7 +474,25 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 import json as _json
                 outgoing_payload["interactive_payload"] = _json.dumps(interactive)
 
-            await xadd(redis, OUTGOING_STREAM, outgoing_payload)
+            try:
+                await xadd(redis, OUTGOING_STREAM, outgoing_payload)
+            except Exception:
+                await db.execute(
+                    update(Message)
+                    .where(Message.id == bot_msg.id)
+                    .values(status=MessageStatus.ERROR)
+                )
+                await db.execute(
+                    update(Message)
+                    .where(Message.id == message_id)
+                    .values(status=MessageStatus.PROCESSING)
+                )
+                await db.commit()
+                logger.exception(
+                    "Could not publish bot reply for conv %s; restored AI entry",
+                    conversation_id,
+                )
+                raise
             logger.info("Bot replied to conv %s", conversation_id)
 
             # If the image is still pending (LLM answered but didn't call the
@@ -434,7 +513,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                                     conversation_id=conversation_id,
                                     sender_type=SenderType.BOT,
                                     content="",
-                                    status=MessageStatus.PROCESSED,
+                                    status=MessageStatus.PENDING,
                                     created_at=now,
                                 )
                                 async with AsyncSessionLocal() as menu_db:
@@ -443,6 +522,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                                 await xadd(redis, OUTGOING_STREAM, {
                                     "tenant_id": tenant_id,
                                     "tenant_slug": tenant_slug,
+                                    "conversation_id": str(conversation_id),
                                     "phone": phone,
                                     "message_id": str(menu_msg.id),
                                     "content": "",

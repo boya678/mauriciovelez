@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # AI tuning
     AI_MAX_TURNS: int = 10
     AI_CONFIDENCE_THRESHOLD: float = 0.6
+    HUMAN_HANDOFF_NOTICE_TEXT: str = (
+        "Voy a transferirte con un agente humano para continuar con tu solicitud. "
+        "Un momento, por favor."
+    )
 
     # Worker concurrency
     WORKER_POLL_INTERVAL_MS: int = 100
@@ -48,6 +52,36 @@ class Settings(BaseSettings):
     AI_CONSUMER_GROUP: str = "ai_group"
     ASSIGN_CONSUMER_GROUP: str = "assignment_group"
     OUTGOING_CONSUMER_GROUP: str = "outgoing_group"
+    OUTGOING_MAX_RETRIES: int = 5
+    OUTGOING_RETRY_TTL_SECONDS: int = 3600
+    OUTGOING_PROCESSING_LOCK_SECONDS: int = 120
+
+    # Conversation inactivity lifecycle. Set ENABLED=false to disable it.
+    # The close window starts only after the warning was delivered.
+    CONVERSATION_IDLE_ENABLED: bool = True
+    CONVERSATION_IDLE_WARNING_MINUTES: int = 30
+    CONVERSATION_IDLE_GRACE_MINUTES: int = 10
+    CONVERSATION_IDLE_SCAN_SECONDS: int = 60
+    CONVERSATION_IDLE_SCAN_BATCH: int = 100
+    CONVERSATION_IDLE_WARNING_TEXT: str = (
+        "Seguimos atentos a tu respuesta. Si no recibimos un mensaje en los "
+        "próximos {minutes} minutos, daremos por finalizada esta conversación."
+    )
+    CONVERSATION_IDLE_CLOSED_TEXT: str = (
+        "Hemos finalizado esta conversación por inactividad. Cuando lo necesites, "
+        "puedes escribirnos nuevamente y con gusto continuaremos ayudándote."
+    )
+    HUMAN_WAIT_TIMEOUT_MINUTES: int = 60
+    HUMAN_WAIT_WINDOW_BUFFER_MINUTES: int = 5
+    HUMAN_WAIT_TIMEOUT_TEXT: str = (
+        "En este momento no fue posible conectarte con un agente. Hemos finalizado "
+        "esta solicitud, pero puedes escribirnos nuevamente y con gusto te atenderemos."
+    )
+    CONVERSATION_EXPIRED_CLEANUP_MINUTES: int = 60
+    MANUAL_CLOSE_NOTICE_TEXT: str = (
+        "Hemos finalizado esta conversación. Cuando lo necesites, puedes escribirnos "
+        "nuevamente y con gusto continuaremos ayudándote."
+    )
 
     # App
     APP_ENV: str = "production"

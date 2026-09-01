@@ -92,7 +92,7 @@
   <!-- Chat panel -->
   <div class="chat-panel">
     @if (selectedId()) {
-      <app-chat [conversationId]="selectedId()!" (conversationReopened)="fetchConversations()" />
+      <app-chat [conversationId]="selectedId()!" (conversationReopened)="scheduleRefresh()" />
     } @else {
       <div class="empty-chat">
         <div class="empty-icon"><span class="material-icons" style="font-size:3rem">chat_bubble_outline</span></div>

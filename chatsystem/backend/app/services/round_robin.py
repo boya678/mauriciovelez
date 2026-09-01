@@ -144,15 +144,25 @@ async def assign_agent(
 
             # 4. Assign in DB transaction
             now = datetime.now(timezone.utc)
-            await db.execute(
+            assignment_update = await db.execute(
                 update(Conversation)
-                .where(Conversation.id == conversation_id)
+                .where(
+                    Conversation.id == conversation_id,
+                    Conversation.status == ConversationStatus.WAITING_HUMAN,
+                )
                 .values(
                     assigned_agent_id=agent.id,
                     status=ConversationStatus.HUMAN_ACTIVE,
                     updated_at=now,
                 )
             )
+            if assignment_update.rowcount != 1:
+                await db.rollback()
+                logger.info(
+                    "Conversation %s is no longer waiting; assignment skipped",
+                    conversation_id,
+                )
+                return None
             db.add(Assignment(
                 id=uuid.uuid4(),
                 conversation_id=conversation_id,

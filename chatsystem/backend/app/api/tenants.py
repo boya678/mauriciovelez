@@ -35,7 +35,11 @@ CREATE TABLE IF NOT EXISTS {schema}.conversations (
     assigned_agent_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    closed_at TIMESTAMPTZ
+    closed_at TIMESTAMPTZ,
+    last_user_message_at TIMESTAMPTZ,
+    last_activity_at TIMESTAMPTZ,
+    idle_warning_sent_at TIMESTAMPTZ,
+    handoff_notice_sent_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS {schema}.messages (
@@ -82,6 +86,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_contactos_bsuid ON {schema}.contactos (bsui
 
 CREATE INDEX IF NOT EXISTS idx_conv_status ON {schema}.conversations(status);
 CREATE INDEX IF NOT EXISTS idx_conv_phone ON {schema}.conversations(phone);
+CREATE INDEX IF NOT EXISTS ix_conv_idle_scan ON {schema}.conversations(status, last_activity_at);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON {schema}.messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_assign_agent ON {schema}.assignments(agent_id);
 """

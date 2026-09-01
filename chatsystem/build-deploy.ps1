@@ -111,8 +111,11 @@ spec:
 "@
 $migManifest | kubectl apply -f -
 
-# Esperar a que termine (máx 2 minutos)
-$deadline = (Get-Date).AddSeconds(120)
+# Esperar a que termine (máx 15 minutos). La migración puede tardar por el
+# volumen de conversaciones, pero los locks de PostgreSQL fallan antes con un
+# error explícito en vez de quedar esperando indefinidamente.
+$migrationTimeoutSeconds = 900
+$deadline = (Get-Date).AddSeconds($migrationTimeoutSeconds)
 do {
     Start-Sleep -Seconds 3
     $phase = kubectl get pod $migPod -n $NAMESPACE -o jsonpath='{.status.phase}' 2>$null
@@ -120,8 +123,13 @@ do {
 
 kubectl logs $migPod --namespace $NAMESPACE
 if ($phase -ne "Succeeded") {
-    Write-Host "`n   ERROR: Migraciones fallaron (phase=$phase). Abortando deploy." -ForegroundColor Red
-    kubectl delete pod $migPod --namespace $NAMESPACE --ignore-not-found | Out-Null
+    if ($phase -eq "Failed") {
+        Write-Host "`n   ERROR: Alembic terminó con error. Revisa el log anterior." -ForegroundColor Red
+    } else {
+        Write-Host "`n   ERROR: Timeout tras $migrationTimeoutSeconds segundos (phase=$phase)." -ForegroundColor Red
+        Write-Host "   La migración no reportó fallo, pero no terminó dentro del plazo." -ForegroundColor Yellow
+    }
+    kubectl delete pod $migPod --namespace $NAMESPACE --ignore-not-found --wait=true | Out-Null
     exit 1
 }
 kubectl delete pod $migPod --namespace $NAMESPACE --ignore-not-found | Out-Null
@@ -141,12 +149,18 @@ kubectl set image deployment/chatsystem-frontend frontend=$FRONTEND_IMAGE --name
 # ── 6. Esperar rollout ────────────────────────────────────────
 Write-Step "Esperando rollout backend..."
 kubectl rollout restart deployment/chatsystem-backend --namespace $NAMESPACE
+kubectl rollout status deployment/chatsystem-backend --namespace $NAMESPACE --timeout=300s
+if ($LASTEXITCODE -ne 0) { throw "Rollout de chatsystem-backend falló o venció" }
 
 Write-Step "Esperando rollout workers..."
 kubectl rollout restart deployment/chatsystem-workers --namespace $NAMESPACE
+kubectl rollout status deployment/chatsystem-workers --namespace $NAMESPACE --timeout=300s
+if ($LASTEXITCODE -ne 0) { throw "Rollout de chatsystem-workers falló o venció" }
 
 Write-Step "Esperando rollout frontend..."
 kubectl rollout restart deployment/chatsystem-frontend --namespace $NAMESPACE
+kubectl rollout status deployment/chatsystem-frontend --namespace $NAMESPACE --timeout=300s
+if ($LASTEXITCODE -ne 0) { throw "Rollout de chatsystem-frontend falló o venció" }
 
 # ── 8. Estado final ───────────────────────────────────────────
 Write-Step "Estado del namespace $NAMESPACE"

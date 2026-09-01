@@ -39,6 +39,14 @@
       </div>
     </div>
 
+    @if (actionError(); as err) {
+      <div class="send-error">
+        <span class="material-icons" style="font-size:1rem">error_outline</span>
+        {{ err }}
+        <button class="send-error-close" (click)="actionError.set(null)" title="Cerrar">✕</button>
+      </div>
+    }
+
     <!-- Window status banner -->
     @if (conv.status === 'human_active' || conv.status === 'waiting_human') {
       @if (conv.window_open) {

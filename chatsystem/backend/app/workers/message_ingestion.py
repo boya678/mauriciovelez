@@ -28,6 +28,7 @@ from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import Message, MessageStatus, SenderType
 from app.models.tenant import Tenant
 from app.services.audio_transcription import transcribe_audio_bytes
+from app.services.conversation_start_lock import acquire_conversation_start_lock
 from app.services.whatsapp import download_media, send_request_contact_info, send_template_message
 from app.services.message_stats import record_messages
 from app.redis.client import get_redis
@@ -73,6 +74,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 f"SET search_path TO {schema}, public"
             )
         )
+        await acquire_conversation_start_lock(db, tenant_id, phone)
 
         # 1. Deduplication
         if external_id:
@@ -85,7 +87,9 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
 
         # 2. Upsert conversation
         conv = await db.scalar(
-            select(Conversation).where(Conversation.id == conversation_id)
+            select(Conversation)
+            .where(Conversation.id == conversation_id)
+            .with_for_update()
         )
         now = datetime.now(timezone.utc)
 
@@ -105,6 +109,8 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 created_at=now,
                 updated_at=now,
                 last_user_message_at=now,
+                last_activity_at=now,
+                idle_warning_sent_at=None,
             )
             db.add(conv)
             await db.flush()
@@ -159,7 +165,12 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 )
         else:
             # Keep existing ownership/status; just refresh timestamps.
-            new_values: dict = {"updated_at": now, "last_user_message_at": now}
+            new_values: dict = {
+                "updated_at": now,
+                "last_user_message_at": now,
+                "last_activity_at": now,
+                "idle_warning_sent_at": None,
+            }
             # Update username if we received one and it differs
             if username and conv.username != username:
                 new_values["username"] = username
@@ -191,6 +202,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 new_values["status"] = ConversationStatus.BOT_ACTIVE
                 new_values["assigned_agent_id"] = None
                 new_values["closed_at"] = None
+                new_values["handoff_notice_sent_at"] = None
                 logger.info(
                     "Reopened CLOSED conv %s → BOT_ACTIVE (new user msg)",
                     conversation_id,

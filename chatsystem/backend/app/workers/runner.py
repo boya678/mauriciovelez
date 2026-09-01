@@ -12,6 +12,7 @@ from app.workers.message_ingestion import run as run_ingestion
 from app.workers.ai_worker import run as run_ai
 from app.workers.assignment_worker import run as run_assignment
 from app.workers.outgoing_worker import run as run_outgoing
+from app.workers.conversation_lifecycle import run as run_conversation_lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,10 @@ async def start_workers() -> list[asyncio.Task]:
         asyncio.create_task(run_ai(_stop_event), name="worker:ai"),
         asyncio.create_task(run_assignment(_stop_event), name="worker:assignment"),
         asyncio.create_task(run_outgoing(_stop_event), name="worker:outgoing"),
+        asyncio.create_task(
+            run_conversation_lifecycle(_stop_event),
+            name="worker:conversation-lifecycle",
+        ),
     ]
     logger.info("All workers started (%d tasks)", len(tasks))
     return tasks

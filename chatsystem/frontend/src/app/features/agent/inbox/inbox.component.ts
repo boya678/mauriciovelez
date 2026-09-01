@@ -49,6 +49,8 @@ export class InboxComponent implements OnInit, OnDestroy {
   readonly STATUS_BADGE = STATUS_BADGE;
 
   private wsSub?: Subscription;
+  private refreshTimer?: ReturnType<typeof setTimeout>;
+  private fetchSequence = 0;
 
   constructor(
     private conversationsService: ConversationsService,
@@ -67,18 +69,21 @@ export class InboxComponent implements OnInit, OnDestroy {
         ev.type === 'conversation_waiting' ||
         ev.type === 'conversation_started'
       ) {
-        this.fetchConversations();
+        this.scheduleRefresh();
       }
     });
   }
 
-  fetchConversations(): void {
-    this.loading.set(true);
-    const status = TAB_STATUS[this.activeTab()];
+  fetchConversations(showLoading = true): void {
+    if (showLoading) this.loading.set(true);
+    const requestedTab = this.activeTab();
+    const requestSequence = ++this.fetchSequence;
+    const status = TAB_STATUS[requestedTab];
     this.conversationsService.list(status ?? undefined).subscribe({
       next: (list) => {
+        if (requestSequence !== this.fetchSequence || requestedTab !== this.activeTab()) return;
         // For "mine" tab, filter by assigned agent
-        if (this.activeTab() === 'mine') {
+        if (requestedTab === 'mine') {
           const myId = this.auth.getAgentId();
           this.conversations.set(list.filter((c) => c.assigned_agent_id === myId));
         } else {
@@ -86,8 +91,18 @@ export class InboxComponent implements OnInit, OnDestroy {
         }
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        if (requestSequence === this.fetchSequence) this.loading.set(false);
+      },
     });
+  }
+
+  scheduleRefresh(): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      this.fetchConversations(false);
+    }, 150);
   }
 
   selectTab(tab: Tab): void {
@@ -198,6 +213,7 @@ export class InboxComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
     this.wsSub?.unsubscribe();
   }
 }

@@ -17,9 +17,10 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from pydantic import BaseModel
-from sqlalchemy import desc, select, update
+from sqlalchemy import desc, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.db.tenant import TenantContext, get_tenant_db, resolve_tenant, require_agent
 from app.models.assignment import Assignment
@@ -28,6 +29,8 @@ from app.models.message import Message, MessageStatus, SenderType
 from app.redis.client import get_redis
 from app.redis.streams import OUTGOING_STREAM, xadd
 from app.services.message_stats import record_messages
+from app.services.conversation_start_lock import acquire_conversation_start_lock
+from app.services.handoff_lock import acquire_handoff_lock, release_handoff_lock
 from app.schemas.conversation import (
     ConversationDetail,
     ConversationOut,
@@ -104,6 +107,10 @@ async def start_conversation(
     - Closed conversation within 24 h window → reopen + send text (no template needed)
     - No conversation / window expired → create new + send template
     """
+    # Serialize concurrent starts for the same tenant + phone. The transaction
+    # lock is released automatically on commit/rollback, including exceptions.
+    await acquire_conversation_start_lock(db, tenant.id, body.phone)
+
     # ── 1. Check for an existing OPEN conversation ────────────────────────────
     existing = await db.scalar(
         select(Conversation).where(
@@ -138,6 +145,7 @@ async def start_conversation(
         )
         .order_by(desc(Conversation.updated_at))
         .limit(1)
+        .with_for_update()
     )
 
     last_user_ts = (closed_conv.last_user_message_at if closed_conv else None)
@@ -151,19 +159,31 @@ async def start_conversation(
             phone_id=tenant.whatsapp_phone_id,
             token=tenant.whatsapp_token,
             to=body.phone,
-            text="Un agente se pondrá en contacto contigo pronto.",
+            text=settings.HUMAN_HANDOFF_NOTICE_TEXT,
         )
-        msg_content = "Un agente se pondrá en contacto contigo pronto."
-        await db.execute(
+        msg_content = settings.HUMAN_HANDOFF_NOTICE_TEXT
+        reopen_result = await db.execute(
             update(Conversation)
-            .where(Conversation.id == closed_conv.id)
+            .where(
+                Conversation.id == closed_conv.id,
+                Conversation.status == ConversationStatus.CLOSED,
+            )
             .values(
                 status=ConversationStatus.HUMAN_ACTIVE,
                 assigned_agent_id=agent.id,
                 closed_at=None,
                 updated_at=now,
+                last_activity_at=now,
+                idle_warning_sent_at=None,
+                handoff_notice_sent_at=now,
             )
         )
+        if reopen_result.rowcount != 1:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La conversación cambió de estado; vuelve a intentarlo.",
+            )
         conv_id = closed_conv.id
     else:
         # ── 2b. Window expired or no history → create new + send template ────
@@ -196,6 +216,9 @@ async def start_conversation(
             assigned_agent_id=agent.id,
             created_at=now,
             updated_at=now,
+            last_activity_at=now,
+            idle_warning_sent_at=None,
+            handoff_notice_sent_at=now,
         )
         db.add(new_conv)
         await db.flush()
@@ -276,12 +299,33 @@ async def take_conversation(
     db: AsyncSession = Depends(get_tenant_db),
     agent=Depends(require_agent),
 ):
+    redis = await get_redis()
+    lock_token = await acquire_handoff_lock(redis, conversation_id)
+    if lock_token is None:
+        raise HTTPException(
+            status_code=409,
+            detail="La transferencia de esta conversación ya está en proceso.",
+        )
+    try:
+        return await _take_conversation_locked(conversation_id, tenant, db, agent)
+    finally:
+        await release_handoff_lock(redis, conversation_id, lock_token)
+
+
+async def _take_conversation_locked(
+    conversation_id: uuid.UUID,
+    tenant: TenantContext,
+    db: AsyncSession,
+    agent,
+):
     """Agent manually claims a WAITING_HUMAN conversation."""
     conv = await db.scalar(
-        select(Conversation).where(
+        select(Conversation)
+        .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant.id,
         )
+        .with_for_update()
     )
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -291,15 +335,88 @@ async def take_conversation(
             detail=f"Conversation is {conv.status.value}, cannot take",
         )
 
+    if conv.status == ConversationStatus.BOT_ACTIVE:
+        pending_bot_message = await db.scalar(
+            select(Message.id)
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.sender_type == SenderType.BOT,
+                Message.status == MessageStatus.PENDING,
+            )
+            .limit(1)
+        )
+        if pending_bot_message is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "El bot tiene una respuesta en proceso. Espera a que termine "
+                    "antes de tomar la conversación."
+                ),
+            )
+
     now = datetime.now(timezone.utc)
+    last_user_ts = conv.last_user_message_at
+    if last_user_ts and last_user_ts.tzinfo is None:
+        last_user_ts = last_user_ts.replace(tzinfo=timezone.utc)
+    window_open = (
+        last_user_ts is not None
+        and now - last_user_ts < timedelta(hours=24)
+    )
+    if conv.status != ConversationStatus.HUMAN_ACTIVE and not window_open:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La ventana de 24 horas está cerrada. No se asignó la conversación; "
+                "se requiere una plantilla aprobada y una nueva respuesta del usuario."
+            ),
+        )
+
+    handoff_message: Message | None = None
+    needs_notice = (
+        conv.status in (ConversationStatus.WAITING_HUMAN, ConversationStatus.BOT_ACTIVE)
+        and conv.handoff_notice_sent_at is None
+    )
+    if needs_notice:
+        try:
+            await send_text_message(
+                phone_id=tenant.whatsapp_phone_id,
+                token=tenant.whatsapp_token,
+                to=conv.phone,
+                text=settings.HUMAN_HANDOFF_NOTICE_TEXT,
+            )
+        except Exception as exc:
+            logger.exception("Could not notify user before taking conv %s", conversation_id)
+            raise HTTPException(
+                status_code=502,
+                detail="No se pudo avisar al usuario; la conversación no fue asignada.",
+            ) from exc
+
+        handoff_message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            sender_type=SenderType.BOT,
+            content=settings.HUMAN_HANDOFF_NOTICE_TEXT,
+            message_type="text",
+            status=MessageStatus.PROCESSED,
+            created_at=now,
+        )
+        db.add(handoff_message)
+
+    update_values: dict = {
+        "assigned_agent_id": agent.id,
+        "status": ConversationStatus.HUMAN_ACTIVE,
+        "updated_at": now,
+    }
+    if needs_notice:
+        update_values.update({
+            "handoff_notice_sent_at": now,
+            "last_activity_at": now,
+            "idle_warning_sent_at": None,
+        })
     await db.execute(
         update(Conversation)
         .where(Conversation.id == conversation_id)
-        .values(
-            assigned_agent_id=agent.id,
-            status=ConversationStatus.HUMAN_ACTIVE,
-            updated_at=now,
-        )
+        .values(**update_values)
     )
     db.add(Assignment(
         id=uuid.uuid4(),
@@ -310,6 +427,18 @@ async def take_conversation(
     await db.commit()
     await db.refresh(conv)
 
+    if handoff_message is not None:
+        await manager.publish(tenant.slug, {
+            "type": "new_message",
+            "conversation_id": str(conversation_id),
+            "message": {
+                "id": str(handoff_message.id),
+                "content": handoff_message.content,
+                "sender_type": SenderType.BOT.value,
+                "message_type": "text",
+                "created_at": now.isoformat(),
+            },
+        })
     await manager.publish(tenant.slug, {
         "type": "conversation_assigned",
         "conversation_id": str(conversation_id),
@@ -327,24 +456,115 @@ async def close_conversation(
     db: AsyncSession = Depends(get_tenant_db),
     agent=Depends(require_agent),
 ):
+    redis = await get_redis()
+    lock_token = await acquire_handoff_lock(redis, conversation_id)
+    if lock_token is None:
+        raise HTTPException(
+            status_code=409,
+            detail="La conversación tiene otra acción en proceso. Intenta nuevamente.",
+        )
+    try:
+        return await _close_conversation_locked(conversation_id, tenant, db, agent)
+    finally:
+        await release_handoff_lock(redis, conversation_id, lock_token)
+
+
+async def _close_conversation_locked(
+    conversation_id: uuid.UUID,
+    tenant: TenantContext,
+    db: AsyncSession,
+    agent,
+):
     conv = await db.scalar(
-        select(Conversation).where(
+        select(Conversation)
+        .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant.id,
         )
+        .with_for_update()
     )
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    if conv.status == ConversationStatus.CLOSED:
+        raise HTTPException(status_code=409, detail="Conversation is already closed")
 
     now = datetime.now(timezone.utc)
+    last_user_ts = conv.last_user_message_at
+    if last_user_ts and last_user_ts.tzinfo is None:
+        last_user_ts = last_user_ts.replace(tzinfo=timezone.utc)
+    window_open = (
+        last_user_ts is not None
+        and now - last_user_ts < timedelta(hours=24)
+    )
+    if not window_open:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La ventana de 24 horas está cerrada. Para cerrar avisando al usuario "
+                "se requiere una plantilla de cierre aprobada en Meta."
+            ),
+        )
+    close_message: Message | None = None
+    try:
+        await send_text_message(
+            phone_id=tenant.whatsapp_phone_id,
+            token=tenant.whatsapp_token,
+            to=conv.phone,
+            text=settings.MANUAL_CLOSE_NOTICE_TEXT,
+        )
+    except Exception as exc:
+        logger.exception("Could not notify user before closing conv %s", conversation_id)
+        raise HTTPException(
+            status_code=502,
+            detail="No se pudo avisar al usuario; la conversación no fue cerrada.",
+        ) from exc
+
+    close_message = Message(
+        id=uuid.uuid4(),
+        conversation_id=conversation_id,
+        sender_type=SenderType.BOT,
+        content=settings.MANUAL_CLOSE_NOTICE_TEXT,
+        message_type="text",
+        status=MessageStatus.PROCESSED,
+        created_at=now,
+    )
+    db.add(close_message)
+
     await db.execute(
         update(Conversation)
         .where(Conversation.id == conversation_id)
-        .values(status=ConversationStatus.CLOSED, updated_at=now, closed_at=now)
+        .values(
+            status=ConversationStatus.CLOSED,
+            assigned_agent_id=None,
+            updated_at=now,
+            closed_at=now,
+            last_activity_at=now,
+            idle_warning_sent_at=None,
+        )
+    )
+    await db.execute(
+        update(Assignment)
+        .where(
+            Assignment.conversation_id == conversation_id,
+            Assignment.released_at.is_(None),
+        )
+        .values(released_at=now)
     )
     await db.commit()
     await db.refresh(conv)
 
+    if close_message is not None:
+        await manager.publish(tenant.slug, {
+            "type": "new_message",
+            "conversation_id": str(conversation_id),
+            "message": {
+                "id": str(close_message.id),
+                "content": close_message.content,
+                "sender_type": SenderType.BOT.value,
+                "message_type": "text",
+                "created_at": now.isoformat(),
+            },
+        })
     await manager.publish(tenant.slug, {
         "type": "conversation_closed",
         "conversation_id": str(conversation_id),
@@ -403,6 +623,31 @@ class SendMessageBody(BaseModel):
     content: str
 
 
+async def _publish_outgoing_or_fail(
+    db: AsyncSession,
+    redis,
+    message_id: uuid.UUID,
+    payload: dict,
+) -> None:
+    try:
+        await xadd(redis, OUTGOING_STREAM, payload)
+    except Exception as exc:
+        await db.execute(
+            update(Message)
+            .where(Message.id == message_id)
+            .values(status=MessageStatus.ERROR)
+        )
+        await db.commit()
+        logger.exception("Could not enqueue outgoing message %s", message_id)
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No se pudo poner el mensaje en la cola y no fue enviado. "
+                "Intenta nuevamente."
+            ),
+        ) from exc
+
+
 ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_AUDIO_MIME_TYPES = {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/webm", "video/webm"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -430,10 +675,12 @@ async def send_message(
     agent=Depends(require_agent),
 ):
     conv = await db.scalar(
-        select(Conversation).where(
+        select(Conversation)
+        .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant.id,
         )
+        .with_for_update()
     )
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -460,9 +707,10 @@ async def send_message(
     window_open = last_user_ts is not None and (now - last_user_ts) < timedelta(hours=24)
 
     redis = await get_redis()
-    await xadd(redis, OUTGOING_STREAM, {
+    await _publish_outgoing_or_fail(db, redis, msg.id, {
         "tenant_id": str(tenant.id),
         "tenant_slug": tenant.slug,
+        "conversation_id": str(conversation_id),
         "phone": conv.phone,
         "message_id": str(msg.id),
         "content": body.content,
@@ -505,10 +753,12 @@ async def send_media_message(
     agent=Depends(require_agent),
 ):
     conv = await db.scalar(
-        select(Conversation).where(
+        select(Conversation)
+        .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant.id,
         )
+        .with_for_update()
     )
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -575,9 +825,10 @@ async def send_media_message(
     await db.refresh(msg)
 
     redis = await get_redis()
-    await xadd(redis, OUTGOING_STREAM, {
+    await _publish_outgoing_or_fail(db, redis, msg.id, {
         "tenant_id": str(tenant.id),
         "tenant_slug": tenant.slug,
+        "conversation_id": str(conversation_id),
         "phone": conv.phone,
         "message_id": str(msg.id),
         "content": content,
@@ -625,10 +876,12 @@ async def reopen_conversation(
 ):
     """Reopen a closed conversation. Sends text if within 24 h, template otherwise."""
     conv = await db.scalar(
-        select(Conversation).where(
+        select(Conversation)
+        .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant.id,
         )
+        .with_for_update()
     )
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -646,7 +899,7 @@ async def reopen_conversation(
             phone_id=tenant.whatsapp_phone_id,
             token=tenant.whatsapp_token,
             to=conv.phone,
-            text="Un agente se pondrá en contacto contigo pronto.",
+            text=settings.HUMAN_HANDOFF_NOTICE_TEXT,
         )
     else:
         if not tenant.whatsapp_template_name:
@@ -663,7 +916,7 @@ async def reopen_conversation(
         )
 
     reopen_content = (
-        "Un agente se pondrá en contacto contigo pronto."
+        settings.HUMAN_HANDOFF_NOTICE_TEXT
         if within_24h
         else f"[Plantilla: {tenant.whatsapp_template_name}]"
     )
@@ -684,6 +937,9 @@ async def reopen_conversation(
             assigned_agent_id=agent.id,
             closed_at=None,
             updated_at=now,
+            last_activity_at=now,
+            idle_warning_sent_at=None,
+            handoff_notice_sent_at=now,
         )
     )
     db.add(Assignment(

@@ -35,6 +35,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   loading = signal(false);
   sending = signal(false);
   loadError = signal<string | null>(null);
+  actionError = signal<string | null>(null);
   sendError = signal<string | null>(null);
   newMessage = '';
   showReopenConfirm = signal(false);
@@ -66,7 +67,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.wsSub = this.ws.events$.subscribe((ev) => {
       const id = this.conversation()?.id;
       if (
-        (ev.type === 'new_message' || ev.type === 'conversation_assigned' || ev.type === 'conversation_closed') &&
+        (
+          ev.type === 'new_message' ||
+          ev.type === 'conversation_waiting' ||
+          ev.type === 'conversation_assigned' ||
+          ev.type === 'conversation_closed'
+        ) &&
         ev['conversation_id'] === id
       ) {
         this.load(id!);
@@ -108,13 +114,25 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   take(): void {
     const id = this.conversation()?.id;
     if (!id) return;
-    this.conversationsService.take(id).subscribe(() => this.load(id));
+    this.actionError.set(null);
+    this.conversationsService.take(id).subscribe({
+      next: () => this.load(id),
+      error: (err) => this.actionError.set(
+        err?.error?.detail || 'No se pudo asignar la conversación.'
+      ),
+    });
   }
 
   close(): void {
     const id = this.conversation()?.id;
     if (!id) return;
-    this.conversationsService.close(id).subscribe(() => this.load(id));
+    this.actionError.set(null);
+    this.conversationsService.close(id).subscribe({
+      next: () => this.load(id),
+      error: (err) => this.actionError.set(
+        err?.error?.detail || 'No se pudo cerrar la conversación.'
+      ),
+    });
   }
 
   send(): void {
