@@ -227,6 +227,9 @@ class ChequeoOut(BaseModel):
     es_comprobante: Optional[bool]
     comprobante_num: Optional[str]
     monto_extraido: Optional[float]
+    numero_destino: Optional[str] = None
+    nombre_destino: Optional[str] = None
+    destino_valido: Optional[bool] = None
     ya_procesado: bool
     procesado_para_celular: Optional[str]
 
@@ -268,6 +271,9 @@ def chequear_comprobante(
         es_comprobante=ia.es_comprobante,
         comprobante_num=ia.comprobante_num,
         monto_extraido=float(ia.monto_extraido) if ia.monto_extraido is not None else None,
+        numero_destino=ia.numero_destino,
+        nombre_destino=ia.nombre_destino,
+        destino_valido=ia.destino_valido,
         ya_procesado=duplicado is not None,
         procesado_para_celular=duplicado.celular if duplicado else None,
     )
@@ -356,7 +362,7 @@ class ReprocesarOut(BaseModel):
     es_comprobante: bool
     comprobante_num: Optional[str]
     monto_extraido: Optional[float]
-    accion: str   # renovado | cliente_creado | relampago_registrado | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | no_es_comprobante | sin_numero
+    accion: str   # renovado | cliente_creado | relampago_registrado | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | destino_invalido | no_es_comprobante | sin_numero
     detalle: Optional[str] = None
 
 
@@ -411,6 +417,9 @@ def reprocesar_con_ia(
     comprobante_num = resultado_ia.get("comprobante_num") or None
     monto_raw = resultado_ia.get("monto")
     monto = Decimal(str(monto_raw)) if monto_raw is not None else None
+    numero_destino = resultado_ia.get("numero_destino") or None
+    nombre_destino = resultado_ia.get("nombre_destino") or None
+    destino_valido = bool(resultado_ia.get("destino_valido"))
 
     # ── 4. Actualizar / reemplazar el registro de análisis IA ─────────────────
     ia_existente = db.execute(
@@ -421,6 +430,9 @@ def reprocesar_con_ia(
         ia_existente.es_comprobante = es_comprobante
         ia_existente.monto_extraido = monto
         ia_existente.comprobante_num = comprobante_num
+        ia_existente.numero_destino = numero_destino
+        ia_existente.nombre_destino = nombre_destino
+        ia_existente.destino_valido = destino_valido
         ia_existente.image_hash = image_hash
         from datetime import timezone
         ia_existente.processed_at = datetime.now(timezone.utc)
@@ -430,6 +442,9 @@ def reprocesar_con_ia(
             es_comprobante=es_comprobante,
             monto_extraido=monto,
             comprobante_num=comprobante_num,
+            numero_destino=numero_destino,
+            nombre_destino=nombre_destino,
+            destino_valido=destino_valido,
             image_hash=image_hash,
         ))
     db.commit()
@@ -439,6 +454,19 @@ def reprocesar_con_ia(
     if not es_comprobante:
         return ReprocesarOut(es_comprobante=False, comprobante_num=None,
                              monto_extraido=monto_float, accion="no_es_comprobante")
+
+    if not destino_valido:
+        return ReprocesarOut(
+            es_comprobante=True,
+            comprobante_num=comprobante_num,
+            monto_extraido=monto_float,
+            accion="destino_invalido",
+            detalle=(
+                f"Destino no coincide con la cuenta autorizada "
+                f"(numero='{numero_destino}', nombre='{nombre_destino}'). "
+                "Usa 'registrar comprobante' si validaste manualmente que es correcto."
+            ),
+        )
 
     conferencia_cfg = get_conferencia_config(db)
     conferencia_vip_cfg = get_conferencia_vip_config(db)

@@ -249,15 +249,9 @@ export class TransaccionesComponent implements OnInit {
       next: (res) => {
         this.reprocesarLoading.set(false);
         this.reprocesarResult.set({ accion: res.accion, detalle: res.detalle });
-        // Refrescar el chequeo con los nuevos datos
-        const prev = this.chequeoResult();
-        if (prev) this.chequeoResult.set({
-          ...prev,
-          analizado_por_ia: true,
-          es_comprobante: res.es_comprobante,
-          comprobante_num: res.comprobante_num,
-          monto_extraido: res.monto_extraido,
-          ya_procesado: res.accion === 'ya_procesado' || res.accion === 'renovado' || res.accion === 'cliente_creado',
+        // Refrescar el chequeo completo (incluye numero_destino/nombre_destino/destino_valido)
+        this.svc.chequear(t.id).subscribe({
+          next: (chequeo) => this.chequeoResult.set(chequeo),
         });
       },
       error: (err) => {

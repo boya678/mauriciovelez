@@ -439,7 +439,8 @@
 
   .material-icons-round { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
 
-  &.accion-renovado, &.accion-cliente_creado {
+  &.accion-renovado, &.accion-cliente_creado, &.accion-relampago_registrado,
+  &.accion-conferencia_registrada, &.accion-conferencia_vip_registrada {
     background: rgba(46, 160, 67, 0.15);
     color: #4caf50;
   }
@@ -447,7 +448,7 @@
     background: rgba(99, 102, 241, 0.12);
     color: #818cf8;
   }
-  &.accion-monto_incorrecto, &.accion-no_es_comprobante, &.accion-sin_numero {
+  &.accion-monto_incorrecto, &.accion-no_es_comprobante, &.accion-sin_numero, &.accion-destino_invalido {
     background: rgba(245, 158, 11, 0.12);
     color: #f59e0b;
   }

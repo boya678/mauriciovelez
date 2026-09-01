@@ -27,6 +27,9 @@ class MensajeIaProcesado(Base):
     monto_extraido: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
     comprobante_num: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     image_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    numero_destino: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    nombre_destino: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    destino_valido: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

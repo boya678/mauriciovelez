@@ -34,6 +34,9 @@ export interface ChequeoResult {
   es_comprobante: boolean | null;
   comprobante_num: string | null;
   monto_extraido: number | null;
+  numero_destino: string | null;
+  nombre_destino: string | null;
+  destino_valido: boolean | null;
   ya_procesado: boolean;
   procesado_para_celular: string | null;
 }

@@ -495,8 +495,8 @@ def should_escalate(state: dict) -> Literal["escalate", "reply"]:
     # Always honor an explicit user request for a human agent
     if intent == "escalate":
         return "escalate"
-    # Guard auto-escalation on the very first interaction
-    if turns <= 1:
+    # Guard auto-escalation on the very first interactions
+    if turns <= 2:
         return "reply"
     # Escalate only when the bot itself signals low confidence in its reply.
     # We intentionally do NOT escalate based on total turn count — that would

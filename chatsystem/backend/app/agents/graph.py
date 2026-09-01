@@ -66,10 +66,7 @@ async def escalate_node(state: ChatState) -> ChatState:
     return {
         **state,  # type: ignore[misc]
         "needs_escalation": True,
-        "bot_reply": state.get(
-            "bot_reply",
-            "Voy a transferirte con un agente humano. Un momento por favor.",
-        ),
+        "bot_reply": state.get("bot_reply") or "Voy a transferirte con un agente humano. Un momento por favor.",
     }
 
 

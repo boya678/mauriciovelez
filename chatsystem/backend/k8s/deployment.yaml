@@ -41,7 +41,7 @@ metadata:
   name: chatsystem-workers
   namespace: mauriciovelez
 spec:
-  replicas: 3
+  replicas: 5
   selector:
     matchLabels:
       app: chatsystem-workers

@@ -320,26 +320,26 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                     logger.warning("Could not parse tenant image_menu_payload: %s", _menu_err)
 
         if result["needs_escalation"]:
-            # Send a goodbye bot message first if there is a reply
-            if result["bot_reply"]:
-                farewell = Message(
-                    id=uuid.uuid4(),
-                    conversation_id=conversation_id,
-                    sender_type=SenderType.BOT,
-                    content=result["bot_reply"],
-                    status=MessageStatus.PROCESSED,
-                    created_at=now,
-                )
-                db.add(farewell)
-                await xadd(redis, OUTGOING_STREAM, {
-                    "tenant_id": tenant_id,
-                    "tenant_slug": tenant_slug,
-                    "phone": phone,
-                    "message_id": str(farewell.id),
-                    "content": result["bot_reply"],
-                    "phone_id": tenant.whatsapp_phone_id if tenant else "",
-                    "token": tenant.whatsapp_token if tenant else "",
-                })
+            # Always send a farewell message — never transfer silently
+            farewell_text = result.get("bot_reply") or "Voy a transferirte con un agente humano. Un momento por favor."
+            farewell = Message(
+                id=uuid.uuid4(),
+                conversation_id=conversation_id,
+                sender_type=SenderType.BOT,
+                content=farewell_text,
+                status=MessageStatus.PROCESSED,
+                created_at=now,
+            )
+            db.add(farewell)
+            await xadd(redis, OUTGOING_STREAM, {
+                "tenant_id": tenant_id,
+                "tenant_slug": tenant_slug,
+                "phone": phone,
+                "message_id": str(farewell.id),
+                "content": farewell_text,
+                "phone_id": tenant.whatsapp_phone_id if tenant else "",
+                "token": tenant.whatsapp_token if tenant else "",
+            })
 
             # Mark the triggering user message as processed so it doesn't stay stuck.
             await db.execute(

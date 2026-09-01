@@ -747,6 +747,9 @@ def _procesar_pagos_automatico() -> None:
                         es_comprobante=hash_ya_procesado.es_comprobante,
                         monto_extraido=hash_ya_procesado.monto_extraido,
                         comprobante_num=hash_ya_procesado.comprobante_num,
+                        numero_destino=hash_ya_procesado.numero_destino,
+                        nombre_destino=hash_ya_procesado.nombre_destino,
+                        destino_valido=hash_ya_procesado.destino_valido,
                         image_hash=image_hash,
                     ))
                     db.commit()
@@ -771,6 +774,9 @@ def _procesar_pagos_automatico() -> None:
             comprobante_num = resultado_ia.get("comprobante_num") or None
             monto_raw = resultado_ia.get("monto")
             monto = Decimal(str(monto_raw)) if monto_raw is not None else None
+            numero_destino = resultado_ia.get("numero_destino") or None
+            nombre_destino = resultado_ia.get("nombre_destino") or None
+            destino_valido = bool(resultado_ia.get("destino_valido"))
 
             # ── 4. Registrar que ya se analizó (independiente del resultado) ───
             try:
@@ -779,6 +785,9 @@ def _procesar_pagos_automatico() -> None:
                     es_comprobante=es_comprobante,
                     monto_extraido=monto,
                     comprobante_num=comprobante_num,
+                    numero_destino=numero_destino,
+                    nombre_destino=nombre_destino,
+                    destino_valido=destino_valido,
                     image_hash=image_hash,
                 ))
                 db.commit()
@@ -794,6 +803,13 @@ def _procesar_pagos_automatico() -> None:
 
             if not comprobante_num:
                 print(f"[CRON pagos] msg={msg_id}: comprobante sin número extraído, ignorado")
+                continue
+
+            if not destino_valido:
+                print(
+                    f"[CRON pagos] msg={msg_id}: destino no validado "
+                    f"(numero='{numero_destino}', nombre='{nombre_destino}'), queda para validación manual"
+                )
                 continue
 
             if not _is_valid_local_phone(celular_local):

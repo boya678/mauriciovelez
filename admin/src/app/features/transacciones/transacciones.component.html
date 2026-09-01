@@ -316,6 +316,18 @@
                 <strong>{{ chequeoResult()!.monto_extraido != null ? ('$' + (chequeoResult()!.monto_extraido! | number)) : '—' }}</strong>
               </div>
               <div class="chequeo-row">
+                <span class="chequeo-label">Destino</span>
+                <span>
+                  <strong>{{ chequeoResult()!.nombre_destino ?? '—' }}</strong>
+                  @if (chequeoResult()!.numero_destino) {
+                    <span> ({{ chequeoResult()!.numero_destino }})</span>
+                  }
+                  <span [class]="chequeoResult()!.destino_valido ? 'badge badge-vip' : 'badge badge-inactivo'">
+                    {{ chequeoResult()!.destino_valido ? 'Válido' : 'No válido' }}
+                  </span>
+                </span>
+              </div>
+              <div class="chequeo-row">
                 <span class="chequeo-label">Estado</span>
                 @if (chequeoResult()!.ya_procesado) {
                   <span class="badge badge-vip">Ya procesado — {{ chequeoResult()!.procesado_para_celular }}</span>
@@ -335,8 +347,12 @@
                 <strong>{{ {
                   renovado: 'Renovado',
                   cliente_creado: 'Cliente VIP creado',
+                  relampago_registrado: 'Registrado — número relámpago',
+                  conferencia_registrada: 'Registrado — conferencia',
+                  conferencia_vip_registrada: 'Registrado — conferencia VIP',
                   ya_procesado: 'Ya procesado',
                   monto_incorrecto: 'Monto incorrecto',
+                  destino_invalido: 'Destino no válido',
                   no_es_comprobante: 'No es comprobante',
                   sin_numero: 'Sin número extraído'
                 }[reprocesarResult()!.accion] }}</strong>

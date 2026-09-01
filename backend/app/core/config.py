@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     AZURE_OPENAI_TEMPERATURE: float = 0.0
     VIP_AMOUNT: int = 30000
     CRON_PAGOS: str = "*/10 * * * *"
+    # Validación de destino del comprobante (anti-fraude)
+    CUENTA_DESTINO_NUMERO: str = "3225556333"
+    CUENTA_DESTINO_NOMBRES: str = "Mauricio Velez,Luz Alvarez"  # separados por coma
 
     model_config = SettingsConfigDict(
         env_file=".env",
