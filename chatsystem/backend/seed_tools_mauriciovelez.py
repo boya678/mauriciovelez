@@ -117,6 +117,237 @@ TOOLS = [
         "http_url": None, "http_method": None, "http_headers": None,
         "http_body_tpl": None, "http_timeout_seconds": None,
     },
+    {
+        "name": "consultar_resumen_cliente",
+        "description": (
+            "Consulta un resumen actualizado del cliente: nombre, estado de cuenta, "
+            "VIP, saldo y vigencia de su suscripción. Úsala para consultas generales "
+            "sobre la cuenta; no muestra correo ni documento."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                c.nombre,
+                c.enabled AS cuenta_activa,
+                c.vip,
+                c.saldo::text AS saldo,
+                COALESCE(tc.nombre, 'Sin clasificación') AS tipo_cliente,
+                (s.fin > now()) AS suscripcion_vigente,
+                s.inicio::date::text AS inicio_suscripcion,
+                s.fin::date::text AS fin_suscripcion
+            FROM clientes c
+            LEFT JOIN tipos_cliente tc ON tc.id = c.tipo_cliente
+            LEFT JOIN LATERAL (
+                SELECT inicio, fin
+                FROM suscripciones
+                WHERE cliente_id = c.id AND activa = true
+                ORDER BY fin DESC
+                LIMIT 1
+            ) s ON true
+            WHERE CONCAT(c.codigo_pais, c.celular) = :phone
+            LIMIT 1
+        """.strip(),
+        "sql_params": ["phone"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_historial_suscripciones",
+        "description": (
+            "Consulta las últimas suscripciones del cliente con fechas de inicio, "
+            "fin y estado. Úsala para revisar renovaciones anteriores o aclarar "
+            "el historial de vigencias."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                s.inicio::date::text AS inicio,
+                s.fin::date::text AS fin,
+                s.activa,
+                CASE
+                    WHEN s.activa AND s.fin > now() THEN 'vigente'
+                    WHEN s.fin <= now() THEN 'vencida'
+                    ELSE 'inactiva'
+                END AS estado
+            FROM suscripciones s
+            JOIN clientes c ON c.id = s.cliente_id
+            WHERE CONCAT(c.codigo_pais, c.celular) = :phone
+            ORDER BY s.inicio DESC
+            LIMIT 10
+        """.strip(),
+        "sql_params": ["phone"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_comprobantes_vip",
+        "description": (
+            "Consulta los últimos comprobantes VIP registrados para el teléfono del "
+            "cliente: fecha, monto, número y descripción. Un registro indica recepción "
+            "del comprobante, no aprobación ni activación del pago."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                cv.created_at::date::text AS fecha,
+                cv.monto::text AS monto,
+                cv.comprobante_num,
+                cv.descripcion
+            FROM comprobantes_vip cv
+            WHERE regexp_replace(cv.celular, '[^0-9]', '', 'g') =
+                  right(regexp_replace(:phone, '[^0-9]', '', 'g'), 10)
+            ORDER BY cv.created_at DESC
+            LIMIT 10
+        """.strip(),
+        "sql_params": ["phone"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_boletas_rifa",
+        "description": (
+            "Consulta las boletas de rifas asignadas al cliente, mostrando rifa, número, "
+            "fecha de asignación y estado. Úsala cuando pregunte por sus boletas o números "
+            "de una rifa."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                r.titulo AS rifa,
+                rb.numero AS boleta,
+                rb.asignado_en::date::text AS fecha_asignacion,
+                r.fecha_inicio::text,
+                r.fecha_fin::text,
+                r.estado
+            FROM rifa_boletas rb
+            JOIN rifas r ON r.id = rb.rifa_id
+            JOIN clientes c ON c.id = rb.cliente_id
+            WHERE CONCAT(c.codigo_pais, c.celular) = :phone
+            ORDER BY rb.asignado_en DESC, rb.numero
+            LIMIT 30
+        """.strip(),
+        "sql_params": ["phone"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_rifas_activas",
+        "description": (
+            "Consulta las rifas activas disponibles: título, descripción, fechas, "
+            "requisitos VIP y boletas otorgadas por renovación. No requiere identificar "
+            "al cliente."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                titulo,
+                descripcion,
+                fecha_inicio::text,
+                fecha_fin::text,
+                boletas_por_renovacion,
+                solo_vip,
+                estado
+            FROM rifas
+            WHERE estado = 'activa'
+              AND fecha_fin >= CURRENT_DATE
+            ORDER BY fecha_inicio DESC
+            LIMIT 10
+        """.strip(),
+        "sql_params": [],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_historial_numeros",
+        "description": (
+            "Consulta los últimos números históricos asignados al cliente con fecha y tipo. "
+            "Úsala cuando pregunte por números anteriores, no para reemplazar la consulta "
+            "de números vigentes."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                nh.number,
+                nh.type,
+                nh.date::text AS fecha
+            FROM numbers_historic nh
+            JOIN clientes c ON c.id = nh.id_user
+            WHERE CONCAT(c.codigo_pais, c.celular) = :phone
+            ORDER BY nh.date DESC, nh.id DESC
+            LIMIT 20
+        """.strip(),
+        "sql_params": ["phone"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_aciertos",
+        "description": (
+            "Consulta aciertos históricos de los números del cliente: número, tipo, "
+            "lotería, fecha y resultado. Úsala cuando pregunte si alguno de sus números "
+            "tuvo aciertos."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                nh.number,
+                nh.type AS tipo_numero,
+                na.tipo AS tipo_acierto,
+                lr.fecha::text,
+                lr.loteria,
+                lr.resultado,
+                lr.serie
+            FROM numero_aciertos na
+            JOIN numbers_historic nh ON nh.id = na.historic_id
+            JOIN loteria_resultados lr ON lr.id = na.resultado_id
+            JOIN clientes c ON c.id = nh.id_user
+            WHERE CONCAT(c.codigo_pais, c.celular) = :phone
+            ORDER BY lr.fecha DESC, na.created_at DESC
+            LIMIT 30
+        """.strip(),
+        "sql_params": ["phone"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
+    {
+        "name": "consultar_resultado_loteria",
+        "description": (
+            "Consulta los resultados más recientes de una lotería indicada por el usuario. "
+            "Solicita el nombre de la lotería si no está claro."
+        ),
+        "tool_type": "SQL",
+        "sql_dsn": PORTAL_DB_URL,
+        "sql_query": """
+            SELECT
+                fecha::text,
+                loteria,
+                resultado,
+                serie
+            FROM loteria_resultados
+            WHERE lower(loteria) LIKE '%' || lower(:loteria) || '%'
+               OR lower(slug) LIKE '%' || lower(:loteria) || '%'
+            ORDER BY fecha DESC
+            LIMIT 10
+        """.strip(),
+        "sql_params": ["loteria"],
+        "static_text": None,
+        "http_url": None, "http_method": None, "http_headers": None,
+        "http_body_tpl": None, "http_timeout_seconds": None,
+    },
 ]
 
 

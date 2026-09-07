@@ -8,7 +8,7 @@ Supported types:
   STATIC — returns a fixed text
 
 Template variables available in http_url, http_body_tpl, sql_query, sql_dsn:
-  {phone}           — conversation phone number
+    {phone}           — real identity phone (BSUID resolved through contactos)
   {conversation_id} — conversation UUID
   {tenant_slug}     — tenant slug
   {env:VAR_NAME}    — value from os.environ["VAR_NAME"]
@@ -40,6 +40,39 @@ logger = logging.getLogger(__name__)
 # ── Template substitution ─────────────────────────────────────────────────────
 
 _ENV_RE = re.compile(r"\{env:([A-Z0-9_]+)\}")
+
+
+async def resolve_identity_phone(
+    db: AsyncSession,
+    recipient: str,
+) -> str | None:
+    """Resolve the real phone used only for personal-data tool queries."""
+    if "." not in recipient:
+        return recipient
+
+    phone = await db.scalar(
+        text("SELECT id FROM contactos WHERE bsuid = :bsuid LIMIT 1"),
+        {"bsuid": recipient},
+    )
+    return str(phone) if phone else None
+
+
+def _tool_requires_phone(tool: AgentTool) -> bool:
+    if tool.tool_type == ToolType.SQL:
+        return (
+            "phone" in (tool.sql_params or [])
+            or ":phone" in (tool.sql_query or "")
+            or "{phone}" in (tool.sql_query or "")
+            or "{phone}" in (tool.sql_dsn or "")
+        )
+    if tool.tool_type == ToolType.HTTP:
+        sources = (
+            (tool.http_url or "")
+            + (tool.http_body_tpl or "")
+            + json.dumps(tool.http_headers or {})
+        )
+        return "{phone}" in sources
+    return False
 
 
 def _render(template: str, ctx: dict[str, str]) -> str:
@@ -190,8 +223,13 @@ async def load_tools(
     tenant_slug: str,
 ) -> list[StructuredTool]:
     """
-    Loads all enabled tools for the tenant and returns LangChain StructuredTools.
+    Load enabled tools with a real identity phone for personal-data queries.
+
+    WhatsApp delivery remains untouched. If a protected user has not shared a
+    contact yet, identity-dependent tools are withheld instead of receiving a
+    BSUID as though it were a phone number.
     """
+    identity_phone = await resolve_identity_phone(db, phone)
     rows = await db.scalars(
         select(AgentTool).where(
             AgentTool.tenant_id == tenant_id,
@@ -203,13 +241,20 @@ async def load_tools(
         return []
 
     ctx = {
-        "phone": phone,
         "conversation_id": conversation_id,
         "tenant_slug": tenant_slug,
     }
+    if identity_phone:
+        ctx["phone"] = identity_phone
 
     lc_tools: list[StructuredTool] = []
     for row in tools_rows:
+        if identity_phone is None and _tool_requires_phone(row):
+            logger.info(
+                "Skipping identity-dependent tool %s: protected user has no stored contact",
+                row.name,
+            )
+            continue
         try:
             lc_tools.append(_build_tool(row, ctx))
         except Exception as exc:
