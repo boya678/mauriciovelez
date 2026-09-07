@@ -3,11 +3,22 @@
   "to": "573215332978",
   "type": "template",
   "template": {
-    "name": "conferencia_23",
+    "name": "6150",
     "language": {
       "code": "es_co"
     },
     "components": [
+            {
+        "type": "header",
+        "parameters": [
+          {
+            "type": "image",
+            "image": {
+              "link": "https://res.cloudinary.com/dfpy0exz1/image/upload/v1788479169/6150_ynoc0s.jpg" 
+            }
+          }
+        ]
+      },
       {
         "type": "body",
         "parameters": [
