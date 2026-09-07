@@ -1,5 +1,5 @@
 """
-Seed script: crea las 4 herramientas SQL para el tenant mauriciovelez.
+Seed script: crea o actualiza las herramientas SQL para el tenant mauriciovelez.
 
 Ejecutar con:
     kubectl exec -n mauriciovelez deploy/chatsystem-backend -- python /app/seed_tools_mauriciovelez.py
@@ -18,10 +18,9 @@ import os
 DATABASE_URL = os.environ["DATABASE_URL"]
 TENANT_SLUG = "mauriciovelez"
 
-# DSN explícito del DB donde viven las tablas clientes/suscripciones/etc.
-# Se almacena literalmente en la columna sql_dsn del tool; no depende de
-# variables de entorno del chatsystem.
-PORTAL_DB_URL = "postgresql+asyncpg://postgres:Ardilla1*@transferiadb.postgres.database.azure.com:5432/portal"
+# Prefer the deployment secret. Existing installations can reuse the DSN from
+# the original numbers tool when the variable has not been configured yet.
+PORTAL_DB_URL = os.environ.get("PORTAL_DB_URL")
 
 TOOLS = [
     {
@@ -366,8 +365,28 @@ async def main() -> None:
         tenant_id = tenant[0]
         print(f"Tenant encontrado: {tenant_id}")
 
-        for tool in TOOLS:
-            # Verificar si ya existe
+        portal_db_url = PORTAL_DB_URL
+        if not portal_db_url:
+            result = await conn.execute(
+                text(
+                    "SELECT sql_dsn FROM public.agent_tools "
+                    "WHERE tenant_id = :tid "
+                    "AND name = 'consultar_numeros_asignados' "
+                    "AND sql_dsn IS NOT NULL LIMIT 1"
+                ),
+                {"tid": tenant_id},
+            )
+            portal_db_url = result.scalar_one_or_none()
+        if not portal_db_url:
+            raise RuntimeError(
+                "Configura PORTAL_DB_URL o crea primero consultar_numeros_asignados."
+            )
+
+        for definition in TOOLS:
+            tool = {**definition, "sql_dsn": portal_db_url}
+            tool_type_lit = tool["tool_type"]
+            sql_params_lit = json.dumps(tool["sql_params"])
+
             existing = await conn.execute(
                 text(
                     "SELECT id FROM public.agent_tools "
@@ -376,14 +395,43 @@ async def main() -> None:
                 {"tid": tenant_id, "name": tool["name"]},
             )
             if existing.fetchone():
-                print(f"  [SKIP] '{tool['name']}' ya existe")
+                await conn.execute(
+                    text(f"""
+                        UPDATE public.agent_tools SET
+                            description = :description,
+                            tool_type = '{tool_type_lit}'::tool_type,
+                            enabled = true,
+                            sql_dsn = :sql_dsn,
+                            sql_query = :sql_query,
+                            sql_params = '{sql_params_lit}'::jsonb,
+                            http_url = :http_url,
+                            http_method = :http_method,
+                            http_headers = :http_headers,
+                            http_body_tpl = :http_body_tpl,
+                            http_timeout_seconds = :http_timeout_seconds,
+                            static_text = :static_text,
+                            updated_at = now()
+                        WHERE tenant_id = :tenant_id AND name = :name
+                    """),
+                    {
+                        "tenant_id": tenant_id,
+                        "name": tool["name"],
+                        "description": tool["description"],
+                        "sql_dsn": tool["sql_dsn"],
+                        "sql_query": tool["sql_query"],
+                        "http_url": tool["http_url"],
+                        "http_method": tool["http_method"],
+                        "http_headers": tool["http_headers"],
+                        "http_body_tpl": tool["http_body_tpl"],
+                        "http_timeout_seconds": tool["http_timeout_seconds"],
+                        "static_text": tool["static_text"],
+                    },
+                )
+                print(f"  [OK]   '{tool['name']}' actualizada")
                 continue
 
             # asyncpg no convierte :name:: correctamente — embebemos los valores
             # literales seguros (enum fijo) y JSON (lista controlada) directamente.
-            tool_type_lit = tool["tool_type"]          # 'HTTP' | 'SQL' | 'STATIC'
-            sql_params_lit = json.dumps(tool["sql_params"])  # e.g. '["phone"]'
-
             await conn.execute(
                 text(f"""
                     INSERT INTO public.agent_tools (
