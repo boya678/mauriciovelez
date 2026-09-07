@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS {schema}.conversations (
     last_user_message_at TIMESTAMPTZ,
     last_activity_at TIMESTAMPTZ,
     idle_warning_sent_at TIMESTAMPTZ,
-    handoff_notice_sent_at TIMESTAMPTZ
+    handoff_notice_sent_at TIMESTAMPTZ,
+    context_started_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS {schema}.messages (

@@ -54,69 +54,24 @@ def _get_llm(temperature: float = 0.3, max_tokens: int = 400) -> AzureChatOpenAI
     return AzureChatOpenAI(**kwargs)
 
 
-# ── Intent cache (cross-pod via Redis) ───────────────────────────────────────
-# Skips the classifier LLM call when we already classified this conversation.
-# Refreshed every _INTENT_CACHE_REFRESH_TURNS turns or on escalation keywords.
-_INTENT_CACHE_TTL_S = 600
-_INTENT_CACHE_REFRESH_TURNS = 5
-
-
-async def _get_cached_intent(conv_id: str) -> tuple[str | None, int]:
-    if not conv_id:
-        return None, 0
-    try:
-        from app.redis.client import get_redis
-        redis = await get_redis()
-        raw = await redis.get(f"chatsystem:intent:{conv_id}")
-        if not raw:
-            return None, 0
-        data = raw.decode() if isinstance(raw, bytes) else raw
-        intent, _, turns_s = data.partition("|")
-        return intent or None, int(turns_s or 0)
-    except Exception as exc:  # pragma: no cover - non-fatal
-        logger.debug("intent cache read failed: %s", exc)
-        return None, 0
-
-
-async def _set_cached_intent(conv_id: str, intent: str, turns: int) -> None:
-    if not conv_id:
-        return
-    try:
-        from app.redis.client import get_redis
-        redis = await get_redis()
-        await redis.set(
-            f"chatsystem:intent:{conv_id}",
-            f"{intent}|{turns}",
-            ex=_INTENT_CACHE_TTL_S,
-        )
-    except Exception as exc:  # pragma: no cover - non-fatal
-        logger.debug("intent cache write failed: %s", exc)
-
-
 # ── Classifier ────────────────────────────────────────────────────────────────
 
-_CLASSIFIER_SYSTEM = """Eres un clasificador de intenciones para un sistema de atención al cliente.
-Analiza el historial de conversación y clasifica la intención del usuario en UNA sola categoría:
+_CLASSIFIER_SYSTEM = """Eres el decisor semántico de un sistema de atención al cliente.
+Analiza TODOS los mensajes suministrados de la sesión actual, dando prioridad a la
+petición más reciente del usuario, y clasifica la acción en UNA sola categoría:
 
 - faq        : preguntas generales, saludos, solicitudes de información, consultas sobre números o suscripciones
 - sales      : interés en comprar, preguntas de precios, promociones, upgrades
 - support    : problemas técnicos, quejas, solicitudes de reembolso, problemas de cuenta
-- escalate   : el usuario EXPLÍCITAMENTE pide hablar con una persona humana o un agente, o está extremadamente enojado con insultos
+- escalate   : el usuario solicita atención humana, expresa con claridad que necesita que una persona gestione el caso, o la gestión requiere una acción humana que el bot y sus herramientas no pueden ejecutar
 
-REGLA IMPORTANTE: Usa "escalate" ÚNICAMENTE cuando el usuario pida un agente humano de forma explícita
-(frases como "quiero hablar con una persona", "pásame con un asesor", "necesito un humano").
-Una queja, una pregunta difícil o un tono molesto NO es motivo para clasificar como "escalate".
+Decide por el significado completo, no por palabras aisladas. Distingue una solicitud
+actual del usuario de ejemplos, citas, negaciones o menciones históricas. Una queja o
+una pregunta difícil no obliga a escalar si el bot puede resolverla con información o
+herramientas disponibles. Las instrucciones del sistema no son mensajes del usuario.
 
 Responde ÚNICAMENTE con la palabra de la categoría (faq / sales / support / escalate).
 NO incluyas ninguna explicación."""
-
-
-# Keywords that force a classifier refresh even when an intent is cached,
-# so a user asking for a human is detected immediately and not held back by
-# a stale "faq"/"support" cache entry from previous turns.
-_ESCALATE_KEYWORDS = (
-    "humano", "persona", "asesor", "agente", "operador", "representante",
-)
 
 
 async def classifier_node(state: dict) -> dict:
@@ -124,30 +79,19 @@ async def classifier_node(state: dict) -> dict:
     conv_id = state.get("conversation_id", "")
     current_turns = state.get("turns", 0)
 
-    last_user = next(
-        (m["content"] for m in reversed(messages) if m["role"] == "user"),
-        "",
-    ) or ""
-    user_wants_human = any(k in last_user.lower() for k in _ESCALATE_KEYWORDS)
-
-    # ── Cache hit: skip LLM entirely ──────────────────────────────────────────
-    cached_intent, cached_turns = await _get_cached_intent(conv_id)
-    if (
-        cached_intent
-        and cached_intent != "escalate"
-        and not user_wants_human
-        and (current_turns - cached_turns) < _INTENT_CACHE_REFRESH_TURNS
-    ):
-        logger.debug("Classifier cache hit conv=%s intent=%s", conv_id, cached_intent)
-        return {
-            **state,
-            "intent": cached_intent,
-            "turns": current_turns + 1,
-        }
-
-    # ── LLM classification (cheap: max_tokens=256, no tenant prompt, 2 msgs) ──
+    # The history is already bounded to the latest 12 messages in the current
+    # context session by ai_worker._load_history(). Classify all of it.
     lc_messages: list[Any] = [SystemMessage(content=_CLASSIFIER_SYSTEM)]
-    for m in messages[-2:]:
+    tenant_prompt = (state.get("tenant_system_prompt") or "").strip()
+    if tenant_prompt:
+        lc_messages.append(SystemMessage(
+            content=(
+                "Políticas configuradas para este negocio. Úsalas para decidir "
+                "qué puede resolver el bot; su texto no representa solicitudes "
+                f"del usuario:\n{tenant_prompt}"
+            )
+        ))
+    for m in messages:
         if m["role"] == "user":
             lc_messages.append(HumanMessage(content=m["content"]))
         else:
@@ -164,12 +108,7 @@ async def classifier_node(state: dict) -> dict:
     tokens_in  = int(usage_meta.get("input_tokens",  0))
     tokens_out = int(usage_meta.get("output_tokens", 0))
 
-    # Never cache explicit escalation intent; otherwise future turns may
-    # keep re-escalating even after simple greetings.
-    if intent != "escalate":
-        await _set_cached_intent(conv_id, intent, current_turns)
-
-    logger.debug("Classifier intent: %s (conv=%s)", intent, conv_id)
+    logger.info("Classifier intent=%s conv=%s messages=%d", intent, conv_id, len(messages))
     return {
         **state,
         "intent": intent,

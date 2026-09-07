@@ -55,6 +55,23 @@ spec:
           image: datara.azurecr.io/chatsystem-backend:latest
           imagePullPolicy: Always
           command: ["python", "-m", "app.workers.runner"]
+          ports:
+            - containerPort: 8001
+              name: health
           envFrom:
             - secretRef:
                 name: chatsystem-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3

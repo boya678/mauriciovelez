@@ -74,7 +74,7 @@ def _ensure_handoff_notice(reply: str | None) -> str:
 
 
 async def _load_history(db, conversation_id: uuid.UUID) -> tuple[list[dict], int]:
-    """Return (history, user_turns).
+    """Return the latest 12 messages from the current context session.
 
     history    : list of {role, content} dicts. Image messages are rendered as
                  [IMAGEN: <desc>] or [IMAGEN sin describir aún] so the LLM is
@@ -82,14 +82,25 @@ async def _load_history(db, conversation_id: uuid.UUID) -> tuple[list[dict], int
     user_turns : count of USER messages in this conversation. Used to feed a
                  realistic turn counter into the graph (cache + escalation).
     """
-    msgs = await db.scalars(
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
+    context_started_at = await db.scalar(
+        select(Conversation.context_started_at).where(
+            Conversation.id == conversation_id
+        )
     )
+    filters = [Message.conversation_id == conversation_id]
+    if context_started_at is not None:
+        filters.append(Message.created_at >= context_started_at)
+
+    result = await db.scalars(
+        select(Message)
+        .where(*filters)
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(12)
+    )
+    msgs = list(reversed(result.all()))
     history: list[dict] = []
     user_turns = 0
-    for m in msgs.all():
+    for m in msgs:
         is_user = m.sender_type == SenderType.USER
         role = "user" if is_user else "bot"
         if is_user:
@@ -174,6 +185,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
             }
             if conv.assigned_agent_id:
                 payload["agent_id"] = str(conv.assigned_agent_id)
+            payload["source"] = "user_message"
             await xadd(redis, HUMAN_ASSIGN_STREAM, payload)
 
             logger.info(
@@ -585,7 +597,10 @@ async def run(stop_event: asyncio.Event) -> None:
                 except Exception:
                     logger.exception("Error in AI entry %s", entry_id)
         except asyncio.CancelledError:
-            break
+            if stop_event.is_set():
+                break
+            logger.critical("ai_worker cancelled without shutdown signal")
+            raise
         except Exception:
             logger.exception("ai_worker loop error")
             await asyncio.sleep(2)

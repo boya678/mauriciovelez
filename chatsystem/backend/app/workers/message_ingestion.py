@@ -111,6 +111,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 last_user_message_at=now,
                 last_activity_at=now,
                 idle_warning_sent_at=None,
+                context_started_at=now,
             )
             db.add(conv)
             await db.flush()
@@ -203,6 +204,7 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                 new_values["assigned_agent_id"] = None
                 new_values["closed_at"] = None
                 new_values["handoff_notice_sent_at"] = None
+                new_values["context_started_at"] = now
                 logger.info(
                     "Reopened CLOSED conv %s → BOT_ACTIVE (new user msg)",
                     conversation_id,
@@ -319,6 +321,8 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
         }
         if conv.assigned_agent_id:
             payload["agent_id"] = str(conv.assigned_agent_id)
+        if target_stream == HUMAN_ASSIGN_STREAM:
+            payload["source"] = "user_message"
 
         await xadd(redis, target_stream, payload)
         logger.info(

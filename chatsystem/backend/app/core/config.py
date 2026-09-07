@@ -44,6 +44,12 @@ class Settings(BaseSettings):
         "Voy a transferirte con un agente humano para continuar con tu solicitud. "
         "Un momento, por favor."
     )
+    HUMAN_QUEUE_ACK_TEXT: str = (
+        "Ya estás en la cola de atención. En este momento no hay un agente "
+        "disponible; por favor ten un poco de paciencia. Te atenderemos tan "
+        "pronto como sea posible."
+    )
+    HUMAN_QUEUE_ACK_COOLDOWN_SECONDS: int = 120
 
     # Worker concurrency
     WORKER_POLL_INTERVAL_MS: int = 100
@@ -55,6 +61,7 @@ class Settings(BaseSettings):
     OUTGOING_MAX_RETRIES: int = 5
     OUTGOING_RETRY_TTL_SECONDS: int = 3600
     OUTGOING_PROCESSING_LOCK_SECONDS: int = 120
+    WORKER_HEALTH_PORT: int = 8001
 
     # Conversation inactivity lifecycle. Set ENABLED=false to disable it.
     # The close window starts only after the warning was delivered.
@@ -70,12 +77,6 @@ class Settings(BaseSettings):
     CONVERSATION_IDLE_CLOSED_TEXT: str = (
         "Hemos finalizado esta conversación por inactividad. Cuando lo necesites, "
         "puedes escribirnos nuevamente y con gusto continuaremos ayudándote."
-    )
-    HUMAN_WAIT_TIMEOUT_MINUTES: int = 60
-    HUMAN_WAIT_WINDOW_BUFFER_MINUTES: int = 5
-    HUMAN_WAIT_TIMEOUT_TEXT: str = (
-        "En este momento no fue posible conectarte con un agente. Hemos finalizado "
-        "esta solicitud, pero puedes escribirnos nuevamente y con gusto te atenderemos."
     )
     CONVERSATION_EXPIRED_CLEANUP_MINUTES: int = 60
     MANUAL_CLOSE_NOTICE_TEXT: str = (

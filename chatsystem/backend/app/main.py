@@ -27,7 +27,7 @@ from app.api.token_usage import router as token_usage_router
 from app.api.message_stats import router as message_stats_router
 from app.api.contactos import router as contactos_router
 from app.redis.client import init_redis, close_redis
-from app.workers.runner import start_workers, stop_workers
+from app.workers.runner import start_workers, stop_workers, worker_health_snapshot
 from app.websocket.manager import manager
 from app.services.tenant_cache import start_invalidation_listener
 import asyncio
@@ -121,5 +121,10 @@ app.include_router(ws_router)  # WebSocket has its own path prefix
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["health"])
-async def health() -> dict:
-    return {"status": "ok"}
+async def health() -> JSONResponse:
+    workers = worker_health_snapshot()
+    healthy = workers["healthy"]
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "ok" if healthy else "unhealthy", **workers},
+    )

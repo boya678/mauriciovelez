@@ -674,6 +674,32 @@ class OutgoingHandoffTests(unittest.IsolatedAsyncioTestCase):
         send_text.assert_not_awaited()
         send_template.assert_awaited_once()
 
+    async def test_waiting_queue_ack_is_delivered_while_still_waiting(self):
+        conv = conversation(status=ConversationStatus.WAITING_HUMAN)
+        msg = message(conv.id, sender_type=SenderType.BOT)
+        precheck_db = FakeSession([msg, conv])
+        completion_db = FakeSession([msg])
+        redis = self._redis()
+        send = AsyncMock()
+
+        data = handoff_data(conv, msg)
+        data.update({
+            "handoff_after_send": False,
+            "allow_waiting_human": True,
+        })
+        with (
+            patch.object(
+                outgoing_worker,
+                "make_tenant_session",
+                SessionFactory(FakeSession([msg]), precheck_db, completion_db),
+            ),
+            patch.object(outgoing_worker, "send_text_message", send),
+        ):
+            completed = await outgoing_worker._process_entry(redis, "1-0", data)
+
+        self.assertTrue(completed)
+        send.assert_awaited_once()
+
 
 class AssignmentSafetyTests(unittest.IsolatedAsyncioTestCase):
     async def test_legacy_waiting_conversation_outside_window_is_not_notified(self):
@@ -747,6 +773,80 @@ class AssignmentSafetyTests(unittest.IsolatedAsyncioTestCase):
         assign.assert_awaited_once()
         redis.eval.assert_awaited_once()
 
+    async def test_user_message_without_agent_triggers_queue_ack(self):
+        conv = conversation(
+            status=ConversationStatus.WAITING_HUMAN,
+            handoff_notice_sent_at=datetime.now(timezone.utc),
+        )
+        db = FakeSession([conv, conv])
+        assign = AsyncMock(return_value=None)
+        queue_ack = AsyncMock(return_value=True)
+        redis = SimpleNamespace(
+            set=AsyncMock(return_value=True),
+            eval=AsyncMock(return_value=1),
+        )
+
+        with (
+            patch.object(
+                assignment_worker,
+                "make_tenant_session",
+                SessionFactory(db),
+            ),
+            patch.object(assignment_worker, "assign_agent", assign),
+            patch.object(assignment_worker, "_queue_waiting_ack", queue_ack),
+        ):
+            completed = await assignment_worker._process_entry(
+                redis,
+                "1-0",
+                {
+                    "tenant_id": str(conv.tenant_id),
+                    "tenant_slug": "prueba",
+                    "conversation_id": str(conv.id),
+                    "phone": conv.phone,
+                    "source": "user_message",
+                },
+            )
+
+        self.assertTrue(completed)
+        queue_ack.assert_awaited_once()
+
+    async def test_initial_handoff_without_agent_does_not_duplicate_notice(self):
+        conv = conversation(
+            status=ConversationStatus.WAITING_HUMAN,
+            handoff_notice_sent_at=datetime.now(timezone.utc),
+        )
+        db = FakeSession([conv, conv])
+        assign = AsyncMock(return_value=None)
+        queue_ack = AsyncMock(return_value=True)
+        redis = SimpleNamespace(
+            set=AsyncMock(return_value=True),
+            eval=AsyncMock(return_value=1),
+        )
+
+        with (
+            patch.object(
+                assignment_worker,
+                "make_tenant_session",
+                SessionFactory(db),
+            ),
+            patch.object(assignment_worker, "assign_agent", assign),
+            patch.object(assignment_worker, "_queue_waiting_ack", queue_ack),
+        ):
+            completed = await assignment_worker._process_entry(
+                redis,
+                "1-0",
+                {
+                    "tenant_id": str(conv.tenant_id),
+                    "tenant_slug": "prueba",
+                    "conversation_id": str(conv.id),
+                    "phone": conv.phone,
+                    "source": "handoff",
+                },
+            )
+
+        self.assertTrue(completed)
+        queue_ack.assert_not_awaited()
+
     async def test_concurrent_handoff_flow_does_not_notify_or_assign(self):
         conv = conversation(status=ConversationStatus.WAITING_HUMAN)
         redis = SimpleNamespace(
@@ -775,6 +875,86 @@ class AssignmentSafetyTests(unittest.IsolatedAsyncioTestCase):
         send.assert_not_awaited()
         assign.assert_not_awaited()
         redis.eval.assert_not_awaited()
+
+
+class WaitingQueueAcknowledgementTests(unittest.IsolatedAsyncioTestCase):
+    def _redis(self, acquired=True):
+        return SimpleNamespace(
+            set=AsyncMock(return_value=acquired),
+            delete=AsyncMock(),
+        )
+
+    async def test_first_user_message_queues_waiting_ack(self):
+        conv = conversation(status=ConversationStatus.WAITING_HUMAN)
+        db = FakeSession()
+        public_db = FakeSession([tenant(id=conv.tenant_id)])
+        redis = self._redis()
+        add_to_stream = AsyncMock()
+        publish = AsyncMock()
+
+        with (
+            patch.object(
+                assignment_worker,
+                "AsyncSessionLocal",
+                SessionFactory(public_db),
+            ),
+            patch.object(assignment_worker, "xadd", add_to_stream),
+            patch.object(assignment_worker.manager, "publish", publish),
+        ):
+            queued = await assignment_worker._queue_waiting_ack(
+                redis, db, conv.tenant_id, "prueba", conv
+            )
+
+        self.assertTrue(queued)
+        self.assertEqual(len(db.added), 1)
+        self.assertEqual(db.added[0].status, MessageStatus.PENDING)
+        self.assertEqual(
+            db.added[0].content, assignment_worker.settings.HUMAN_QUEUE_ACK_TEXT
+        )
+        self.assertTrue(add_to_stream.await_args.args[2]["allow_waiting_human"])
+        publish.assert_awaited_once()
+
+    async def test_queue_ack_cooldown_suppresses_burst(self):
+        conv = conversation(status=ConversationStatus.WAITING_HUMAN)
+        db = FakeSession()
+        redis = self._redis(acquired=False)
+
+        queued = await assignment_worker._queue_waiting_ack(
+            redis, db, conv.tenant_id, "prueba", conv
+        )
+
+        self.assertFalse(queued)
+        self.assertEqual(db.added, [])
+        redis.set.assert_awaited_once()
+
+    async def test_queue_ack_enqueue_failure_marks_error_and_releases_cooldown(self):
+        conv = conversation(status=ConversationStatus.WAITING_HUMAN)
+        db = FakeSession()
+        public_db = FakeSession([tenant(id=conv.tenant_id)])
+        redis = self._redis()
+        add_to_stream = AsyncMock(side_effect=RuntimeError("Redis unavailable"))
+
+        with (
+            patch.object(
+                assignment_worker,
+                "AsyncSessionLocal",
+                SessionFactory(public_db),
+            ),
+            patch.object(assignment_worker, "xadd", add_to_stream),
+        ):
+            queued = await assignment_worker._queue_waiting_ack(
+                redis, db, conv.tenant_id, "prueba", conv
+            )
+
+        self.assertFalse(queued)
+        self.assertEqual(db.commits, 2)
+        redis.delete.assert_awaited_once()
+        status_updates = [
+            args[0].compile().params.get("status")
+            for args, _ in db.executed
+            if args and hasattr(args[0], "compile")
+        ]
+        self.assertIn(MessageStatus.ERROR, status_updates)
 
 
 class ManualCloseTests(unittest.IsolatedAsyncioTestCase):
@@ -1358,16 +1538,15 @@ class InactivityLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(conv.closed_at)
         self.assertEqual(db.commits, 0)
 
-    async def test_waiting_human_timeout_notifies_then_closes(self):
+    async def test_waiting_human_remains_open_indefinitely(self):
         now = datetime.now(timezone.utc)
         conv = conversation(
             status=ConversationStatus.WAITING_HUMAN,
-            handoff_notice_sent_at=now - timedelta(minutes=70),
-            last_activity_at=now - timedelta(minutes=70),
-            last_user_message_at=now - timedelta(hours=2),
+            handoff_notice_sent_at=now - timedelta(days=7),
+            last_activity_at=now - timedelta(days=7),
+            last_user_message_at=now - timedelta(days=7),
         )
         db = FakeSession([conv])
-        send = AsyncMock()
         publish = AsyncMock()
 
         with (
@@ -1376,115 +1555,21 @@ class InactivityLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 "make_tenant_session",
                 SessionFactory(db),
             ),
-            patch.object(conversation_lifecycle, "send_text_message", send),
             patch.object(conversation_lifecycle.manager, "publish", publish),
         ):
-            await conversation_lifecycle._close_waiting_conversation(
-                tenant(),
-                conv.id,
-                now - timedelta(minutes=60),
-                now - timedelta(hours=23, minutes=55),
+            await conversation_lifecycle._close_expired_conversation(
+                "prueba", conv.id, now - timedelta(minutes=60)
             )
-
-        send.assert_awaited_once()
-        self.assertEqual(conv.status, ConversationStatus.CLOSED)
-        self.assertIsNotNone(conv.closed_at)
-        self.assertEqual(db.commits, 1)
-        self.assertEqual(publish.await_count, 2)
-
-    async def test_waiting_human_recent_activity_stays_open(self):
-        now = datetime.now(timezone.utc)
-        conv = conversation(
-            status=ConversationStatus.WAITING_HUMAN,
-            handoff_notice_sent_at=now - timedelta(minutes=10),
-            last_activity_at=now - timedelta(minutes=10),
-            last_user_message_at=now - timedelta(hours=2),
-        )
-        db = FakeSession([conv])
-        send = AsyncMock()
-
-        with (
-            patch.object(
-                conversation_lifecycle,
-                "make_tenant_session",
-                SessionFactory(db),
-            ),
-            patch.object(conversation_lifecycle, "send_text_message", send),
-        ):
-            await conversation_lifecycle._close_waiting_conversation(
-                tenant(),
-                conv.id,
-                now - timedelta(minutes=60),
-                now - timedelta(hours=23, minutes=55),
-            )
-
-        send.assert_not_awaited()
-        self.assertEqual(conv.status, ConversationStatus.WAITING_HUMAN)
-
-    async def test_waiting_human_outside_24h_does_not_send_free_text(self):
-        now = datetime.now(timezone.utc)
-        conv = conversation(
-            status=ConversationStatus.WAITING_HUMAN,
-            handoff_notice_sent_at=now - timedelta(hours=25),
-            last_activity_at=now - timedelta(hours=25),
-            last_user_message_at=now - timedelta(hours=25),
-        )
-        db = FakeSession([conv])
-        send = AsyncMock()
-
-        with (
-            patch.object(
-                conversation_lifecycle,
-                "make_tenant_session",
-                SessionFactory(db),
-            ),
-            patch.object(conversation_lifecycle, "send_text_message", send),
-        ):
-            await conversation_lifecycle._close_waiting_conversation(
-                tenant(),
-                conv.id,
-                now - timedelta(minutes=60),
-                now - timedelta(hours=23, minutes=55),
-            )
-
-        send.assert_not_awaited()
-        self.assertEqual(conv.status, ConversationStatus.WAITING_HUMAN)
-
-    async def test_waiting_human_meta_failure_does_not_close(self):
-        now = datetime.now(timezone.utc)
-        conv = conversation(
-            status=ConversationStatus.WAITING_HUMAN,
-            handoff_notice_sent_at=now - timedelta(minutes=70),
-            last_activity_at=now - timedelta(minutes=70),
-            last_user_message_at=now - timedelta(hours=2),
-        )
-        db = FakeSession([conv])
-        send = AsyncMock(side_effect=RuntimeError("Meta unavailable"))
-
-        with (
-            patch.object(
-                conversation_lifecycle,
-                "make_tenant_session",
-                SessionFactory(db),
-            ),
-            patch.object(conversation_lifecycle, "send_text_message", send),
-        ):
-            with self.assertRaises(RuntimeError):
-                await conversation_lifecycle._close_waiting_conversation(
-                    tenant(),
-                    conv.id,
-                    now - timedelta(minutes=60),
-                    now - timedelta(hours=23, minutes=55),
-                )
 
         self.assertEqual(conv.status, ConversationStatus.WAITING_HUMAN)
         self.assertIsNone(conv.closed_at)
         self.assertEqual(db.commits, 0)
+        publish.assert_not_awaited()
 
     async def test_expired_window_cleanup_closes_and_releases_without_sending(self):
         now = datetime.now(timezone.utc)
         conv = conversation(
-            status=ConversationStatus.WAITING_HUMAN,
+            status=ConversationStatus.HUMAN_ACTIVE,
             assigned_agent_id=uuid.uuid4(),
             last_user_message_at=now - timedelta(hours=25),
             last_activity_at=now - timedelta(hours=2),

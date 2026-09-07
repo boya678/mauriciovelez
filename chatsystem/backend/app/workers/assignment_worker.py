@@ -14,7 +14,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -26,6 +26,7 @@ from app.models.tenant import Tenant
 from app.redis.client import get_redis
 from app.redis.streams import (
     HUMAN_ASSIGN_STREAM,
+    OUTGOING_STREAM,
     ASSIGN_CONSUMER_GROUP,
     ensure_consumer_group,
     xadd,
@@ -53,6 +54,91 @@ def _window_open(last_user_message_at: datetime | None) -> bool:
     if last_user_message_at.tzinfo is None:
         last_user_message_at = last_user_message_at.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc) - last_user_message_at < timedelta(hours=24)
+
+
+def _queue_ack_key(conversation_id: uuid.UUID) -> str:
+    return f"human_queue_ack:{conversation_id}"
+
+
+async def _queue_waiting_ack(
+    redis,
+    db: AsyncSession,
+    tenant_id: str | uuid.UUID,
+    tenant_slug: str,
+    conv: Conversation,
+) -> bool:
+    key = _queue_ack_key(conv.id)
+    acquired = await redis.set(
+        key,
+        "1",
+        nx=True,
+        ex=settings.HUMAN_QUEUE_ACK_COOLDOWN_SECONDS,
+    )
+    if not acquired:
+        return False
+
+    try:
+        async with AsyncSessionLocal() as public_db:
+            tenant = await public_db.scalar(
+                select(Tenant).where(Tenant.id == uuid.UUID(str(tenant_id)))
+            )
+        if not tenant or not tenant.whatsapp_phone_id or not tenant.whatsapp_token:
+            logger.error("Cannot queue waiting acknowledgement for conv %s", conv.id)
+            await redis.delete(key)
+            return False
+
+        now = datetime.now(timezone.utc)
+        queue_message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conv.id,
+            sender_type=SenderType.BOT,
+            content=settings.HUMAN_QUEUE_ACK_TEXT,
+            message_type="text",
+            status=MessageStatus.PENDING,
+            created_at=now,
+        )
+        db.add(queue_message)
+        await db.commit()
+
+        try:
+            await xadd(redis, OUTGOING_STREAM, {
+                "tenant_id": str(tenant_id),
+                "tenant_slug": tenant_slug,
+                "conversation_id": str(conv.id),
+                "phone": conv.phone,
+                "message_id": str(queue_message.id),
+                "content": settings.HUMAN_QUEUE_ACK_TEXT,
+                "phone_id": tenant.whatsapp_phone_id,
+                "token": tenant.whatsapp_token,
+                "allow_waiting_human": True,
+            })
+        except Exception:
+            await db.execute(
+                update(Message)
+                .where(Message.id == queue_message.id)
+                .values(status=MessageStatus.ERROR)
+            )
+            await db.commit()
+            await redis.delete(key)
+            logger.exception("Could not enqueue waiting acknowledgement for conv %s", conv.id)
+            return False
+
+        await manager.publish(tenant_slug, {
+            "type": "new_message",
+            "conversation_id": str(conv.id),
+            "message": {
+                "id": str(queue_message.id),
+                "content": queue_message.content,
+                "sender_type": SenderType.BOT.value,
+                "message_type": "text",
+                "created_at": now.isoformat(),
+            },
+        })
+        logger.info("Queued waiting acknowledgement for conv %s", conv.id)
+        return True
+    except Exception:
+        await redis.delete(key)
+        raise
 
 
 async def _ensure_handoff_notice(
@@ -179,6 +265,14 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
                 "No agent available for conv %s; rescue scanner will retry",
                 conversation_id,
             )
+            if data.get("source") == "user_message":
+                await _queue_waiting_ack(
+                    redis,
+                    db,
+                    tenant_id,
+                    tenant_slug,
+                    conv,
+                )
             return True
 
         # Notify the assigned agent via WebSocket (keyed by slug, matches WS path)

@@ -209,76 +209,6 @@ async def _close_conversation(tenant: Tenant, conv_id: uuid.UUID, cutoff: dateti
         logger.info("Closed inactive conv %s", conv.id)
 
 
-async def _close_waiting_conversation(
-    tenant: Tenant,
-    conv_id: uuid.UUID,
-    timeout_cutoff: datetime,
-    window_buffer_cutoff: datetime,
-) -> None:
-    schema = f"t_{tenant.slug}"
-    set_tenant_schema(schema)
-    async with make_tenant_session(schema) as db:
-        conv = await db.scalar(
-            select(Conversation)
-            .where(Conversation.id == conv_id)
-            .with_for_update()
-        )
-        if (
-            conv is None
-            or conv.status != ConversationStatus.WAITING_HUMAN
-            or conv.handoff_notice_sent_at is None
-            or conv.last_activity_at is None
-            or conv.last_user_message_at is None
-            or not _window_open(conv.last_user_message_at)
-            or (
-                conv.last_activity_at > timeout_cutoff
-                and conv.last_user_message_at > window_buffer_cutoff
-            )
-        ):
-            return
-
-        text = settings.HUMAN_WAIT_TIMEOUT_TEXT
-        await send_text_message(
-            phone_id=tenant.whatsapp_phone_id or "",
-            token=tenant.whatsapp_token or "",
-            to=conv.phone,
-            text=text,
-        )
-
-        now = datetime.now(timezone.utc)
-        message = Message(
-            id=uuid.uuid4(),
-            conversation_id=conv.id,
-            sender_type=SenderType.BOT,
-            content=text,
-            message_type="text",
-            status=MessageStatus.PROCESSED,
-            created_at=now,
-        )
-        db.add(message)
-        conv.status = ConversationStatus.CLOSED
-        conv.assigned_agent_id = None
-        conv.closed_at = now
-        conv.updated_at = now
-        conv.last_activity_at = now
-        conv.idle_warning_sent_at = None
-        await db.execute(
-            update(Assignment)
-            .where(
-                Assignment.conversation_id == conv.id,
-                Assignment.released_at.is_(None),
-            )
-            .values(released_at=now)
-        )
-        await db.commit()
-        await _publish_message(tenant.slug, conv.id, message)
-        await manager.publish(tenant.slug, {
-            "type": "conversation_closed",
-            "conversation_id": str(conv.id),
-        })
-        logger.info("Closed unassigned waiting conv %s", conv.id)
-
-
 async def _close_expired_conversation(
     tenant_slug: str,
     conv_id: uuid.UUID,
@@ -298,7 +228,6 @@ async def _close_expired_conversation(
             or conv.status not in (
                 ConversationStatus.BOT_ACTIVE,
                 ConversationStatus.HUMAN_ACTIVE,
-                ConversationStatus.WAITING_HUMAN,
             )
             or conv.last_activity_at is None
             or conv.last_activity_at > activity_cutoff
@@ -356,11 +285,6 @@ async def _scan_once(redis) -> None:
         minutes=-settings.CONVERSATION_IDLE_GRACE_MINUTES,
     )
     close_window_cutoff = now - timedelta(hours=24)
-    human_wait_cutoff = now - timedelta(minutes=settings.HUMAN_WAIT_TIMEOUT_MINUTES)
-    human_wait_window_cutoff = now - timedelta(
-        hours=24,
-        minutes=-settings.HUMAN_WAIT_WINDOW_BUFFER_MINUTES,
-    )
     expired_activity_cutoff = now - timedelta(
         minutes=settings.CONVERSATION_EXPIRED_CLEANUP_MINUTES
     )
@@ -415,24 +339,6 @@ async def _scan_once(redis) -> None:
                         .limit(settings.CONVERSATION_IDLE_SCAN_BATCH)
                     )
                 ).all()
-                waiting_ids = (
-                    await db.scalars(
-                        select(Conversation.id)
-                        .where(
-                            Conversation.status == ConversationStatus.WAITING_HUMAN,
-                            Conversation.handoff_notice_sent_at.is_not(None),
-                            Conversation.last_activity_at.is_not(None),
-                            Conversation.last_user_message_at.is_not(None),
-                            Conversation.last_user_message_at >= close_window_cutoff,
-                            or_(
-                                Conversation.last_activity_at <= human_wait_cutoff,
-                                Conversation.last_user_message_at <= human_wait_window_cutoff,
-                            ),
-                        )
-                        .order_by(Conversation.last_activity_at.asc())
-                        .limit(settings.CONVERSATION_IDLE_SCAN_BATCH)
-                    )
-                ).all()
                 expired_ids = (
                     await db.scalars(
                         select(Conversation.id)
@@ -440,7 +346,6 @@ async def _scan_once(redis) -> None:
                             Conversation.status.in_([
                                 ConversationStatus.BOT_ACTIVE,
                                 ConversationStatus.HUMAN_ACTIVE,
-                                ConversationStatus.WAITING_HUMAN,
                             ]),
                             Conversation.last_activity_at.is_not(None),
                             Conversation.last_activity_at <= expired_activity_cutoff,
@@ -466,20 +371,6 @@ async def _scan_once(redis) -> None:
                     )
                 except Exception:
                     logger.exception("Could not clean up expired conv %s", conv_id)
-
-            for conv_id in waiting_ids:
-                try:
-                    await _run_with_conversation_lock(
-                        redis,
-                        conv_id,
-                        _close_waiting_conversation,
-                        tenant,
-                        conv_id,
-                        human_wait_cutoff,
-                        human_wait_window_cutoff,
-                    )
-                except Exception:
-                    logger.exception("Could not close waiting conv %s", conv_id)
 
             for conv_id in close_ids:
                 try:

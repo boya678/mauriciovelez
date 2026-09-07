@@ -176,6 +176,7 @@ async def start_conversation(
                 last_activity_at=now,
                 idle_warning_sent_at=None,
                 handoff_notice_sent_at=now,
+                context_started_at=now,
             )
         )
         if reopen_result.rowcount != 1:
@@ -219,6 +220,7 @@ async def start_conversation(
             last_activity_at=now,
             idle_warning_sent_at=None,
             handoff_notice_sent_at=now,
+            context_started_at=now,
         )
         db.add(new_conv)
         await db.flush()
@@ -940,6 +942,7 @@ async def reopen_conversation(
             last_activity_at=now,
             idle_warning_sent_at=None,
             handoff_notice_sent_at=now,
+            context_started_at=now,
         )
     )
     db.add(Assignment(

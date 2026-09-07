@@ -143,6 +143,7 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
     template_name = data.get("template_name", "")
     template_language = data.get("template_language", "es") or "es"
     handoff_after_send = bool(data.get("handoff_after_send", False))
+    allow_waiting_human = bool(data.get("allow_waiting_human", False))
     conversation_id_raw = data.get("conversation_id", "")
 
     schema = f"t_{tenant_slug}" if tenant_slug else "public"
@@ -192,6 +193,10 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
                 and conv.status not in (
                     ConversationStatus.NEW,
                     ConversationStatus.BOT_ACTIVE,
+                )
+                and not (
+                    allow_waiting_human
+                    and conv.status == ConversationStatus.WAITING_HUMAN
                 )
             ):
                 cancel_reason = f"bot no longer owns conversation ({conv.status})"
@@ -384,6 +389,7 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
             "tenant_slug": tenant_slug,
             "conversation_id": str(conversation_id),
             "phone": phone,
+            "source": "handoff",
         })
         await manager.publish(tenant_slug, {
             "type": "conversation_waiting",
