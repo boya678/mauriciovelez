@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS {schema}.assignments (
     conversation_id UUID NOT NULL REFERENCES {schema}.conversations(id),
     agent_id UUID NOT NULL REFERENCES {schema}.agents(id),
     assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    released_at TIMESTAMPTZ
+    released_at TIMESTAMPTZ,
+    last_read_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS {schema}.contactos (
@@ -90,6 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_conv_phone ON {schema}.conversations(phone);
 CREATE INDEX IF NOT EXISTS ix_conv_idle_scan ON {schema}.conversations(status, last_activity_at);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON {schema}.messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_assign_agent ON {schema}.assignments(agent_id);
+CREATE INDEX IF NOT EXISTS ix_assign_active_read ON {schema}.assignments(conversation_id, agent_id) WHERE released_at IS NULL;
 """
 
 

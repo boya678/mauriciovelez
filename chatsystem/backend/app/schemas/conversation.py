@@ -20,6 +20,9 @@ class ConversationOut(BaseModel):
     closed_at: datetime | None = None
     last_user_message_at: datetime | None = None
     tags: str | None = None
+    unread_count: int = 0
+    last_message_preview: str | None = None
+    last_message_at: datetime | None = None
 
     @computed_field  # type: ignore[misc]
     @property

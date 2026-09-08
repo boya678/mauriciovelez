@@ -15,7 +15,13 @@
         [class.active]="activeTab() === 'mine'"
         (click)="selectTab('mine')"
       >
-        <span class="material-icons" style="font-size:1em;vertical-align:middle">forum</span> Mis chats
+        <span class="material-icons" style="font-size:1em;vertical-align:middle">forum</span>
+        <span>Mis chats</span>
+        @if (mineUnreadTotal() > 0) {
+          <span class="tab-unread" [attr.aria-label]="mineUnreadTotal() + ' mensajes sin leer'">
+            {{ mineUnreadTotal() > 99 ? '99+' : mineUnreadTotal() }}
+          </span>
+        }
       </button>
       <button
         class="tab"
@@ -64,6 +70,8 @@
           <div
             class="conv-item"
             [class.selected]="selectedId() === conv.id"
+            [class.unread]="conv.unread_count > 0"
+            [class.just-received]="highlightedIds().has(conv.id)"
             (click)="selectConversation(conv.id)"
           >
             <div class="conv-avatar">{{ (conv.username || conv.phone).slice(-2) }}</div>
@@ -76,6 +84,9 @@
                 }
               </span>
               <span class="conv-time">{{ formatDate(conv.updated_at) }}</span>
+              @if (conv.last_message_preview) {
+                <span class="conv-preview">{{ conv.last_message_preview }}</span>
+              }
               @if (conv.tags) {
                 <span class="conv-tags">{{ conv.tags }}</span>
               }
@@ -83,6 +94,11 @@
             <span class="badge {{ STATUS_BADGE[conv.status] }}">
               {{ STATUS_LABELS[conv.status] }}
             </span>
+            @if (conv.unread_count > 0) {
+              <span class="unread-count" [attr.aria-label]="conv.unread_count + ' mensajes sin leer'">
+                {{ conv.unread_count > 99 ? '99+' : conv.unread_count }}
+              </span>
+            }
           </div>
         }
       }
@@ -92,7 +108,11 @@
   <!-- Chat panel -->
   <div class="chat-panel">
     @if (selectedId()) {
-      <app-chat [conversationId]="selectedId()!" (conversationReopened)="scheduleRefresh()" />
+      <app-chat
+        [conversationId]="selectedId()!"
+        (conversationReopened)="scheduleRefresh()"
+        (conversationRead)="markConversationRead($event)"
+      />
     } @else {
       <div class="empty-chat">
         <div class="empty-icon"><span class="material-icons" style="font-size:3rem">chat_bubble_outline</span></div>

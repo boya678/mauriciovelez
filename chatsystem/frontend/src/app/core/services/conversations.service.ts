@@ -20,6 +20,10 @@ export class ConversationsService {
     return this.http.get<ConversationDetail>(`${environment.apiUrl}/api/v1/conversations/${id}`);
   }
 
+  markRead(id: string) {
+    return this.http.post<void>(`${environment.apiUrl}/api/v1/conversations/${id}/read`, {});
+  }
+
   take(id: string) {
     return this.http.post<Conversation>(`${environment.apiUrl}/api/v1/conversations/${id}/take`, {});
   }

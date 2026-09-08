@@ -26,6 +26,7 @@ from app.api.knowledge import router as knowledge_router
 from app.api.token_usage import router as token_usage_router
 from app.api.message_stats import router as message_stats_router
 from app.api.contactos import router as contactos_router
+from app.api.agent_metrics import router as agent_metrics_router
 from app.redis.client import init_redis, close_redis
 from app.workers.runner import start_workers, stop_workers, worker_health_snapshot
 from app.websocket.manager import manager
@@ -115,6 +116,7 @@ app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(token_usage_router, prefix="/api/v1")
 app.include_router(message_stats_router, prefix="/api/v1")
 app.include_router(contactos_router, prefix="/api/v1")
+app.include_router(agent_metrics_router, prefix="/api/v1")
 app.include_router(ws_router)  # WebSocket has its own path prefix
 
 

@@ -1,0 +1,160 @@
+<div class="metrics-page">
+  <header class="page-header">
+    <div>
+      <h1>Métricas</h1>
+      <p>Desempeño del equipo de atención humana</p>
+    </div>
+    <button class="export-button" type="button" (click)="exportCsv()" [disabled]="!metrics()?.agents?.length">
+      <span class="material-icons">download</span>
+      Exportar CSV
+    </button>
+  </header>
+
+  <section class="filters" aria-label="Filtros de métricas">
+    <label>
+      <span>Desde</span>
+      <input type="date" [(ngModel)]="fromDate" />
+    </label>
+    <label>
+      <span>Hasta</span>
+      <input type="date" [(ngModel)]="toDate" />
+    </label>
+    <label class="agent-filter">
+      <span>Agente</span>
+      <select [(ngModel)]="selectedAgentId">
+        <option value="">Todos los agentes</option>
+        @for (agent of agentOptions(); track agent.agent_id) {
+          <option [value]="agent.agent_id">{{ agent.name }}</option>
+        }
+      </select>
+    </label>
+    <button class="apply-button" type="button" (click)="load()" [disabled]="loading()">
+      <span class="material-icons">filter_alt</span>
+      Aplicar
+    </button>
+  </section>
+
+  @if (error()) {
+    <div class="error-message">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="loading-state">Cargando métricas…</div>
+  } @else {
+    @if (metrics(); as data) {
+    <section class="summary-grid" aria-label="Resumen del período">
+      <article class="summary-card accent-blue">
+        <span class="material-icons">assignment_ind</span>
+        <strong>{{ formatNumber(summary().assigned) }}</strong>
+        <small>Asignadas</small>
+      </article>
+      <article class="summary-card accent-green">
+        <span class="material-icons">support_agent</span>
+        <strong>{{ formatNumber(summary().handled) }}</strong>
+        <small>Atendidas</small>
+      </article>
+      <article class="summary-card accent-teal">
+        <span class="material-icons">task_alt</span>
+        <strong>{{ formatNumber(summary().closed) }}</strong>
+        <small>Cerradas</small>
+      </article>
+      <article class="summary-card accent-orange">
+        <span class="material-icons">forum</span>
+        <strong>{{ formatNumber(summary().messages) }}</strong>
+        <small>Mensajes enviados</small>
+      </article>
+      <article class="summary-card accent-red">
+        <span class="material-icons">mark_chat_unread</span>
+        <strong>{{ formatNumber(summary().unread) }}</strong>
+        <small>Pendientes de leer</small>
+      </article>
+      <article class="summary-card accent-slate">
+        <span class="material-icons">timer</span>
+        <strong>{{ formatDuration(summary().firstResponse) }}</strong>
+        <small>Primera respuesta</small>
+      </article>
+    </section>
+
+    <section class="activity-section">
+      <div class="section-heading">
+        <h2>Actividad diaria</h2>
+        <div class="legend">
+          <span><i class="assigned"></i>Asignadas</span>
+          <span><i class="closed"></i>Cerradas</span>
+          <span><i class="messages"></i>Mensajes</span>
+        </div>
+      </div>
+      <div class="chart-scroll">
+        <div class="daily-chart" [style.--day-count]="data.daily.length">
+          @for (day of data.daily; track day.day; let index = $index; let last = $last) {
+            <div
+              class="day-column"
+              [title]="formatDay(day.day) + ': ' + day.assigned_conversations + ' asignadas, ' + day.closed_conversations + ' cerradas, ' + day.human_messages + ' mensajes'"
+            >
+              <div class="bars">
+                <i class="bar assigned" [style.height.%]="barHeight(day.assigned_conversations)"></i>
+                <i class="bar closed" [style.height.%]="barHeight(day.closed_conversations)"></i>
+                <i class="bar messages" [style.height.%]="barHeight(day.human_messages)"></i>
+              </div>
+              <span>{{ index % 5 === 0 || last ? formatDay(day.day) : '' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="table-section">
+      <div class="section-heading">
+        <h2>Comparativo por agente</h2>
+        <span class="period">{{ data.from_date }} a {{ data.to_date }}</span>
+      </div>
+      @if (data.agents.length === 0) {
+        <div class="empty-state">No hay agentes para el filtro seleccionado.</div>
+      } @else {
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Agente</th>
+                <th>Asignadas</th>
+                <th>Atendidas</th>
+                <th>Cerradas</th>
+                <th>Activas</th>
+                <th>Mensajes</th>
+                <th>Pendientes</th>
+                <th>Primera respuesta</th>
+                <th>Respuesta promedio</th>
+                <th>Resolución promedio</th>
+                <th>Liberadas</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (agent of data.agents; track agent.agent_id) {
+                <tr>
+                  <td class="agent-cell">
+                    <span class="status-dot" [class.online]="agent.status === 'online'"></span>
+                    <span>
+                      <strong>{{ agent.name }} @if (!agent.active) { <em>Inactivo</em> }</strong>
+                      <small>{{ agent.email }}</small>
+                    </span>
+                  </td>
+                  <td>{{ formatNumber(agent.assigned_conversations) }}</td>
+                  <td>{{ formatNumber(agent.handled_conversations) }}</td>
+                  <td>{{ formatNumber(agent.closed_conversations) }}</td>
+                  <td>{{ formatNumber(agent.active_conversations) }}</td>
+                  <td>{{ formatNumber(agent.human_messages) }}</td>
+                  <td [class.has-unread]="agent.unread_messages > 0">{{ formatNumber(agent.unread_messages) }}</td>
+                  <td>{{ formatDuration(agent.avg_first_response_seconds) }}</td>
+                  <td>{{ formatDuration(agent.avg_response_seconds) }}</td>
+                  <td>{{ formatDuration(agent.avg_resolution_seconds) }}</td>
+                  <td>{{ formatNumber(agent.released_conversations) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+    }
+  }
+</div>

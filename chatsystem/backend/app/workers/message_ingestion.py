@@ -288,6 +288,9 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
         await manager.publish(data["tenant_slug"], {
             "type": "new_message",
             "conversation_id": str(conversation_id),
+            "assigned_agent_id": (
+                str(conv.assigned_agent_id) if conv.assigned_agent_id else None
+            ),
             "message": {
                 "id": str(msg.id),
                 "content": content,

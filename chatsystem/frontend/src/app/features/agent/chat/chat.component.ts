@@ -30,6 +30,7 @@ import { Message } from '../../../core/models/message.model';
 export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   conversationId = input.required<string>();
   conversationReopened = output<void>();
+  conversationRead = output<string>();
 
   conversation = signal<ConversationDetail | null>(null);
   loading = signal(false);
@@ -90,6 +91,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.conversation.set(detail);
         this.loading.set(false);
         this.shouldScroll = true;
+        if (detail.assigned_agent_id === this.auth.getAgentId()) {
+          this.conversationsService.markRead(id).subscribe({
+            next: () => this.conversationRead.emit(id),
+          });
+        }
       },
       error: (err) => {
         console.error('[chat] load error', err);

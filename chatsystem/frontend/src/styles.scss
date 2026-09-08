@@ -99,6 +99,42 @@ html, body {
   background: $bg;
 }
 
+@media (max-width: 720px) {
+  .app-shell:has(app-metrics) {
+    flex-direction: column;
+
+    .sidebar {
+      width: 100%;
+      min-width: 0;
+      max-height: 142px;
+      flex: 0 0 auto;
+
+      .sidebar-header { padding: 8px 12px; }
+      .sidebar-header h2 { font-size: 14px; }
+      .sidebar-nav {
+        display: flex;
+        flex: 0 0 auto;
+        padding: 0;
+        overflow-x: auto;
+      }
+      .nav-item {
+        width: auto;
+        flex: 0 0 auto;
+        padding: 8px 12px;
+      }
+      .sidebar-footer {
+        display: flex;
+        gap: 8px;
+        padding: 6px 10px;
+      }
+      .sidebar-footer .nav-item,
+      .status-toggle { width: auto; }
+    }
+
+    .main-content { min-width: 0; }
+  }
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 .status-toggle {
   display: flex;

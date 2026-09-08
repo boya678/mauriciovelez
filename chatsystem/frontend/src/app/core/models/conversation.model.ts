@@ -19,6 +19,9 @@ export interface Conversation {
   last_user_message_at: string | null;
   window_open: boolean;
   tags: string | null;
+  unread_count: number;
+  last_message_preview: string | null;
+  last_message_at: string | null;
 }
 
 export interface ConversationDetail extends Conversation {

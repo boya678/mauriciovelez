@@ -52,7 +52,7 @@ async def list_conversations(
     page_size: int = Query(20, ge=1, le=500),
     tenant: TenantContext = Depends(resolve_tenant),
     db: AsyncSession = Depends(get_tenant_db),
-    _agent=Depends(require_agent),
+    agent=Depends(require_agent),
 ):
     from sqlalchemy import text as _text
     schema = tenant.schema
@@ -60,16 +60,52 @@ async def list_conversations(
     status_clause = "AND c.status = :status" if status_filter else ""
     rows = (await db.execute(
         _text(f"""
-            SELECT c.id, c.tenant_id, c.phone, c.status, c.assigned_agent_id,
+            SELECT c.id, c.tenant_id, c.phone, c.username, c.bsuid,
+                   c.status, c.assigned_agent_id,
                    c.created_at, c.updated_at, c.closed_at, c.last_user_message_at,
-                   ct.tags
+                   ct.tags,
+                   CASE WHEN active_assignment.id IS NULL THEN 0 ELSE (
+                       SELECT COUNT(*)::int
+                       FROM {schema}.messages unread_message
+                       WHERE unread_message.conversation_id = c.id
+                         AND unread_message.sender_type = 'user'
+                         AND (
+                             active_assignment.last_read_at IS NULL
+                             OR unread_message.created_at > active_assignment.last_read_at
+                         )
+                   ) END AS unread_count,
+                   latest_message.content AS last_message_preview,
+                   latest_message.created_at AS last_message_at
             FROM {schema}.conversations c
             LEFT JOIN {schema}.contactos ct ON ct.id = c.phone
+            LEFT JOIN LATERAL (
+                SELECT a.id, a.last_read_at
+                FROM {schema}.assignments a
+                WHERE a.conversation_id = c.id
+                  AND a.agent_id = :agent_id
+                  AND a.released_at IS NULL
+                ORDER BY a.assigned_at DESC
+                LIMIT 1
+            ) active_assignment ON true
+            LEFT JOIN LATERAL (
+                SELECT m.content, m.created_at
+                FROM {schema}.messages m
+                WHERE m.conversation_id = c.id
+                ORDER BY m.created_at DESC
+                LIMIT 1
+            ) latest_message ON true
             WHERE c.tenant_id = :tenant_id {status_clause}
-            ORDER BY c.updated_at DESC
+            ORDER BY unread_count DESC,
+                     COALESCE(latest_message.created_at, c.updated_at) DESC
             LIMIT :limit OFFSET :offset
         """),
-        {"tenant_id": str(tenant.id), "status": status_filter, "limit": page_size, "offset": offset},
+        {
+            "tenant_id": str(tenant.id),
+            "agent_id": str(agent.id),
+            "status": status_filter,
+            "limit": page_size,
+            "offset": offset,
+        },
     )).mappings().all()
 
     return [
@@ -77,6 +113,8 @@ async def list_conversations(
             id=r["id"],
             tenant_id=r["tenant_id"],
             phone=r["phone"],
+            username=r["username"],
+            bsuid=r["bsuid"],
             status=r["status"],
             assigned_agent_id=r["assigned_agent_id"],
             created_at=r["created_at"],
@@ -84,6 +122,9 @@ async def list_conversations(
             closed_at=r["closed_at"],
             last_user_message_at=r["last_user_message_at"],
             tags=r["tags"],
+            unread_count=r["unread_count"],
+            last_message_preview=r["last_message_preview"],
+            last_message_at=r["last_message_at"],
         )
         for r in rows
     ]
@@ -290,6 +331,34 @@ async def get_conversation(
         **ConversationOut.model_validate(conv).model_dump(),
         messages=[MessageOut.model_validate(m) for m in msgs.all()],
     )
+
+
+@router.post("/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_conversation_read(
+    conversation_id: uuid.UUID,
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    agent=Depends(require_agent),
+):
+    conv = await db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant.id,
+        )
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    await db.execute(
+        update(Assignment)
+        .where(
+            Assignment.conversation_id == conversation_id,
+            Assignment.agent_id == agent.id,
+            Assignment.released_at.is_(None),
+        )
+        .values(last_read_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
 
 
 # ── Take ──────────────────────────────────────────────────────────────────────
