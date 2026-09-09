@@ -41,17 +41,15 @@ export class InboxComponent implements OnInit, OnDestroy {
   newConvError = signal<string | null>(null);
   newConvBotConvId = signal<string | null>(null);
 
-  filteredConversations = computed(() => {
-    const term = this.searchTerm().trim().toLowerCase();
-    if (!term) return this.conversations();
-    return this.conversations().filter(c => c.phone.toLowerCase().includes(term));
-  });
+  // Search is resolved by the backend against the full table, not just the loaded batch.
+  filteredConversations = computed(() => this.conversations());
 
   readonly STATUS_LABELS = STATUS_LABELS;
   readonly STATUS_BADGE = STATUS_BADGE;
 
   private wsSub?: Subscription;
   private refreshTimer?: ReturnType<typeof setTimeout>;
+  private searchTimer?: ReturnType<typeof setTimeout>;
   private highlightTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private fetchSequence = 0;
   private audioContext?: AudioContext;
@@ -102,7 +100,8 @@ export class InboxComponent implements OnInit, OnDestroy {
     const requestedTab = this.activeTab();
     const requestSequence = ++this.fetchSequence;
     const status = TAB_STATUS[requestedTab];
-    this.conversationsService.list(status ?? undefined).subscribe({
+    const phone = this.searchTerm().trim() || undefined;
+    this.conversationsService.list(status ?? undefined, 1, 500, phone).subscribe({
       next: (list) => {
         if (requestSequence !== this.fetchSequence || requestedTab !== this.activeTab()) return;
         // For "mine" tab, filter by assigned agent
@@ -150,6 +149,18 @@ export class InboxComponent implements OnInit, OnDestroy {
     this.fetchConversations();
   }
 
+  onSearchInput(value: string): void {
+    this.searchTerm.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.fetchConversations(), 300);
+  }
+
+  clearSearch(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTerm.set('');
+    this.fetchConversations();
+  }
+
   selectConversation(id: string): void {
     this.selectedId.set(id);
   }
@@ -192,23 +203,18 @@ export class InboxComponent implements OnInit, OnDestroy {
       this.mineUnreadTotal.update((total) => total + 1);
       const content = (message as Record<string, unknown>)['content'];
       const createdAt = (message as Record<string, unknown>)['created_at'];
+      // Keep the existing position; only unread count/preview update, never reorders.
       this.conversations.update((items) =>
-        items
-          .map((conversation) =>
-            conversation.id === conversationId
-              ? {
-                  ...conversation,
-                  unread_count: conversation.unread_count + 1,
-                  last_message_preview: typeof content === 'string' ? content : conversation.last_message_preview,
-                  last_message_at: typeof createdAt === 'string' ? createdAt : conversation.last_message_at,
-                }
-              : conversation
-          )
-          .sort((left, right) =>
-            right.unread_count - left.unread_count ||
-            Date.parse(right.last_message_at || right.updated_at) -
-              Date.parse(left.last_message_at || left.updated_at)
-          )
+        items.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                unread_count: conversation.unread_count + 1,
+                last_message_preview: typeof content === 'string' ? content : conversation.last_message_preview,
+                last_message_at: typeof createdAt === 'string' ? createdAt : conversation.last_message_at,
+              }
+            : conversation
+        )
       );
       this.highlightConversation(conversationId);
       this.playNotificationSound();
@@ -369,6 +375,7 @@ export class InboxComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
     for (const timer of this.highlightTimers.values()) clearTimeout(timer);
     document.removeEventListener('pointerdown', this.unlockNotificationAudio);
     document.removeEventListener('keydown', this.unlockNotificationAudio);

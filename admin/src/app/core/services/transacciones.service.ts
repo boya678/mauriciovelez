@@ -20,6 +20,11 @@ export interface Transaccion {
   media_mime_type: string | null;
   imagen_descripcion: string | null;
   cliente: ClienteInfo;
+  analizado_por_ia: boolean;
+  es_comprobante: boolean | null;
+  monto_extraido: number | null;
+  comprobante_num: string | null;
+  destino_valido: boolean | null;
 }
 
 export interface PagedTransacciones {
@@ -39,6 +44,20 @@ export interface ChequeoResult {
   destino_valido: boolean | null;
   ya_procesado: boolean;
   procesado_para_celular: string | null;
+}
+
+export interface ReprocesarResult {
+  es_comprobante: boolean;
+  comprobante_num: string | null;
+  monto_extraido: number | null;
+  accion: string;
+  detalle: string | null;
+}
+
+export interface ReprocesarTodoResult {
+  pendientes: number;
+  procesados: number;
+  fecha: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -77,13 +96,24 @@ export class TransaccionesService {
   }
 
   reprocesar(id: string) {
-    return this.http.post<{
-      es_comprobante: boolean;
-      comprobante_num: string | null;
-      monto_extraido: number | null;
-      accion: string;
-      detalle: string | null;
-    }>(`${this.base}/${id}/reprocesar`, {});
+    return this.http.post<ReprocesarResult>(`${this.base}/${id}/reprocesar`, {});
+  }
+
+  procesar(id: string, overrides: { comprobanteNumManual?: string; montoManual?: number; esComprobanteManual?: boolean }) {
+    return this.http.post<ReprocesarResult>(
+      `${this.base}/${id}/procesar`,
+      {
+        comprobante_num_manual: overrides.comprobanteNumManual || undefined,
+        monto_manual: overrides.montoManual ?? undefined,
+        es_comprobante_manual: overrides.esComprobanteManual ?? undefined,
+      }
+    );
+  }
+
+  reprocesarTodo(fecha?: string) {
+    let params = new HttpParams();
+    if (fecha) params = params.set('fecha', fecha);
+    return this.http.post<ReprocesarTodoResult>(`${this.base}/reprocesar-todo`, {}, { params });
   }
 }
 

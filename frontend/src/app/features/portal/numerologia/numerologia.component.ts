@@ -12,6 +12,7 @@ export interface NumeroData {
   fecha_asignacion: string;
   vigencia_hasta: string;
   dias_restantes: number;
+  vigencia_dias: number;
 }
 
 export interface MisNumerosResponse {

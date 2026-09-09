@@ -18,7 +18,8 @@ export class ComprobantesComponent implements OnInit {
   error = signal('');
 
   // Filtros
-  filtroFecha = '';
+  filtroFechaInicio = '';
+  filtroFechaFin = '';
   filtroComprobante = '';
   page = 1;
 
@@ -30,6 +31,11 @@ export class ComprobantesComponent implements OnInit {
   constructor(private svc: ComprobantesAdminService) {}
 
   ngOnInit() {
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
+    const hace30 = new Date();
+    hace30.setDate(hace30.getDate() - 30);
+    this.filtroFechaFin = hoy;
+    this.filtroFechaInicio = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(hace30);
     this.cargar();
   }
 
@@ -37,7 +43,8 @@ export class ComprobantesComponent implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.svc.list({
-      fecha: this.filtroFecha || undefined,
+      fechaInicio: this.filtroFechaInicio || undefined,
+      fechaFin: this.filtroFechaFin || undefined,
       comprobante_num: this.filtroComprobante || undefined,
       page: this.page,
     }).subscribe({
@@ -60,7 +67,11 @@ export class ComprobantesComponent implements OnInit {
   }
 
   limpiar() {
-    this.filtroFecha = '';
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
+    const hace30 = new Date();
+    hace30.setDate(hace30.getDate() - 30);
+    this.filtroFechaFin = hoy;
+    this.filtroFechaInicio = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(hace30);
     this.filtroComprobante = '';
     this.page = 1;
     this.cargar();
@@ -103,14 +114,15 @@ export class ComprobantesComponent implements OnInit {
   exportar() {
     this.exporting.set(true);
     this.svc.exportar({
-      fecha: this.filtroFecha || undefined,
+      fechaInicio: this.filtroFechaInicio || undefined,
+      fechaFin: this.filtroFechaFin || undefined,
       comprobante_num: this.filtroComprobante || undefined,
     }).subscribe({
       next: (blob: Blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `comprobantes_${this.filtroFecha || 'todos'}.xlsx`;
+        a.download = `comprobantes_${this.filtroFechaInicio || 'inicio'}_a_${this.filtroFechaFin || 'fin'}.xlsx`;
         a.click();
         URL.revokeObjectURL(url);
         this.exporting.set(false);

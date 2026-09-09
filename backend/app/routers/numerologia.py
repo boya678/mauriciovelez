@@ -1,6 +1,7 @@
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -13,9 +14,12 @@ from app.models.loteria_resultado import LoteriaResultado
 from app.models.numero_acierto import NumeroAcierto
 from app.models.numbers_historic import NumberHistoric
 from app.models.numbers_users import NumberUser
-from app.services.numbers import VIGENCIA_FREE, VIGENCIA_VIP
+from app.services.numbers import VIGENCIA_FREE, VIGENCIA_VIP, _get_ciclo_param
 
 router = APIRouter(prefix="/numerologia", tags=["Numerologia"])
+
+COL_TZ = ZoneInfo("America/Bogota")
+
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
@@ -25,15 +29,17 @@ def _apply_method(number: str) -> str:
     return number[0] + number[3] + number[2] + number[1]
 
 
-def _serialize(assignment: NumberUser) -> dict:
-    today = date.today()
+def _serialize(db: Session, assignment: NumberUser, num_type: str) -> dict:
+    today = datetime.now(COL_TZ).date()
     dias = max(0, (assignment.valid_until - today).days)
+    vigencia_dias, _epoch = _get_ciclo_param(db, num_type)
     return {
         "numero": assignment.number,
         "numero_metodo": _apply_method(assignment.number),
         "fecha_asignacion": assignment.date_assigned.isoformat(),
         "vigencia_hasta": assignment.valid_until.isoformat(),
         "dias_restantes": dias,
+        "vigencia_dias": vigencia_dias,
     }
 
 
@@ -44,8 +50,6 @@ def get_mis_numeros(
     current_user: Annotated[Cliente, Depends(get_current_user)],
     db: Session = Depends(get_db),
 ):
-    today = date.today()
-
     # ── Número gratuito ───────────────────────────────────────
     free_row = db.execute(
         select(NumberUser).where(
@@ -58,7 +62,7 @@ def get_mis_numeros(
         "nombre": current_user.nombre,
         "es_vip": current_user.vip,
         "enabled": current_user.enabled,
-        "numero_libre": _serialize(free_row) if free_row else None,
+        "numero_libre": _serialize(db, free_row, "free") if free_row else None,
     }
 
     # ── Número VIP (solo usuarios VIP) ───────────────────────
@@ -70,7 +74,7 @@ def get_mis_numeros(
             )
         ).scalar_one_or_none()
 
-        result["numero_vip"] = _serialize(vip_row) if vip_row else None
+        result["numero_vip"] = _serialize(db, vip_row, "vip") if vip_row else None
 
     return result
 

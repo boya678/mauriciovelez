@@ -148,31 +148,73 @@ async def receive_webhook(
     redis = await get_redis()
     schema = f"t_{tenant.slug}"
 
-    for msg_data in messages:
-        phone = msg_data.get("phone_number") or msg_data.get("phone", "")
-        bsuid = msg_data.get("bsuid", "")
-        # Use BSUID as stable conversation identifier when available.
-        # This ensures the conversation thread is stable even after the user
-        # shares their real phone number via pedir_contacto.
-        stable_id = bsuid or phone
-        conversation_id = uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            f"{tenant.id}:{stable_id}",
-        )
-        await xadd(redis, MESSAGES_STREAM, {
-            "tenant_id": str(tenant.id),
-            "tenant_slug": tenant.slug,
-            "conversation_id": str(conversation_id),
-            "external_id": msg_data.get("external_id", ""),
-            "phone": phone,
-            "bsuid": bsuid,
-            "username": msg_data.get("username", ""),
-            "real_phone": msg_data.get("real_phone", ""),
-            "content": msg_data.get("content", ""),
-            "message_type": msg_data.get("message_type", "text"),
-            "media_id": msg_data.get("media_id", ""),
-            "received_at": datetime.now(timezone.utc).isoformat(),
-        })
-        logger.info("Queued incoming msg from %s bsuid=%s (conv %s)", phone, bsuid or "-", conversation_id)
+    from app.db.session import make_tenant_session
+
+    async with make_tenant_session(schema) as contact_db:
+        await contact_db.execute(sa_text(f"SET search_path TO {schema}, public"))
+
+        for msg_data in messages:
+            phone = msg_data.get("phone_number") or msg_data.get("phone", "")
+            bsuid = msg_data.get("bsuid", "")
+            real_phone = msg_data.get("real_phone", "")
+            # Meta sometimes discloses the real number alongside the BSUID in
+            # the same event ("phone" then differs from "bsuid"); other times
+            # it only arrives via the pedir_contacto "contacts" reply.
+            disclosed_phone = real_phone or (phone if phone and phone != bsuid else "")
+
+            linked_phone = ""
+            if bsuid:
+                linked_phone = await contact_db.scalar(
+                    sa_text(f"SELECT id FROM {schema}.contactos WHERE bsuid = :bsuid LIMIT 1"),
+                    {"bsuid": bsuid},
+                ) or ""
+
+            if bsuid and disclosed_phone and "." not in disclosed_phone and not linked_phone:
+                # First time we see both identifiers together — remember the
+                # link so every future message from this BSUID (even if Meta
+                # later hides the phone again) keeps landing on the same
+                # conversation instead of forking a new one.
+                try:
+                    await contact_db.execute(
+                        sa_text(
+                            f"INSERT INTO {schema}.contactos (id, bsuid, created_at) "
+                            f"VALUES (:phone, :bsuid, NOW()) "
+                            f"ON CONFLICT (id) DO UPDATE SET "
+                            f"bsuid = COALESCE({schema}.contactos.bsuid, EXCLUDED.bsuid)"
+                        ),
+                        {"phone": disclosed_phone, "bsuid": bsuid},
+                    )
+                    await contact_db.commit()
+                    linked_phone = disclosed_phone
+                except Exception:
+                    # Unique bsuid index conflict (already linked to another
+                    # phone) or any other write issue — don't let a
+                    # best-effort optimization break message ingestion.
+                    await contact_db.rollback()
+                    logger.warning("Could not link bsuid=%s to phone for tenant %s", bsuid, tenant.slug)
+
+            # Stable identifier priority: a previously-linked real phone (keeps
+            # continuity for users Meta later routes back through BSUID-only),
+            # then the BSUID for privacy-protected users, then the raw phone.
+            stable_id = linked_phone or bsuid or phone
+            conversation_id = uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"{tenant.id}:{stable_id}",
+            )
+            await xadd(redis, MESSAGES_STREAM, {
+                "tenant_id": str(tenant.id),
+                "tenant_slug": tenant.slug,
+                "conversation_id": str(conversation_id),
+                "external_id": msg_data.get("external_id", ""),
+                "phone": phone,
+                "bsuid": bsuid,
+                "username": msg_data.get("username", ""),
+                "real_phone": msg_data.get("real_phone", ""),
+                "content": msg_data.get("content", ""),
+                "message_type": msg_data.get("message_type", "text"),
+                "media_id": msg_data.get("media_id", ""),
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info("Queued incoming msg from %s bsuid=%s (conv %s)", phone, bsuid or "-", conversation_id)
 
     return {"status": "ok"}

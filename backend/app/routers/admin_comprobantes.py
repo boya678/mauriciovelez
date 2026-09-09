@@ -1,7 +1,7 @@
 import io
 import math
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -42,12 +42,19 @@ class PagedComprobantes(BaseModel):
     items: list[ComprobanteOut]
 
 
-def _build_query(db: Session, fecha: Optional[date], comprobante_num: Optional[str]):
+def _rango_default() -> tuple[date, date]:
+    """Sin filtro explícito, limita a los últimos 30 días para evitar escanear toda la tabla."""
+    hoy = datetime.now(COL_TZ).date()
+    return hoy - timedelta(days=30), hoy
+
+
+def _build_query(db: Session, fecha_inicio: Optional[date], fecha_fin: Optional[date], comprobante_num: Optional[str]):
     q = db.query(ComprobanteVip)
-    if fecha:
-        q = q.filter(
-            func.date(func.timezone("America/Bogota", ComprobanteVip.created_at)) == fecha
-        )
+    fecha_col = func.date(func.timezone("America/Bogota", ComprobanteVip.created_at))
+    if fecha_inicio:
+        q = q.filter(fecha_col >= fecha_inicio)
+    if fecha_fin:
+        q = q.filter(fecha_col <= fecha_fin)
     if comprobante_num:
         q = q.filter(ComprobanteVip.comprobante_num.ilike(f"%{comprobante_num}%"))
     return q
@@ -55,13 +62,17 @@ def _build_query(db: Session, fecha: Optional[date], comprobante_num: Optional[s
 
 @router.get("/exportar")
 def exportar_comprobantes(
-    fecha: Optional[date] = Query(default=None),
+    fecha_inicio: Optional[date] = Query(default=None),
+    fecha_fin: Optional[date] = Query(default=None),
     comprobante_num: Optional[str] = Query(default=None),
     _user=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    if fecha_inicio is None and fecha_fin is None:
+        fecha_inicio, fecha_fin = _rango_default()
+
     items = (
-        _build_query(db, fecha, comprobante_num)
+        _build_query(db, fecha_inicio, fecha_fin, comprobante_num)
         .order_by(ComprobanteVip.created_at.desc())
         .all()
     )
@@ -88,7 +99,7 @@ def exportar_comprobantes(
     wb.save(output)
     output.seek(0)
 
-    filename = f"comprobantes_{fecha or 'todos'}.xlsx"
+    filename = f"comprobantes_{fecha_inicio}_a_{fecha_fin}.xlsx"
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -98,13 +109,17 @@ def exportar_comprobantes(
 
 @router.get("", response_model=PagedComprobantes)
 def list_comprobantes(
-    fecha: Optional[date] = Query(default=None, description="Filtrar por fecha de creación (YYYY-MM-DD)"),
+    fecha_inicio: Optional[date] = Query(default=None, description="Fecha inicio (YYYY-MM-DD)"),
+    fecha_fin: Optional[date] = Query(default=None, description="Fecha fin (YYYY-MM-DD)"),
     comprobante_num: Optional[str] = Query(default=None, description="Filtrar por número de comprobante (parcial)"),
     page: int = Query(default=1, ge=1),
     _user=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    q = _build_query(db, fecha, comprobante_num)
+    if fecha_inicio is None and fecha_fin is None:
+        fecha_inicio, fecha_fin = _rango_default()
+
+    q = _build_query(db, fecha_inicio, fecha_fin, comprobante_num)
     total = q.count()
     items = (
         q.order_by(ComprobanteVip.created_at.desc())

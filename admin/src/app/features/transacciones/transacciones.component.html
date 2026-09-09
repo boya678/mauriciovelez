@@ -5,7 +5,19 @@
       <label class="filter-label">Fecha</label>
       <input type="date" class="date-input" [(ngModel)]="fecha" (change)="onFechaChange()" />
       <span class="count-badge">{{ total() }} registros</span>
+      <button class="btn-accion btn-reprocesar-todo" [disabled]="reprocesarTodoLoading()" (click)="reprocesarTodo()"
+              title="Reprocesar con IA todas las pendientes de este día">
+        @if (reprocesarTodoLoading()) {
+          <span class="material-icons-round spin">autorenew</span>
+        } @else {
+          <span class="material-icons-round">smart_toy</span>
+        }
+        Reprocesar todo
+      </button>
     </div>
+    @if (reprocesarTodoMsg()) {
+      <div class="reprocesar-todo-msg">{{ reprocesarTodoMsg() }}</div>
+    }
   </div>
 
   @if (loading()) {
@@ -76,7 +88,12 @@
                   <span class="badge badge-tipo">{{ t.cliente.tipo_nombre }}</span>
                 }
               </td>
-              <td class="col-desc">{{ t.imagen_descripcion }}</td>
+              <td class="col-desc">
+                {{ t.imagen_descripcion }}
+                @if (badgeError(t); as err) {
+                  <span class="badge badge-ia-error">{{ err }}</span>
+                }
+              </td>
               <td class="col-acciones">
                 <div class="acciones-group">
                   <button class="btn-accion btn-renovar"
@@ -292,14 +309,22 @@
               <div class="chequeo-row">
                 <span class="chequeo-label">¿Es comprobante?</span>
                 <span [class]="chequeoResult()!.es_comprobante ? 'badge badge-vip' : 'badge badge-inactivo'">
-                  {{ chequeoResult()!.es_comprobante ? 'Sí' : 'No' }}
+                  {{ chequeoResult()!.es_comprobante ? 'Sí (IA)' : 'No (IA)' }}
                 </span>
               </div>
+              @if (!chequeoResult()!.ya_procesado && !registrarExito()) {
+                <div class="chequeo-row chequeo-manual">
+                  <label class="chequeo-label">
+                    <input type="checkbox" [(ngModel)]="esComprobanteManual" />
+                    Marcar como comprobante válido
+                  </label>
+                </div>
+              }
               <div class="chequeo-row">
                 <span class="chequeo-label">Comprobante Nro</span>
                 <strong>{{ chequeoResult()!.comprobante_num ?? '—' }}</strong>
               </div>
-              @if (chequeoResult()!.es_comprobante && !chequeoResult()!.comprobante_num && !chequeoResult()!.ya_procesado && !registrarExito()) {
+              @if ((chequeoResult()!.es_comprobante || esComprobanteManual) && !chequeoResult()!.comprobante_num && !chequeoResult()!.ya_procesado && !registrarExito()) {
                 <div class="chequeo-row chequeo-manual">
                   <span class="chequeo-label">Ingresar número manualmente</span>
                   <input
@@ -312,9 +337,20 @@
                 </div>
               }
               <div class="chequeo-row">
-                <span class="chequeo-label">Monto extraído</span>
+                <span class="chequeo-label">Monto extraído (IA)</span>
                 <strong>{{ chequeoResult()!.monto_extraido != null ? ('$' + (chequeoResult()!.monto_extraido! | number)) : '—' }}</strong>
               </div>
+              @if (!chequeoResult()!.ya_procesado && !registrarExito()) {
+                <div class="chequeo-row chequeo-manual">
+                  <span class="chequeo-label">Corregir monto</span>
+                  <input
+                    type="number"
+                    class="input-manual"
+                    [(ngModel)]="montoManual"
+                    placeholder="Ej: 30000"
+                  />
+                </div>
+              }
               <div class="chequeo-row">
                 <span class="chequeo-label">Destino</span>
                 <span>
@@ -377,6 +413,18 @@
               <span class="material-icons-round">smart_toy</span>
             }
             Reprocesar con IA
+          </button>
+        }
+        @if (chequeoResult()?.analizado_por_ia && (chequeoResult()?.es_comprobante || esComprobanteManual) && !chequeoResult()?.ya_procesado) {
+          <button class="btn-procesar" (click)="onProcesar()"
+                  [disabled]="registrarLoading() || !(chequeoResult()?.comprobante_num || comprobanteManual) || montoManual == null"
+                  title="Continúa el proceso con los datos ya analizados (o corregidos), sin volver a llamar a la IA">
+            @if (registrarLoading()) {
+              <span class="material-icons-round spin">autorenew</span>
+            } @else {
+              <span class="material-icons-round">bolt</span>
+            }
+            Procesar
           </button>
         }
         @if (chequeoResult()?.analizado_por_ia && chequeoResult()?.es_comprobante && (chequeoResult()?.comprobante_num || comprobanteManual) && !chequeoResult()?.ya_procesado && !registrarExito()) {

@@ -25,17 +25,19 @@ export class ComprobantesAdminService {
 
   constructor(private http: HttpClient) {}
 
-  list(filters: { fecha?: string; comprobante_num?: string; page?: number }) {
+  list(filters: { fechaInicio?: string; fechaFin?: string; comprobante_num?: string; page?: number }) {
     let params = new HttpParams();
-    if (filters.fecha)           params = params.set('fecha', filters.fecha);
+    if (filters.fechaInicio)      params = params.set('fecha_inicio', filters.fechaInicio);
+    if (filters.fechaFin)         params = params.set('fecha_fin', filters.fechaFin);
     if (filters.comprobante_num) params = params.set('comprobante_num', filters.comprobante_num);
     if (filters.page)            params = params.set('page', String(filters.page));
     return this.http.get<PagedComprobantes>(this.base, { params });
   }
 
-  exportar(filters: { fecha?: string; comprobante_num?: string }) {
+  exportar(filters: { fechaInicio?: string; fechaFin?: string; comprobante_num?: string }) {
     let params = new HttpParams();
-    if (filters.fecha)           params = params.set('fecha', filters.fecha);
+    if (filters.fechaInicio)      params = params.set('fecha_inicio', filters.fechaInicio);
+    if (filters.fechaFin)         params = params.set('fecha_fin', filters.fechaFin);
     if (filters.comprobante_num) params = params.set('comprobante_num', filters.comprobante_num);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }

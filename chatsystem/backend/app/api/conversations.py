@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 @router.get("", response_model=list[ConversationOut])
 async def list_conversations(
     status_filter: ConversationStatus | None = Query(None, alias="status"),
+    phone: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=500),
     tenant: TenantContext = Depends(resolve_tenant),
@@ -58,6 +59,8 @@ async def list_conversations(
     schema = tenant.schema
     offset = (page - 1) * page_size
     status_clause = "AND c.status = :status" if status_filter else ""
+    # Matches the DB directly so results aren't limited to the currently loaded page.
+    phone_clause = "AND c.phone ILIKE :phone_pattern" if phone else ""
     rows = (await db.execute(
         _text(f"""
             SELECT c.id, c.tenant_id, c.phone, c.username, c.bsuid,
@@ -94,15 +97,15 @@ async def list_conversations(
                 ORDER BY m.created_at DESC
                 LIMIT 1
             ) latest_message ON true
-            WHERE c.tenant_id = :tenant_id {status_clause}
-            ORDER BY unread_count DESC,
-                     COALESCE(latest_message.created_at, c.updated_at) DESC
+            WHERE c.tenant_id = :tenant_id {status_clause} {phone_clause}
+            ORDER BY c.created_at ASC
             LIMIT :limit OFFSET :offset
         """),
         {
             "tenant_id": str(tenant.id),
             "agent_id": str(agent.id),
             "status": status_filter,
+            "phone_pattern": f"%{phone}%" if phone else "",
             "limit": page_size,
             "offset": offset,
         },
@@ -433,21 +436,51 @@ async def _take_conversation_locked(
         last_user_ts is not None
         and now - last_user_ts < timedelta(hours=24)
     )
-    if conv.status != ConversationStatus.HUMAN_ACTIVE and not window_open:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "La ventana de 24 horas está cerrada. No se asignó la conversación; "
-                "se requiere una plantilla aprobada y una nueva respuesta del usuario."
-            ),
-        )
 
     handoff_message: Message | None = None
+    sent_notice = False
     needs_notice = (
         conv.status in (ConversationStatus.WAITING_HUMAN, ConversationStatus.BOT_ACTIVE)
         and conv.handoff_notice_sent_at is None
     )
-    if needs_notice:
+    if conv.status != ConversationStatus.HUMAN_ACTIVE and not window_open:
+        # Window expired: a free-form notice would be rejected by WhatsApp.
+        # Reopen with the tenant's approved template instead of blocking "take".
+        if not tenant.whatsapp_template_name:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "La ventana de 24 horas está cerrada y no hay una plantilla de "
+                    "WhatsApp configurada para reabrir. Configúrala en Ajustes."
+                ),
+            )
+        try:
+            await send_template_message(
+                phone_id=tenant.whatsapp_phone_id,
+                token=tenant.whatsapp_token,
+                to=conv.phone,
+                template_name=tenant.whatsapp_template_name,
+                language=tenant.whatsapp_template_language or "es",
+            )
+        except Exception as exc:
+            logger.exception("Could not send reopen template for conv %s", conversation_id)
+            raise HTTPException(
+                status_code=502,
+                detail="No se pudo enviar la plantilla de reapertura; la conversación no fue asignada.",
+            ) from exc
+
+        handoff_message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            sender_type=SenderType.HUMAN,
+            content=f"[Plantilla: {tenant.whatsapp_template_name}]",
+            message_type="text",
+            status=MessageStatus.PROCESSED,
+            created_at=now,
+        )
+        db.add(handoff_message)
+        sent_notice = True
+    elif needs_notice:
         try:
             await send_text_message(
                 phone_id=tenant.whatsapp_phone_id,
@@ -472,13 +505,14 @@ async def _take_conversation_locked(
             created_at=now,
         )
         db.add(handoff_message)
+        sent_notice = True
 
     update_values: dict = {
         "assigned_agent_id": agent.id,
         "status": ConversationStatus.HUMAN_ACTIVE,
         "updated_at": now,
     }
-    if needs_notice:
+    if sent_notice:
         update_values.update({
             "handoff_notice_sent_at": now,
             "last_activity_at": now,
@@ -505,7 +539,7 @@ async def _take_conversation_locked(
             "message": {
                 "id": str(handoff_message.id),
                 "content": handoff_message.content,
-                "sender_type": SenderType.BOT.value,
+                "sender_type": handoff_message.sender_type,
                 "message_type": "text",
                 "created_at": now.isoformat(),
             },

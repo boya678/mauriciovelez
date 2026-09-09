@@ -8,11 +8,12 @@ import { Message } from '../models/message.model';
 export class ConversationsService {
   constructor(private http: HttpClient) {}
 
-  list(status?: ConversationStatus, page = 1, pageSize = 50) {
+  list(status?: ConversationStatus, page = 1, pageSize = 500, phone?: string) {
     let params = new HttpParams()
       .set('page', page)
       .set('page_size', pageSize);
     if (status) params = params.set('status', status);
+    if (phone) params = params.set('phone', phone);
     return this.http.get<Conversation[]>(`${environment.apiUrl}/api/v1/conversations`, { params });
   }
 

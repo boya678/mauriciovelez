@@ -50,10 +50,10 @@
         type="text"
         placeholder="Buscar por celular…"
         [value]="searchTerm()"
-        (input)="searchTerm.set($any($event.target).value)"
+        (input)="onSearchInput($any($event.target).value)"
       />
       @if (searchTerm()) {
-        <button class="conv-search-clear" (click)="searchTerm.set('')" title="Limpiar">
+        <button class="conv-search-clear" (click)="clearSearch()" title="Limpiar">
           <span class="material-icons">close</span>
         </button>
       }

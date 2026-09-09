@@ -405,6 +405,7 @@ def _finalizar_comprobante(
     nombre_destino: Optional[str],
     image_hash: Optional[str],
     origen: str,
+    correccion_manual: Optional[dict] = None,
 ) -> ReprocesarOut:
     """Lógica posterior al análisis IA: gates de monto/destino, registro de
     comprobante y renovación/creación de cliente. Compartida por el endpoint
@@ -508,7 +509,8 @@ def _finalizar_comprobante(
             entity="comprobantes_vip",
             entity_id=str(id),
             detail={"comprobante_num": comprobante_num, "celular": phone_local,
-                    "monto": float(monto), "origen": origen, "descripcion": descripcion},
+                    "monto": float(monto), "origen": origen, "descripcion": descripcion,
+                    **({"correccion_manual": correccion_manual} if correccion_manual else {})},
         ))
         db.flush()
     except Exception:
@@ -755,6 +757,8 @@ def reprocesar_con_ia(
 
 class ProcesarSinIaPayload(BaseModel):
     comprobante_num_manual: Optional[str] = None  # override si la IA no extrajo uno
+    monto_manual: Optional[float] = None          # override si la IA leyó mal el monto
+    es_comprobante_manual: Optional[bool] = None  # override si la IA dijo que no era comprobante
 
 
 @router.post("/{id}/procesar", response_model=ReprocesarOut)
@@ -766,20 +770,40 @@ def procesar_sin_ia(
     user=Depends(require_admin),
 ):
     """Continúa el flujo posterior al análisis IA (gates + registro + renovación)
-    usando el análisis ya guardado, sin volver a llamar a la IA. Útil cuando la
-    imagen sí es una transacción válida pero no se identificó el número de
-    comprobante: el admin lo ingresa manualmente aquí."""
+    usando el análisis ya guardado, sin volver a llamar a la IA. Permite corregir
+    manualmente el monto, el número de comprobante o forzar es_comprobante cuando
+    la IA se equivocó. El destino (destino_valido) NO es editable: viene siempre
+    del análisis IA, esa validación anti-fraude no se puede saltar desde aquí."""
     ia = db.execute(
         select(MensajeIaProcesado).where(MensajeIaProcesado.message_id == id)
     ).scalar_one_or_none()
     if not ia:
         raise HTTPException(status_code=400, detail="Esta imagen aún no fue analizada por la IA")
-    if not ia.es_comprobante:
+
+    es_comprobante = payload.es_comprobante_manual if payload.es_comprobante_manual is not None else ia.es_comprobante
+    if not es_comprobante:
         raise HTTPException(status_code=400, detail="La IA no identificó esta imagen como un comprobante de pago")
 
+    monto = Decimal(str(payload.monto_manual)) if payload.monto_manual is not None else ia.monto_extraido
     comprobante_num = (payload.comprobante_num_manual or "").strip() or ia.comprobante_num
     if not comprobante_num:
         raise HTTPException(status_code=400, detail="Ingresa el número de comprobante manualmente")
+
+    # Registrar la corrección para auditoría y dejar el análisis IA consistente
+    correccion: dict = {}
+    if payload.monto_manual is not None and ia.monto_extraido != monto:
+        correccion["monto"] = {"ia": float(ia.monto_extraido) if ia.monto_extraido is not None else None, "manual": float(monto)}
+    if payload.es_comprobante_manual is not None and ia.es_comprobante != es_comprobante:
+        correccion["es_comprobante"] = {"ia": ia.es_comprobante, "manual": es_comprobante}
+    if payload.comprobante_num_manual and payload.comprobante_num_manual.strip() != (ia.comprobante_num or ""):
+        correccion["comprobante_num"] = {"ia": ia.comprobante_num, "manual": comprobante_num}
+
+    if correccion:
+        ia.monto_extraido = monto
+        ia.es_comprobante = es_comprobante
+        ia.comprobante_num = comprobante_num
+        correccion["usuario"] = user.usuario
+        db.commit()
 
     schema = settings.DATABASE_SCHEMA_2
     if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
@@ -795,13 +819,15 @@ def procesar_sin_ia(
         celular_wp=celular_wp,
         es_comprobante=True,
         comprobante_num=comprobante_num,
-        monto=ia.monto_extraido,
+        monto=monto,
         destino_valido=ia.destino_valido,
         numero_destino=ia.numero_destino,
         nombre_destino=ia.nombre_destino,
         image_hash=ia.image_hash,
-        origen="procesar_sin_ia",
+        origen="procesar_manual_corregido" if correccion else "procesar_sin_ia",
+        correccion_manual=correccion or None,
     )
+
 
 
 # ── Acción: Reprocesar todas las pendientes de un día ────────────────────────

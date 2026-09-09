@@ -24,6 +24,7 @@ def analizar_imagen_con_ia(base64_img: str, mime_type: str) -> dict:
     nombres_autorizados = ", ".join(
         n.strip() for n in settings.CUENTA_DESTINO_NOMBRES.split(",") if n.strip()
     )
+    sufijo_destino = settings.CUENTA_DESTINO_NUMERO[-4:]
 
     prompt = (
         "Eres un experto en comprobantes de pago colombianos (Nequi, Daviplata, Bancolombia, "
@@ -41,9 +42,13 @@ def analizar_imagen_con_ia(base64_img: str, mime_type: str) -> dict:
         "4. El NOMBRE DEL TITULAR DE LA CUENTA DESTINO: el nombre de la persona que recibe "
         "el dinero (destinatario, NO el remitente).\n\n"
         "5. DESTINO_VALIDO: determina si el destinatario de esta transferencia es la cuenta "
-        f"autorizada. Es v\u00e1lido (true) si el n\u00famero de destino es '{settings.CUENTA_DESTINO_NUMERO}' "
-        f"O SI el nombre del titular destino corresponde a alguno de: {nombres_autorizados}. "
-        "Basta con que UNA de las dos condiciones se cumpla para que sea v\u00e1lido. "
+        f"autorizada, evaluando en este orden de prioridad:\n"
+        f"   a) Es válido si el número de destino completo es '{settings.CUENTA_DESTINO_NUMERO}'.\n"
+        f"   b) Es válido si el nombre del titular destino corresponde a alguno de: {nombres_autorizados}.\n"
+        f"   c) Como ÚLTIMA prioridad (solo si no pudiste confirmar a) ni b), por ejemplo porque el "
+        f"comprobante tapa u oculta los primeros dígitos del número): es válido si el número de destino "
+        f"visible termina en '{sufijo_destino}'.\n"
+        "Basta con que UNA de estas condiciones se cumpla para que sea válido. "
         "Si ninguna se cumple, o no tienes suficiente certeza, responde false.\n\n"
         "Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto adicional):\n"
         '{"es_comprobante": true|false, "comprobante_num": "CODIGO_O_NULL", "monto": NUMERO_O_NULL, '

@@ -41,7 +41,7 @@
         <!-- ── NÚMERO VIP (primero) ── -->
         @if (data.es_vip && data.numero_vip) {
       <section class="numero-section vip">
-        <div class="numero-badge vip-badge">★ VIP · NÚMERO PERSONAL VICTORIOSO · 3 DÍAS</div>
+        <div class="numero-badge vip-badge">★ VIP · NÚMERO PERSONAL VICTORIOSO · {{ data.numero_vip.vigencia_dias }} DÍA{{ data.numero_vip.vigencia_dias !== 1 ? 'S' : '' }}</div>
         <h2 class="numero-section-title">Tu Número Personal Victorioso</h2>
 
         <div class="numero-display">
@@ -76,7 +76,7 @@
 
     <!-- ── NÚMERO GRATUITO ── -->
     <section class="numero-section libre">
-      <div class="numero-badge libre-badge">✦ GRATUITO · VIGENTE 10 DÍAS</div>
+      <div class="numero-badge libre-badge">✦ GRATUITO · VIGENTE {{ data.numero_libre.vigencia_dias }} DÍA{{ data.numero_libre.vigencia_dias !== 1 ? 'S' : '' }}</div>
       <h2 class="numero-section-title">Tu Número de la Semana</h2>
 
       @if (!data.enabled) {

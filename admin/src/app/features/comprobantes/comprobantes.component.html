@@ -14,8 +14,12 @@
   <!-- Filtros -->
   <div class="filtros">
     <div class="filtro-group">
-      <label>Fecha</label>
-      <input type="date" [(ngModel)]="filtroFecha" (change)="buscar()" />
+      <label>Fecha inicio</label>
+      <input type="date" [(ngModel)]="filtroFechaInicio" (change)="buscar()" />
+    </div>
+    <div class="filtro-group">
+      <label>Fecha fin</label>
+      <input type="date" [(ngModel)]="filtroFechaFin" (change)="buscar()" />
     </div>
     <div class="filtro-group">
       <label>Nro. Comprobante</label>

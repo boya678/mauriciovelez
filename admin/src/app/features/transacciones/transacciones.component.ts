@@ -46,9 +46,21 @@ export class TransaccionesComponent implements OnInit {
   registrarLoading = signal(false);
   registrarExito = signal('');
   comprobanteManual = '';
+  montoManual: number | null = null;
+  esComprobanteManual = false;
   descripcionManual = '';
   reprocesarLoading = signal(false);
   reprocesarResult = signal<{ accion: string; detalle: string | null } | null>(null);
+
+  // Reprocesar todo el día
+  reprocesarTodoLoading = signal(false);
+  reprocesarTodoMsg = signal('');
+
+  // Acciones que ya ocultan la transacción en el backend (_marcar_procesada)
+  private readonly ACCIONES_FINALES = new Set([
+    'renovado', 'cliente_creado', 'relampago_registrado',
+    'conferencia_registrada', 'conferencia_vip_registrada', 'ya_procesado',
+  ]);
 
   constructor(private svc: TransaccionesService) {}
 
@@ -97,6 +109,32 @@ export class TransaccionesComponent implements OnInit {
   onFechaChange() {
     this.page.set(1);
     this.load();
+  }
+
+  reprocesarTodo() {
+    this.reprocesarTodoLoading.set(true);
+    this.reprocesarTodoMsg.set('');
+    this.svc.reprocesarTodo(this.fecha).subscribe({
+      next: (res) => {
+        this.reprocesarTodoLoading.set(false);
+        this.reprocesarTodoMsg.set(`Analizadas ${res.pendientes} pendientes, ${res.procesados} procesadas.`);
+        this.load();
+      },
+      error: (err) => {
+        this.reprocesarTodoLoading.set(false);
+        this.reprocesarTodoMsg.set(err?.error?.detail || 'Error al reprocesar el día');
+      },
+    });
+  }
+
+  // Texto del badge de error para la fila, o null si no aplica
+  badgeError(t: Transaccion): string | null {
+    if (!t.analizado_por_ia) return null;
+    if (!t.es_comprobante) return 'No es una transferencia';
+    if (t.monto_extraido == null) return 'No se identificó el monto';
+    if (!t.comprobante_num) return 'No se identificó el número de comprobante';
+    if (t.destino_valido === false) return 'Destino no válido';
+    return null;
   }
 
   prevPage() {
@@ -216,6 +254,12 @@ export class TransaccionesComponent implements OnInit {
 
   // ── Chequear comprobante ───────────────────────────────────────────────────
 
+  private aplicarChequeo(res: ChequeoResult) {
+    this.chequeoResult.set(res);
+    this.montoManual = res.monto_extraido;
+    this.esComprobanteManual = !!res.es_comprobante;
+  }
+
   onChequear(t: Transaccion) {
     this.modalChequeo.set(t);
     this.chequeoResult.set(null);
@@ -223,7 +267,7 @@ export class TransaccionesComponent implements OnInit {
     this.registrarExito.set('');
     this.chequeoLoading.set(true);
     this.svc.chequear(t.id).subscribe({
-      next: (res) => { this.chequeoLoading.set(false); this.chequeoResult.set(res); },
+      next: (res) => { this.chequeoLoading.set(false); this.aplicarChequeo(res); },
       error: (err) => { this.chequeoLoading.set(false); this.chequeoError.set(err?.error?.detail || 'Error al consultar'); },
     });
   }
@@ -234,6 +278,8 @@ export class TransaccionesComponent implements OnInit {
     this.chequeoError.set('');
     this.registrarExito.set('');
     this.comprobanteManual = '';
+    this.montoManual = null;
+    this.esComprobanteManual = false;
     this.descripcionManual = '';
     this.reprocesarResult.set(null);
   }
@@ -249,14 +295,49 @@ export class TransaccionesComponent implements OnInit {
       next: (res) => {
         this.reprocesarLoading.set(false);
         this.reprocesarResult.set({ accion: res.accion, detalle: res.detalle });
+        if (this.ACCIONES_FINALES.has(res.accion)) {
+          this.items.update(list => list.filter(i => i.id !== t.id));
+          this.total.update(n => n - 1);
+          return;
+        }
         // Refrescar el chequeo completo (incluye numero_destino/nombre_destino/destino_valido)
         this.svc.chequear(t.id).subscribe({
-          next: (chequeo) => this.chequeoResult.set(chequeo),
+          next: (chequeo) => this.aplicarChequeo(chequeo),
         });
       },
       error: (err) => {
         this.reprocesarLoading.set(false);
         this.chequeoError.set(err?.error?.detail || 'Error al reprocesar');
+      },
+    });
+  }
+
+  onProcesar() {
+    const t = this.modalChequeo();
+    if (!t) return;
+    this.registrarLoading.set(true);
+    this.chequeoError.set('');
+    this.registrarExito.set('');
+    this.svc.procesar(t.id, {
+      comprobanteNumManual: this.comprobanteManual || undefined,
+      montoManual: this.montoManual ?? undefined,
+      esComprobanteManual: this.esComprobanteManual,
+    }).subscribe({
+      next: (res) => {
+        this.registrarLoading.set(false);
+        this.reprocesarResult.set({ accion: res.accion, detalle: res.detalle });
+        if (this.ACCIONES_FINALES.has(res.accion)) {
+          this.items.update(list => list.filter(i => i.id !== t.id));
+          this.total.update(n => n - 1);
+          return;
+        }
+        this.svc.chequear(t.id).subscribe({
+          next: (chequeo) => this.aplicarChequeo(chequeo),
+        });
+      },
+      error: (err) => {
+        this.registrarLoading.set(false);
+        this.chequeoError.set(err?.error?.detail || 'Error al procesar');
       },
     });
   }
@@ -270,9 +351,8 @@ export class TransaccionesComponent implements OnInit {
       next: (res) => {
         this.registrarLoading.set(false);
         this.registrarExito.set(`Comprobante '${res.comprobante_num}' registrado para ${res.celular}`);
-        // Actualizar el resultado para reflejar que ya está procesado
-        const prev = this.chequeoResult();
-        if (prev) this.chequeoResult.set({ ...prev, ya_procesado: true, procesado_para_celular: res.celular });
+        this.items.update(list => list.filter(i => i.id !== t.id));
+        this.total.update(n => n - 1);
       },
       error: (err) => {
         this.registrarLoading.set(false);
