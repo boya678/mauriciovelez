@@ -1,7 +1,10 @@
+import base64 as _b64
+import hashlib
 import math
 import re
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -10,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core import scheduler
 from app.core.admin_security import get_current_platform_user, require_admin
 from app.core.config import settings
 from app.database import get_chat_db, get_db
@@ -69,6 +73,11 @@ class TransaccionOut(BaseModel):
     media_mime_type: Optional[str] = None
     imagen_descripcion: Optional[str] = None
     cliente: ClienteInfo
+    analizado_por_ia: bool = False
+    es_comprobante: Optional[bool] = None
+    monto_extraido: Optional[float] = None
+    comprobante_num: Optional[str] = None
+    destino_valido: Optional[bool] = None
 
     model_config = {"from_attributes": True}
 
@@ -161,12 +170,22 @@ def get_transacciones(
             ).scalars().all()
             tipos_map = {t.id: t.nombre for t in tipos}
 
+    # Batch lookup del análisis IA ya guardado (si existe) para mostrar errores en la tabla
+    ia_map: dict[uuid.UUID, MensajeIaProcesado] = {}
+    row_ids = [row["id"] for row in rows]
+    if row_ids:
+        ia_rows = db.execute(
+            select(MensajeIaProcesado).where(MensajeIaProcesado.message_id.in_(row_ids))
+        ).scalars().all()
+        ia_map = {ia.message_id: ia for ia in ia_rows}
+
     items: list[TransaccionOut] = []
     for row in rows:
         phone_orig = row["phone"] or ""
         phone_resuelto = resolved_cache.get(phone_orig) or (resolve_real_phone_from_identifier(chat_db, schema, phone_orig) or phone_orig)
         phone_local = _strip_country_code(phone_resuelto)
         cli = clientes_map.get(phone_local)
+        ia = ia_map.get(row["id"])
 
         items.append(TransaccionOut(
             id=row["id"],
@@ -184,6 +203,11 @@ def get_transacciones(
                 tipo_nombre=tipos_map.get(cli.tipo_cliente) if cli else None,
                 tipo_cliente=cli.tipo_cliente if cli else None,
             ),
+            analizado_por_ia=ia is not None,
+            es_comprobante=ia.es_comprobante if ia else None,
+            monto_extraido=float(ia.monto_extraido) if ia and ia.monto_extraido is not None else None,
+            comprobante_num=ia.comprobante_num if ia else None,
+            destino_valido=ia.destino_valido if ia else None,
         ))
 
     pages = max(1, math.ceil(total / PAGE_SIZE))
@@ -353,10 +377,11 @@ def registrar_comprobante(
                 "monto": float(ia.monto_extraido or 0), "descripcion": payload.descripcion.strip()},
     ))
     db.commit()
+    _marcar_procesada(db, id)
     return {"ok": True, "comprobante_num": comprobante_num, "celular": celular}
 
 
-# ── Acción: Reprocesar con IA ────────────────────────────────────────────────
+# ── Acción: Reprocesar con IA / continuar sin IA ─────────────────────────────
 
 class ReprocesarOut(BaseModel):
     es_comprobante: bool
@@ -366,89 +391,24 @@ class ReprocesarOut(BaseModel):
     detalle: Optional[str] = None
 
 
-@router.post("/{id}/reprocesar", response_model=ReprocesarOut)
-def reprocesar_con_ia(
+def _finalizar_comprobante(
+    db: Session,
     id: uuid.UUID,
-    db: Session = Depends(get_db),
-    chat_db: Session = Depends(get_chat_db),
-    user=Depends(require_admin),
-):
-    if not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_API_KEY:
-        raise HTTPException(status_code=503, detail="Azure OpenAI no configurado")
-
-    schema = settings.DATABASE_SCHEMA_2
-    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
-        raise ValueError(f"Nombre de schema inválido: {schema}")
-
-    # ── 1. Obtener imagen del chat DB ─────────────────────────────────────────
-    row = chat_db.execute(text(f"""
-        SELECT m.media_content, m.media_mime_type, c.phone
-        FROM {schema}.messages m
-        JOIN {schema}.conversations c ON c.id = m.conversation_id
-        WHERE m.id = :msg_id AND m.media_content IS NOT NULL
-        LIMIT 1
-    """), {"msg_id": id}).mappings().first()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Imagen no encontrada en la BD de chat")
-
-    base64_img: str = row["media_content"]
-    mime_type: str = row["media_mime_type"] or "image/jpeg"
-    phone_orig: str = row["phone"] or ""
-    phone_resuelto = resolve_real_phone_from_identifier(chat_db, schema, phone_orig) or phone_orig
-    phone_local = _strip_country_code(phone_resuelto)
-    if not _is_valid_local_phone(phone_local):
-        raise HTTPException(status_code=400, detail="No se pudo resolver un celular valido desde el identificador del chat")
-    celular_wp = re.sub(r"\D", "", phone_resuelto) or f"57{phone_local}"
-
-    # ── 2. Calcular hash ──────────────────────────────────────────────────────
-    import base64 as _b64
-    import hashlib
-    from decimal import Decimal
-    image_hash = hashlib.sha256(_b64.b64decode(base64_img)).hexdigest()
-
-    # ── 3. Llamar a la IA ─────────────────────────────────────────────────────
-    try:
-        resultado_ia = analizar_imagen_con_ia(base64_img, mime_type)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Error al llamar a la IA: {exc}")
-
-    es_comprobante: bool = bool(resultado_ia.get("es_comprobante"))
-    comprobante_num = resultado_ia.get("comprobante_num") or None
-    monto_raw = resultado_ia.get("monto")
-    monto = Decimal(str(monto_raw)) if monto_raw is not None else None
-    numero_destino = resultado_ia.get("numero_destino") or None
-    nombre_destino = resultado_ia.get("nombre_destino") or None
-    destino_valido = bool(resultado_ia.get("destino_valido"))
-
-    # ── 4. Actualizar / reemplazar el registro de análisis IA ─────────────────
-    ia_existente = db.execute(
-        select(MensajeIaProcesado).where(MensajeIaProcesado.message_id == id)
-    ).scalar_one_or_none()
-
-    if ia_existente:
-        ia_existente.es_comprobante = es_comprobante
-        ia_existente.monto_extraido = monto
-        ia_existente.comprobante_num = comprobante_num
-        ia_existente.numero_destino = numero_destino
-        ia_existente.nombre_destino = nombre_destino
-        ia_existente.destino_valido = destino_valido
-        ia_existente.image_hash = image_hash
-        from datetime import timezone
-        ia_existente.processed_at = datetime.now(timezone.utc)
-    else:
-        db.add(MensajeIaProcesado(
-            message_id=id,
-            es_comprobante=es_comprobante,
-            monto_extraido=monto,
-            comprobante_num=comprobante_num,
-            numero_destino=numero_destino,
-            nombre_destino=nombre_destino,
-            destino_valido=destino_valido,
-            image_hash=image_hash,
-        ))
-    db.commit()
-
+    user,
+    phone_local: str,
+    celular_wp: str,
+    es_comprobante: bool,
+    comprobante_num: Optional[str],
+    monto: Optional[Decimal],
+    destino_valido: bool,
+    numero_destino: Optional[str],
+    nombre_destino: Optional[str],
+    image_hash: Optional[str],
+    origen: str,
+) -> ReprocesarOut:
+    """Lógica posterior al análisis IA: gates de monto/destino, registro de
+    comprobante y renovación/creación de cliente. Compartida por el endpoint
+    que llama a la IA y por el que continúa el proceso sin volver a llamarla."""
     monto_float = float(monto) if monto is not None else None
 
     if not es_comprobante:
@@ -510,11 +470,11 @@ def reprocesar_con_ia(
                              monto_extraido=monto_float, accion="sin_numero",
                              detalle="La IA no extrajo número de comprobante")
 
-    # ── 5. Intentar registrar comprobante único ───────────────────────────────
+    # ── Intentar registrar comprobante único ──────────────────────────────────
     duplicado = db.execute(
         select(ComprobanteVip).where(ComprobanteVip.comprobante_num == comprobante_num)
     ).scalar_one_or_none()
-    if not duplicado:
+    if not duplicado and image_hash:
         duplicado = db.execute(
             select(ComprobanteVip).where(ComprobanteVip.image_hash == image_hash)
         ).scalars().first()
@@ -525,17 +485,19 @@ def reprocesar_con_ia(
                              monto_extraido=monto_float, accion="ya_procesado",
                              detalle=f"Ya procesado para {duplicado.celular}")
 
+    descripcion = (
+        "conferencia_vip" if is_conferencia_vip
+        else "conferencia" if is_conferencia
+        else "numero_relampago" if is_relampago
+        else "pago vip"
+    )
+
     try:
         db.add(ComprobanteVip(
             comprobante_num=comprobante_num,
             celular=phone_local,
             monto=monto,
-            descripcion=(
-                "conferencia_vip" if is_conferencia_vip
-                else "conferencia" if is_conferencia
-                else "numero_relampago" if is_relampago
-                else "pago vip"
-            ),
+            descripcion=descripcion,
             message_id=id,
             image_hash=image_hash,
         ))
@@ -546,13 +508,7 @@ def reprocesar_con_ia(
             entity="comprobantes_vip",
             entity_id=str(id),
             detail={"comprobante_num": comprobante_num, "celular": phone_local,
-                    "monto": float(monto), "origen": "reprocesar",
-                    "descripcion": (
-                        "conferencia_vip" if is_conferencia_vip
-                        else "conferencia" if is_conferencia
-                        else "numero_relampago" if is_relampago
-                        else "pago vip"
-                    )},
+                    "monto": float(monto), "origen": origen, "descripcion": descripcion},
         ))
         db.flush()
     except Exception:
@@ -619,11 +575,8 @@ def reprocesar_con_ia(
             detalle=f"Registrado como numero_relampago y notificado al cliente con numero {relampago_cfg.numero or 'sin_numero'}",
         )
 
-    # ── 6. Renovar o crear cliente ────────────────────────────────────────────
-    cliente = db.execute(
-        select(Cliente).where(Cliente.celular == phone_local)
-    ).scalar_one_or_none()
-
+    # ── Renovar o crear cliente ────────────────────────────────────────────
+    cliente = cliente_actual
     if cliente:
         if cliente.tipo_cliente != 1:
             db.rollback()
@@ -649,7 +602,6 @@ def reprocesar_con_ia(
     else:
         # Cliente nuevo VIP
         from dateutil.relativedelta import relativedelta
-        from datetime import timezone
         from app.models.cuenta_vip import acumular_cuenta_vip
         from app.services.numbers import (
             assign_number, notificar_codigo_asignado,
@@ -688,6 +640,189 @@ def reprocesar_con_ia(
         return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
                              monto_extraido=monto_float, accion="cliente_creado",
                              detalle=f"Nuevo cliente VIP creado: {phone_local}")
+
+
+def _resolver_telefono_transaccion(chat_db: Session, schema: str, id: uuid.UUID) -> tuple[str, str]:
+    """Resuelve (phone_local, celular_wp) para una transacción, validando que exista."""
+    phone_orig = _get_phone_from_chat(chat_db, schema, id)
+    if not phone_orig:
+        raise HTTPException(status_code=404, detail="Mensaje no encontrado en la BD de chat")
+    phone_resuelto = resolve_real_phone_from_identifier(chat_db, schema, phone_orig) or phone_orig
+    phone_local = _strip_country_code(phone_resuelto)
+    if not _is_valid_local_phone(phone_local):
+        raise HTTPException(status_code=400, detail="No se pudo resolver un celular valido desde el identificador del chat")
+    celular_wp = re.sub(r"\D", "", phone_resuelto) or f"57{phone_local}"
+    return phone_local, celular_wp
+
+
+@router.post("/{id}/reprocesar", response_model=ReprocesarOut)
+def reprocesar_con_ia(
+    id: uuid.UUID,
+    db: Session = Depends(get_db),
+    chat_db: Session = Depends(get_chat_db),
+    user=Depends(require_admin),
+):
+    if not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="Azure OpenAI no configurado")
+
+    schema = settings.DATABASE_SCHEMA_2
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
+        raise ValueError(f"Nombre de schema inválido: {schema}")
+
+    # ── 1. Obtener imagen del chat DB ─────────────────────────────────────────
+    row = chat_db.execute(text(f"""
+        SELECT m.media_content, m.media_mime_type, c.phone
+        FROM {schema}.messages m
+        JOIN {schema}.conversations c ON c.id = m.conversation_id
+        WHERE m.id = :msg_id AND m.media_content IS NOT NULL
+        LIMIT 1
+    """), {"msg_id": id}).mappings().first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Imagen no encontrada en la BD de chat")
+
+    base64_img: str = row["media_content"]
+    mime_type: str = row["media_mime_type"] or "image/jpeg"
+    phone_orig: str = row["phone"] or ""
+    phone_resuelto = resolve_real_phone_from_identifier(chat_db, schema, phone_orig) or phone_orig
+    phone_local = _strip_country_code(phone_resuelto)
+    if not _is_valid_local_phone(phone_local):
+        raise HTTPException(status_code=400, detail="No se pudo resolver un celular valido desde el identificador del chat")
+    celular_wp = re.sub(r"\D", "", phone_resuelto) or f"57{phone_local}"
+
+    # ── 2. Calcular hash ──────────────────────────────────────────────────────
+    image_hash = hashlib.sha256(_b64.b64decode(base64_img)).hexdigest()
+
+    # ── 3. Llamar a la IA ─────────────────────────────────────────────────────
+    try:
+        resultado_ia = analizar_imagen_con_ia(base64_img, mime_type)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Error al llamar a la IA: {exc}")
+
+    es_comprobante: bool = bool(resultado_ia.get("es_comprobante"))
+    comprobante_num = resultado_ia.get("comprobante_num") or None
+    monto_raw = resultado_ia.get("monto")
+    monto = Decimal(str(monto_raw)) if monto_raw is not None else None
+    numero_destino = resultado_ia.get("numero_destino") or None
+    nombre_destino = resultado_ia.get("nombre_destino") or None
+    destino_valido = bool(resultado_ia.get("destino_valido"))
+
+    # ── 4. Actualizar / reemplazar el registro de análisis IA ─────────────────
+    ia_existente = db.execute(
+        select(MensajeIaProcesado).where(MensajeIaProcesado.message_id == id)
+    ).scalar_one_or_none()
+
+    if ia_existente:
+        ia_existente.es_comprobante = es_comprobante
+        ia_existente.monto_extraido = monto
+        ia_existente.comprobante_num = comprobante_num
+        ia_existente.numero_destino = numero_destino
+        ia_existente.nombre_destino = nombre_destino
+        ia_existente.destino_valido = destino_valido
+        ia_existente.image_hash = image_hash
+        ia_existente.processed_at = datetime.now(timezone.utc)
+    else:
+        db.add(MensajeIaProcesado(
+            message_id=id,
+            es_comprobante=es_comprobante,
+            monto_extraido=monto,
+            comprobante_num=comprobante_num,
+            numero_destino=numero_destino,
+            nombre_destino=nombre_destino,
+            destino_valido=destino_valido,
+            image_hash=image_hash,
+        ))
+    db.commit()
+
+    return _finalizar_comprobante(
+        db=db,
+        id=id,
+        user=user,
+        phone_local=phone_local,
+        celular_wp=celular_wp,
+        es_comprobante=es_comprobante,
+        comprobante_num=comprobante_num,
+        monto=monto,
+        destino_valido=destino_valido,
+        numero_destino=numero_destino,
+        nombre_destino=nombre_destino,
+        image_hash=image_hash,
+        origen="reprocesar",
+    )
+
+
+# ── Acción: Continuar el proceso SIN volver a llamar a la IA ─────────────────
+
+class ProcesarSinIaPayload(BaseModel):
+    comprobante_num_manual: Optional[str] = None  # override si la IA no extrajo uno
+
+
+@router.post("/{id}/procesar", response_model=ReprocesarOut)
+def procesar_sin_ia(
+    id: uuid.UUID,
+    payload: ProcesarSinIaPayload = Body(default=ProcesarSinIaPayload()),
+    db: Session = Depends(get_db),
+    chat_db: Session = Depends(get_chat_db),
+    user=Depends(require_admin),
+):
+    """Continúa el flujo posterior al análisis IA (gates + registro + renovación)
+    usando el análisis ya guardado, sin volver a llamar a la IA. Útil cuando la
+    imagen sí es una transacción válida pero no se identificó el número de
+    comprobante: el admin lo ingresa manualmente aquí."""
+    ia = db.execute(
+        select(MensajeIaProcesado).where(MensajeIaProcesado.message_id == id)
+    ).scalar_one_or_none()
+    if not ia:
+        raise HTTPException(status_code=400, detail="Esta imagen aún no fue analizada por la IA")
+    if not ia.es_comprobante:
+        raise HTTPException(status_code=400, detail="La IA no identificó esta imagen como un comprobante de pago")
+
+    comprobante_num = (payload.comprobante_num_manual or "").strip() or ia.comprobante_num
+    if not comprobante_num:
+        raise HTTPException(status_code=400, detail="Ingresa el número de comprobante manualmente")
+
+    schema = settings.DATABASE_SCHEMA_2
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
+        raise ValueError(f"Nombre de schema inválido: {schema}")
+
+    phone_local, celular_wp = _resolver_telefono_transaccion(chat_db, schema, id)
+
+    return _finalizar_comprobante(
+        db=db,
+        id=id,
+        user=user,
+        phone_local=phone_local,
+        celular_wp=celular_wp,
+        es_comprobante=True,
+        comprobante_num=comprobante_num,
+        monto=ia.monto_extraido,
+        destino_valido=ia.destino_valido,
+        numero_destino=ia.numero_destino,
+        nombre_destino=ia.nombre_destino,
+        image_hash=ia.image_hash,
+        origen="procesar_sin_ia",
+    )
+
+
+# ── Acción: Reprocesar todas las pendientes de un día ────────────────────────
+
+class ReprocesarTodoOut(BaseModel):
+    pendientes: int
+    procesados: int
+    fecha: str
+
+
+@router.post("/reprocesar-todo", response_model=ReprocesarTodoOut)
+def reprocesar_todo_del_dia(
+    fecha: Optional[date] = Query(default=None, description="Fecha YYYY-MM-DD (default: hoy en Colombia)"),
+    _user=Depends(require_admin),
+):
+    """Corre el mismo pipeline del cron de pagos, pero bajo demanda y solo
+    para las imágenes de la fecha indicada que aún no fueron analizadas."""
+    if fecha is None:
+        fecha = datetime.now(COL_TZ).date()
+    resumen = scheduler._procesar_pagos_automatico(fecha=fecha)
+    return ReprocesarTodoOut(**resumen)
 
 
 # ── Acción: Renovar suscripción ───────────────────────────────────────────────

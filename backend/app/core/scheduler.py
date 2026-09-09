@@ -654,29 +654,31 @@ def _marcar_mensaje_procesada(db, msg_id: uuid.UUID) -> None:
     db.commit()
 
 
-def _procesar_pagos_automatico() -> None:
+def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
     """
-    Cada CRON_PAGOS:
-    1. Consulta imágenes de hoy en chat DB no analizadas aún por la IA.
+    Cada CRON_PAGOS (o bajo demanda para una fecha puntual):
+    1. Consulta imágenes de la fecha en chat DB no analizadas aún por la IA.
     2. Llama a Azure OpenAI Vision para cada una.
     3. Si es comprobante con monto == VIP_AMOUNT:
        - Intenta insertar en comprobantes_vip (UNIQUE en comprobante_num).
        - Si inserta OK  → renueva o crea cliente VIP y oculta el mensaje.
        - Si duplicado   → solo oculta el mensaje, no renueva.
     4. Si ocurre cualquier error → print en consola, NO se marca nada.
+    Retorna {"pendientes": int, "procesados": int, "fecha": str}.
     """
+    resumen = {"pendientes": 0, "procesados": 0, "fecha": str(fecha or datetime.now(COLOMBIA_TZ).date())}
     if not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_API_KEY:
         print("[CRON pagos] Azure OpenAI no configurado, saltando.")
-        return
+        return resumen
     if _SessionChat is None:
         print("[CRON pagos] Chat DB no configurada, saltando.")
-        return
+        return resumen
 
-    hoy = datetime.now(COLOMBIA_TZ).date()
+    hoy = fecha or datetime.now(COLOMBIA_TZ).date()
     schema = settings.DATABASE_SCHEMA_2
     if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
         print(f"[CRON pagos] Schema inválido: {schema}")
-        return
+        return resumen
 
     print(f"[CRON pagos] Inicio — {hoy}")
 
@@ -711,6 +713,7 @@ def _procesar_pagos_automatico() -> None:
             )
 
         pendientes = [r for r in rows if r["id"] not in ya_procesados]
+        resumen["pendientes"] = len(pendientes)
         conferencia_cfg = get_conferencia_config(db)
         conferencia_vip_cfg = get_conferencia_vip_config(db)
         relampago_cfg = get_numero_relampago_config(db)
@@ -759,6 +762,7 @@ def _procesar_pagos_automatico() -> None:
                 # Ocultar el mensaje también
                 try:
                     _marcar_mensaje_procesada(db, msg_id)
+                    resumen["procesados"] += 1
                 except Exception as exc:
                     print(f"[CRON pagos] ERROR ocultando mensaje hash-dup msg={msg_id}: {exc}")
                 continue
@@ -886,6 +890,7 @@ def _procesar_pagos_automatico() -> None:
             # ── 7. Ocultar mensaje del admin ───────────────────────────────────
             try:
                 _marcar_mensaje_procesada(db, msg_id)
+                resumen["procesados"] += 1
             except Exception as exc:
                 print(f"[CRON pagos] ERROR ocultando mensaje msg={msg_id}: {exc}")
                 continue
@@ -986,6 +991,7 @@ def _procesar_pagos_automatico() -> None:
         chat_db.close()
         db.close()
         print(f"[CRON pagos] Fin — {hoy}")
+    return resumen
 
 
 def _parse_cron(expr: str) -> CronTrigger:
