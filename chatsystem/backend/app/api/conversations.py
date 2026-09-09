@@ -133,6 +133,25 @@ async def list_conversations(
     ]
 
 
+# ── Counts (dashboard) ────────────────────────────────────────────────────────
+
+@router.get("/counts")
+async def count_conversations(
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    _agent=Depends(require_agent),
+) -> dict[str, int]:
+    """Real per-status totals for the whole tenant (not capped by page_size)."""
+    rows = (await db.execute(
+        text(
+            "SELECT status, COUNT(*) AS total FROM conversations "
+            "WHERE tenant_id = :tenant_id GROUP BY status"
+        ),
+        {"tenant_id": str(tenant.id)},
+    )).all()
+    return {status_value: total for status_value, total in rows}
+
+
 # ── Start outbound conversation ───────────────────────────────────────────────
 
 class StartConversationBody(BaseModel):

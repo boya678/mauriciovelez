@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import create_access_token, get_current_user
-from app.database import get_db
+from app.database import _SessionChat, get_db
 from app.models.cliente import Cliente
 from app.models.referido import Referido
 from app.models.suscripcion import Suscripcion
@@ -20,6 +20,7 @@ from app.schemas.cliente import (
     VipVerifyRequest,
     UpdateMisDatosRequest,
 )
+from app.services.chat_activity_logger import registrar_notificacion_whatsapp
 from app.services.numbers import assign_number, notificar_nuevo_numero_free
 from pydantic import BaseModel, Field
 
@@ -245,7 +246,22 @@ def _enviar_whatsapp_referido(celular: str, param1: str, param2: str) -> None:
         },
     }
     try:
-        httpx.post(url, json=body, headers=headers, timeout=10)
+        resp = httpx.post(url, json=body, headers=headers, timeout=10)
+        msg_id = None
+        try:
+            msg_id = resp.json()["messages"][0]["id"]
+        except (KeyError, IndexError, ValueError):
+            pass
+        if _SessionChat is not None:
+            chat_db = _SessionChat()
+            try:
+                registrar_notificacion_whatsapp(
+                    chat_db, numero,
+                    f"[Notificación WhatsApp] Referido: {param1} — {param2}",
+                    msg_id,
+                )
+            finally:
+                chat_db.close()
     except Exception:
         pass  # notificación no bloqueante
 

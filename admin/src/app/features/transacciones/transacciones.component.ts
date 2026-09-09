@@ -48,6 +48,7 @@ export class TransaccionesComponent implements OnInit {
   comprobanteManual = '';
   montoManual: number | null = null;
   esComprobanteManual = false;
+  destinoValidoManual = false;
   descripcionManual = '';
   reprocesarLoading = signal(false);
   reprocesarResult = signal<{ accion: string; detalle: string | null } | null>(null);
@@ -258,6 +259,7 @@ export class TransaccionesComponent implements OnInit {
     this.chequeoResult.set(res);
     this.montoManual = res.monto_extraido;
     this.esComprobanteManual = !!res.es_comprobante;
+    this.destinoValidoManual = !!res.destino_valido;
   }
 
   onChequear(t: Transaccion) {
@@ -280,6 +282,7 @@ export class TransaccionesComponent implements OnInit {
     this.comprobanteManual = '';
     this.montoManual = null;
     this.esComprobanteManual = false;
+    this.destinoValidoManual = false;
     this.descripcionManual = '';
     this.reprocesarResult.set(null);
   }
@@ -322,6 +325,7 @@ export class TransaccionesComponent implements OnInit {
       comprobanteNumManual: this.comprobanteManual || undefined,
       montoManual: this.montoManual ?? undefined,
       esComprobanteManual: this.esComprobanteManual,
+      destinoValidoManual: this.destinoValidoManual,
     }).subscribe({
       next: (res) => {
         this.registrarLoading.set(false);

@@ -352,7 +352,7 @@
                 </div>
               }
               <div class="chequeo-row">
-                <span class="chequeo-label">Destino</span>
+                <span class="chequeo-label">Destino (IA)</span>
                 <span>
                   <strong>{{ chequeoResult()!.nombre_destino ?? '—' }}</strong>
                   @if (chequeoResult()!.numero_destino) {
@@ -363,6 +363,14 @@
                   </span>
                 </span>
               </div>
+              @if (!chequeoResult()!.ya_procesado && !registrarExito()) {
+                <div class="chequeo-row chequeo-manual">
+                  <label class="chequeo-label">
+                    <input type="checkbox" [(ngModel)]="destinoValidoManual" />
+                    Marcar destino como válido
+                  </label>
+                </div>
+              }
               <div class="chequeo-row">
                 <span class="chequeo-label">Estado</span>
                 @if (chequeoResult()!.ya_procesado) {

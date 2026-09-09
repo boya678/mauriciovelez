@@ -17,6 +17,8 @@ import httpx
 import redis
 
 from app.core.config import settings
+from app.database import _SessionChat
+from app.services.chat_activity_logger import registrar_notificacion_whatsapp
 from app.services.notification_queue import DEAD_KEY, QUEUE_KEY, _get_redis
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,8 @@ def _wa_url() -> str:
     return f"https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages"
 
 
-def _send_template(numero_dest: str, template: str, components: list) -> None:
+def _send_template(numero_dest: str, template: str, components: list) -> str | None:
+    """Envía la plantilla y retorna el message id que asigna Meta (o None)."""
     body = {
         "messaging_product": "whatsapp",
         "to": numero_dest,
@@ -51,6 +54,21 @@ def _send_template(numero_dest: str, template: str, components: list) -> None:
     resp = httpx.post(_wa_url(), json=body, headers=_wa_headers(), timeout=10)
     if resp.status_code >= 400:
         raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+    try:
+        return resp.json()["messages"][0]["id"]
+    except (KeyError, IndexError, ValueError):
+        return None
+
+
+def _log_chat(numero_dest: str, content: str, external_id: str | None) -> None:
+    """Deja constancia en chatsystem de la notificación enviada (best-effort)."""
+    if _SessionChat is None:
+        return
+    chat_db = _SessionChat()
+    try:
+        registrar_notificacion_whatsapp(chat_db, numero_dest, content, external_id)
+    finally:
+        chat_db.close()
 
 
 def _dispatch(type: str, celular: str, params: dict) -> None:
@@ -62,87 +80,96 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
         param_numero = f"{numero} y con el metodo {metodo}"
         valid_until = params["valid_until"]  # str ISO desde la queue
-        _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": param_numero},
                 {"type": "text", "text": date.fromisoformat(valid_until).strftime("%d/%m/%Y")},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Nuevo número VIP asignado: {numero} (vigente hasta {valid_until})", msg_id)
 
     elif type == "nuevo_numero_free":
         numero = params["numero"]
         metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
         param_numero = f"{numero} y con el metodo {metodo}"
         valid_until = params["valid_until"]
-        _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": param_numero},
                 {"type": "text", "text": date.fromisoformat(valid_until).strftime("%d/%m/%Y")},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Nuevo número gratuito asignado: {numero} (vigente hasta {valid_until})", msg_id)
 
     elif type == "ganador_vip":
         numero = params["numero"]
         devuelto = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero
-        _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_GANADOR_VIP, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_GANADOR_VIP, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": f"{numero} {devuelto}"},
                 {"type": "text", "text": f"{params['loteria']} {params['resultado_num']}"},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] ¡Ganador VIP! Número {numero}, lotería {params['loteria']}, resultado {params['resultado_num']}", msg_id)
 
     elif type == "ganador_free":
         numero = params["numero"]
         devuelto = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero
-        _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_GANADOR_FREE, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_GANADOR_FREE, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": f"{numero} {devuelto}"},
                 {"type": "text", "text": f"{params['loteria']} {params['resultado_num']}"},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] ¡Ganador gratuito! Número {numero}, lotería {params['loteria']}, resultado {params['resultado_num']}", msg_id)
 
     elif type == "recordatorio_vencimiento":
-        _send_template(numero_dest, settings.WHATSAPP_VENCIMIENTO_VIP, [])
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_VENCIMIENTO_VIP, [])
+        _log_chat(numero_dest, "[Notificación WhatsApp] Recordatorio de vencimiento de suscripción VIP", msg_id)
 
     elif type == "codigo_cliente":
         codigo = params["codigo_vip"]
-        _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_CODIGO, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_CODIGO, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": codigo},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Código de cliente asignado: {codigo}", msg_id)
 
     elif type == "contacto_transacciones":
         if not settings.WHATSAPP_CONTACTO_TRANSACCIONES:
             logger.warning("WHATSAPP_CONTACTO_TRANSACCIONES no configurado")
             return
         texto = params["texto"]
-        _send_template(numero_dest, settings.WHATSAPP_CONTACTO_TRANSACCIONES, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_CONTACTO_TRANSACCIONES, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": texto},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Mensaje sobre transacción: {texto}", msg_id)
 
     elif type == "notificar_renovacion":
         if not settings.WHATSAPP_NOTIFICAR_RENOVACION:
             return
         fecha_fin = params.get("fecha_fin", "")
-        _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_RENOVACION, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_RENOVACION, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": fecha_fin},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Renovación VIP confirmada, vence {fecha_fin}", msg_id)
 
     elif type == "notificar_relampago":
         if not settings.WHATSAPP_NOTIFICAR_RELAMPAGO:
             logger.warning("WHATSAPP_NOTIFICAR_RELAMPAGO no configurado")
             return
         texto = str(params.get("texto", "Notificacion relampago"))
-        _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_RELAMPAGO, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_RELAMPAGO, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": texto},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Número relámpago: {texto}", msg_id)
 
     elif type == "notificar_conferencia":
         if not settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
@@ -156,12 +183,13 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         if not link:
             logger.warning("notificar_conferencia sin link_youtube")
             return
-        _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_CONFERENCIA, [
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_CONFERENCIA, [
             {"type": "body", "parameters": [
                 {"type": "text", "text": fecha},
                 {"type": "text", "text": link},
             ]},
         ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Invitación a conferencia el {fecha}: {link}", msg_id)
 
     else:
         logger.warning("Tipo de notificación desconocido: %s", type)

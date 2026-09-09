@@ -16,7 +16,9 @@ export class ConversationsService {
     if (phone) params = params.set('phone', phone);
     return this.http.get<Conversation[]>(`${environment.apiUrl}/api/v1/conversations`, { params });
   }
-
+  counts() {
+    return this.http.get<Record<string, number>>(`${environment.apiUrl}/api/v1/conversations/counts`);
+  }
   getConversation(id: string) {
     return this.http.get<ConversationDetail>(`${environment.apiUrl}/api/v1/conversations/${id}`);
   }

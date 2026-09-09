@@ -94,6 +94,22 @@
                 controls
                 [src]="'data:' + (msg.media_mime_type || 'audio/ogg') + ';base64,' + msg.media_content"
               ></audio>
+            } @else if (msg.message_type === 'video' && msg.media_content) {
+              <video
+                class="bubble-video"
+                controls
+                [src]="'data:' + (msg.media_mime_type || 'video/mp4') + ';base64,' + msg.media_content"
+              ></video>
+              <a
+                class="bubble-download"
+                [href]="'data:' + (msg.media_mime_type || 'video/mp4') + ';base64,' + msg.media_content"
+                [download]="'video-' + msg.id + '.' + videoExtension(msg.media_mime_type)"
+              >
+                <span class="material-icons" style="font-size:1rem;vertical-align:middle">download</span> Descargar video
+              </a>
+              @if (msg.content && msg.content !== '[video]') {
+                <p class="bubble-caption">{{ msg.content }}</p>
+              }
             } @else if (parseInteractive(msg.content)) {
               @if (parseInteractive(msg.content); as menu) {
                 <p class="interactive-body">{{ menu.body }}</p>

@@ -44,23 +44,21 @@ export class DashboardComponent implements OnInit {
   fmt(n: number): string { return n.toLocaleString('es-CO'); }
 
   private load(): void {
-    let remaining = 4;
+    let remaining = 2;
     const done = () => { remaining--; if (remaining === 0) this.loading.set(false); };
 
     const statsArr: Stat[] = [];
+    let onlineAgentsStat: Stat | null = null;
+    const publish = () => this.stats.set([...statsArr.filter(Boolean), ...(onlineAgentsStat ? [onlineAgentsStat] : [])]);
 
-    this.conversationsService.list('waiting_human', 1, 200).subscribe({
-      next: (list) => { statsArr[0] = { label: 'Esperando agente', value: list.length, badge: 'badge-yellow' }; done(); },
-      error: () => done(),
-    });
-
-    this.conversationsService.list('human_active', 1, 200).subscribe({
-      next: (list) => { statsArr[1] = { label: 'Con agente', value: list.length, badge: 'badge-green' }; done(); this.stats.set(statsArr.filter(Boolean)); },
-      error: () => done(),
-    });
-
-    this.conversationsService.list('bot_active', 1, 200).subscribe({
-      next: (list) => { statsArr[2] = { label: 'Bot activo', value: list.length, badge: 'badge-blue' }; done(); this.stats.set(statsArr.filter(Boolean)); },
+    this.conversationsService.counts().subscribe({
+      next: (counts) => {
+        statsArr[0] = { label: 'Esperando agente', value: counts['waiting_human'] ?? 0, badge: 'badge-yellow' };
+        statsArr[1] = { label: 'Con agente', value: counts['human_active'] ?? 0, badge: 'badge-green' };
+        statsArr[2] = { label: 'Bot activo', value: counts['bot_active'] ?? 0, badge: 'badge-blue' };
+        publish();
+        done();
+      },
       error: () => done(),
     });
 
@@ -79,11 +77,9 @@ export class DashboardComponent implements OnInit {
     this.agentsApi.list().subscribe({
       next: (list) => {
         this.agents.set(list);
+        onlineAgentsStat = { label: 'Agentes en línea', value: list.filter(a => a.status === 'online').length, badge: 'badge-green' };
+        publish();
         done();
-        this.stats.set([
-          ...statsArr.filter(Boolean),
-          { label: 'Agentes en línea', value: list.filter(a => a.status === 'online').length, badge: 'badge-green' },
-        ]);
       },
       error: () => done(),
     });

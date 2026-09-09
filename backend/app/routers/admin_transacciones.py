@@ -759,6 +759,7 @@ class ProcesarSinIaPayload(BaseModel):
     comprobante_num_manual: Optional[str] = None  # override si la IA no extrajo uno
     monto_manual: Optional[float] = None          # override si la IA leyó mal el monto
     es_comprobante_manual: Optional[bool] = None  # override si la IA dijo que no era comprobante
+    destino_valido_manual: Optional[bool] = None  # override si la IA se equivocó con el destino
 
 
 @router.post("/{id}/procesar", response_model=ReprocesarOut)
@@ -771,9 +772,8 @@ def procesar_sin_ia(
 ):
     """Continúa el flujo posterior al análisis IA (gates + registro + renovación)
     usando el análisis ya guardado, sin volver a llamar a la IA. Permite corregir
-    manualmente el monto, el número de comprobante o forzar es_comprobante cuando
-    la IA se equivocó. El destino (destino_valido) NO es editable: viene siempre
-    del análisis IA, esa validación anti-fraude no se puede saltar desde aquí."""
+    manualmente el monto, el número de comprobante, es_comprobante o destino_valido
+    cuando la IA se equivocó."""
     ia = db.execute(
         select(MensajeIaProcesado).where(MensajeIaProcesado.message_id == id)
     ).scalar_one_or_none()
@@ -789,6 +789,8 @@ def procesar_sin_ia(
     if not comprobante_num:
         raise HTTPException(status_code=400, detail="Ingresa el número de comprobante manualmente")
 
+    destino_valido = payload.destino_valido_manual if payload.destino_valido_manual is not None else ia.destino_valido
+
     # Registrar la corrección para auditoría y dejar el análisis IA consistente
     correccion: dict = {}
     if payload.monto_manual is not None and ia.monto_extraido != monto:
@@ -797,11 +799,14 @@ def procesar_sin_ia(
         correccion["es_comprobante"] = {"ia": ia.es_comprobante, "manual": es_comprobante}
     if payload.comprobante_num_manual and payload.comprobante_num_manual.strip() != (ia.comprobante_num or ""):
         correccion["comprobante_num"] = {"ia": ia.comprobante_num, "manual": comprobante_num}
+    if payload.destino_valido_manual is not None and ia.destino_valido != destino_valido:
+        correccion["destino_valido"] = {"ia": ia.destino_valido, "manual": destino_valido}
 
     if correccion:
         ia.monto_extraido = monto
         ia.es_comprobante = es_comprobante
         ia.comprobante_num = comprobante_num
+        ia.destino_valido = destino_valido
         correccion["usuario"] = user.usuario
         db.commit()
 
@@ -820,7 +825,7 @@ def procesar_sin_ia(
         es_comprobante=True,
         comprobante_num=comprobante_num,
         monto=monto,
-        destino_valido=ia.destino_valido,
+        destino_valido=destino_valido,
         numero_destino=ia.numero_destino,
         nombre_destino=ia.nombre_destino,
         image_hash=ia.image_hash,

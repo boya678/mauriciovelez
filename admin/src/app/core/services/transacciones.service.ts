@@ -99,13 +99,14 @@ export class TransaccionesService {
     return this.http.post<ReprocesarResult>(`${this.base}/${id}/reprocesar`, {});
   }
 
-  procesar(id: string, overrides: { comprobanteNumManual?: string; montoManual?: number; esComprobanteManual?: boolean }) {
+  procesar(id: string, overrides: { comprobanteNumManual?: string; montoManual?: number; esComprobanteManual?: boolean; destinoValidoManual?: boolean }) {
     return this.http.post<ReprocesarResult>(
       `${this.base}/${id}/procesar`,
       {
         comprobante_num_manual: overrides.comprobanteNumManual || undefined,
         monto_manual: overrides.montoManual ?? undefined,
         es_comprobante_manual: overrides.esComprobanteManual ?? undefined,
+        destino_valido_manual: overrides.destinoValidoManual ?? undefined,
       }
     );
   }

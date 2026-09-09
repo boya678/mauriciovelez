@@ -412,6 +412,16 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     return null;
   }
 
+  videoExtension(mimeType: string | null): string {
+    const map: Record<string, string> = {
+      'video/mp4': 'mp4',
+      'video/3gpp': '3gp',
+      'video/quicktime': 'mov',
+      'video/webm': 'webm',
+    };
+    return map[mimeType || ''] || 'mp4';
+  }
+
   openImg(event: MouseEvent): void {
     const img = event.target as HTMLImageElement;
     const overlay = document.createElement('div');
