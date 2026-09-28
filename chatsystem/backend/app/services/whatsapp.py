@@ -56,8 +56,12 @@ async def send_template_message(
     to: str,
     template_name: str,
     language: str = "es",
+    body_params: list[str] | None = None,
 ) -> dict:
-    """Send a WhatsApp template message (no variables). Returns Meta API response dict."""
+    """Send a WhatsApp template message. Returns Meta API response dict.
+
+    `body_params` fills the template's {{1}}, {{2}}, ... body placeholders, in order.
+    """
     url = f"{WA_API_BASE}/{phone_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
@@ -68,6 +72,13 @@ async def send_template_message(
             "language": {"code": language},
         },
     }
+    if body_params:
+        payload["template"]["components"] = [
+            {
+                "type": "body",
+                "parameters": [{"type": "text", "text": p} for p in body_params],
+            }
+        ]
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.post(
             url,

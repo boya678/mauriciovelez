@@ -185,16 +185,53 @@ async def _process_entry(redis, entry_id: str, data: dict) -> None:
                     "pedir_contacto response: saving phone %s for bsuid=%s (conv %s)",
                     real_phone, bsuid or "-", conversation_id,
                 )
-                await db.execute(
-                    __import__("sqlalchemy", fromlist=["text"]).text(
-                        f"INSERT INTO {schema}.contactos (id, bsuid, username, tags, created_at) "
-                        f"VALUES (:phone, :bsuid, :username, '', NOW()) "
-                        f"ON CONFLICT (id) DO UPDATE SET "
-                        f"bsuid = COALESCE(EXCLUDED.bsuid, {schema}.contactos.bsuid), "
-                        f"username = COALESCE(EXCLUDED.username, {schema}.contactos.username)"
-                    ),
-                    {"phone": real_phone, "bsuid": bsuid, "username": username},
-                )
+                _sa_text = __import__("sqlalchemy", fromlist=["text"]).text
+                try:
+                    await db.execute(
+                        _sa_text(
+                            f"INSERT INTO {schema}.contactos (id, bsuid, username, tags, created_at) "
+                            f"VALUES (:phone, :bsuid, :username, '', NOW()) "
+                            f"ON CONFLICT (id) DO UPDATE SET "
+                            f"bsuid = COALESCE(EXCLUDED.bsuid, {schema}.contactos.bsuid), "
+                            f"username = COALESCE(EXCLUDED.username, {schema}.contactos.username)"
+                        ),
+                        {"phone": real_phone, "bsuid": bsuid, "username": username},
+                    )
+                except Exception:
+                    # bsuid already anchors a different contactos row (e.g. the
+                    # person now reports a different phone number). bsuid is the
+                    # stable identity — migrate that row to the new phone instead
+                    # of crashing the whole message.
+                    await db.rollback()
+                    logger.warning(
+                        "bsuid %s already linked to another phone; migrating contactos to %s",
+                        bsuid, real_phone,
+                    )
+                    try:
+                        await db.execute(
+                            _sa_text(
+                                f"UPDATE {schema}.contactos SET id = :phone, "
+                                f"username = COALESCE(:username, username) "
+                                f"WHERE bsuid = :bsuid"
+                            ),
+                            {"phone": real_phone, "bsuid": bsuid, "username": username},
+                        )
+                        await db.commit()
+                    except Exception:
+                        # New phone already has its own contactos row too —
+                        # merging two existing contacts needs a manual look;
+                        # skip silently rather than crash message processing.
+                        await db.rollback()
+                        logger.warning(
+                            "Could not migrate contactos for bsuid %s to phone %s: "
+                            "target phone already has its own contact row",
+                            bsuid, real_phone,
+                        )
+                    conv = await db.scalar(
+                        select(Conversation)
+                        .where(Conversation.id == conversation_id)
+                        .with_for_update()
+                    )
             # Reopen CLOSED conversations so the bot answers again when the
             # user comes back after the agent (or auto-close) shut it down.
             # We don't touch HUMAN_ACTIVE / WAITING_HUMAN — those stay with

@@ -205,8 +205,13 @@
       </div>
       <div class="modal-body">
         @if (!modalRenovarExito()) {
-          <p>¿Renovar suscripción de <strong>{{ modalRenovar()!.cliente.nombre || modalRenovar()!.phone_local }}</strong>?</p>
-          <p class="modal-hint">Se asignarán nuevos números y la transacción quedará oculta.</p>
+          @if (modalRenovar()!.cliente.registrado) {
+            <p>¿Renovar suscripción de <strong>{{ modalRenovar()!.cliente.nombre || modalRenovar()!.phone_local }}</strong>?</p>
+            <p class="modal-hint">El comprobante quedará registrado como "pago vip", se asignarán nuevos números y la transacción quedará oculta.</p>
+          } @else {
+            <p>El celular <strong>{{ modalRenovar()!.phone_local }}</strong> no está registrado.</p>
+            <p class="modal-hint">Se creará un cliente VIP nuevo, el comprobante quedará registrado como "pago vip", se le asignarán números y la transacción quedará oculta.</p>
+          }
         } @else {
           <div class="modal-exito">
             <span class="material-icons-round">check_circle</span>
@@ -226,7 +231,7 @@
             } @else {
               <span class="material-icons-round">autorenew</span>
             }
-            Renovar
+            {{ modalRenovar()!.cliente.registrado ? 'Renovar' : 'Crear cliente y registrar' }}
           </button>
         } @else {
           <button class="btn-secondary" (click)="closeModalRenovar()">Cerrar</button>

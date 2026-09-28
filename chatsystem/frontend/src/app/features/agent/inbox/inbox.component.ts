@@ -101,7 +101,9 @@ export class InboxComponent implements OnInit, OnDestroy {
     const requestSequence = ++this.fetchSequence;
     const status = TAB_STATUS[requestedTab];
     const phone = this.searchTerm().trim() || undefined;
-    this.conversationsService.list(status ?? undefined, 1, 500, phone).subscribe({
+    // Normal listing is capped to protect the browser/DB; a phone/cédula
+    // search is unbounded on the backend (it ignores this cap when phone is set).
+    this.conversationsService.list(status ?? undefined, 1, 50, phone).subscribe({
       next: (list) => {
         if (requestSequence !== this.fetchSequence || requestedTab !== this.activeTab()) return;
         // For "mine" tab, filter by assigned agent
@@ -133,13 +135,8 @@ export class InboxComponent implements OnInit, OnDestroy {
   }
 
   private fetchMineUnreadTotal(): void {
-    const myId = this.auth.getAgentId();
-    this.conversationsService.list('human_active', 1, 500).subscribe({
-      next: (list) => this.mineUnreadTotal.set(
-        list
-          .filter((conversation) => conversation.assigned_agent_id === myId)
-          .reduce((total, conversation) => total + conversation.unread_count, 0)
-      ),
+    this.conversationsService.mineUnreadCount().subscribe({
+      next: ({ unread_count }) => this.mineUnreadTotal.set(unread_count),
     });
   }
 
@@ -366,11 +363,13 @@ export class InboxComponent implements OnInit, OnDestroy {
 
   formatDate(iso: string): string {
     const d = new Date(iso);
+    const time = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
     const now = new Date();
     if (d.toDateString() === now.toDateString()) {
-      return d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+      return `Hoy, ${time}`;
     }
-    return d.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+    const date = d.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+    return `${date}, ${time}`;
   }
 
   ngOnDestroy(): void {

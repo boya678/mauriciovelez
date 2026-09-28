@@ -61,11 +61,15 @@ async def list_conversations(
     status_clause = "AND c.status = :status" if status_filter else ""
     # Matches the DB directly so results aren't limited to the currently loaded page.
     phone_clause = "AND c.phone ILIKE :phone_pattern" if phone else ""
+    # A phone/cédula search is already narrowed by the WHERE clause, so it
+    # shouldn't be capped like the normal inbox listing — the agent needs
+    # every matching conversation, not just the first page of results.
+    limit_clause = "" if phone else "LIMIT :limit OFFSET :offset"
     rows = (await db.execute(
         _text(f"""
             SELECT c.id, c.tenant_id, c.phone, c.username, c.bsuid,
                    c.status, c.assigned_agent_id,
-                   c.created_at, c.updated_at, c.closed_at, c.last_user_message_at,
+                   c.created_at, c.updated_at, c.context_started_at, c.closed_at, c.last_user_message_at,
                    ct.tags,
                    CASE WHEN active_assignment.id IS NULL THEN 0 ELSE (
                        SELECT COUNT(*)::int
@@ -98,8 +102,8 @@ async def list_conversations(
                 LIMIT 1
             ) latest_message ON true
             WHERE c.tenant_id = :tenant_id {status_clause} {phone_clause}
-            ORDER BY c.created_at ASC
-            LIMIT :limit OFFSET :offset
+            ORDER BY c.context_started_at ASC NULLS FIRST
+            {limit_clause}
         """),
         {
             "tenant_id": str(tenant.id),
@@ -122,6 +126,7 @@ async def list_conversations(
             assigned_agent_id=r["assigned_agent_id"],
             created_at=r["created_at"],
             updated_at=r["updated_at"],
+            context_started_at=r["context_started_at"],
             closed_at=r["closed_at"],
             last_user_message_at=r["last_user_message_at"],
             tags=r["tags"],
@@ -150,6 +155,41 @@ async def count_conversations(
         {"tenant_id": str(tenant.id)},
     )).all()
     return {status_value: total for status_value, total in rows}
+
+
+@router.get("/mine/unread-count")
+async def count_mine_unread(
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    agent=Depends(require_agent),
+) -> dict[str, int]:
+    """Unread-message total for the logged-in agent's own human_active conversations."""
+    schema = tenant.schema
+    total = await db.scalar(
+        text(
+            f"""
+            SELECT COALESCE(SUM(
+                (
+                    SELECT COUNT(*)::int
+                    FROM {schema}.messages m
+                    WHERE m.conversation_id = c.id
+                      AND m.sender_type = 'user'
+                      AND (a.last_read_at IS NULL OR m.created_at > a.last_read_at)
+                )
+            ), 0)::int
+            FROM {schema}.conversations c
+            JOIN {schema}.assignments a
+                ON a.conversation_id = c.id
+               AND a.agent_id = :agent_id
+               AND a.released_at IS NULL
+            WHERE c.tenant_id = :tenant_id
+              AND c.status = 'human_active'
+              AND c.assigned_agent_id = :agent_id
+            """
+        ),
+        {"tenant_id": str(tenant.id), "agent_id": str(agent.id)},
+    )
+    return {"unread_count": total or 0}
 
 
 # ── Start outbound conversation ───────────────────────────────────────────────
@@ -480,6 +520,7 @@ async def _take_conversation_locked(
                 to=conv.phone,
                 template_name=tenant.whatsapp_template_name,
                 language=tenant.whatsapp_template_language or "es",
+                body_params=[settings.HUMAN_HANDOFF_TEMPLATE_PARAM_TEXT],
             )
         except Exception as exc:
             logger.exception("Could not send reopen template for conv %s", conversation_id)
@@ -541,6 +582,16 @@ async def _take_conversation_locked(
         update(Conversation)
         .where(Conversation.id == conversation_id)
         .values(**update_values)
+    )
+    # Release any assignment left open by a previous take/reassign cycle so
+    # exactly one row stays open per conversation.
+    await db.execute(
+        update(Assignment)
+        .where(
+            Assignment.conversation_id == conversation_id,
+            Assignment.released_at.is_(None),
+        )
+        .values(released_at=now)
     )
     db.add(Assignment(
         id=uuid.uuid4(),
@@ -620,39 +671,38 @@ async def _close_conversation_locked(
         last_user_ts is not None
         and now - last_user_ts < timedelta(hours=24)
     )
-    if not window_open:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "La ventana de 24 horas está cerrada. Para cerrar avisando al usuario "
-                "se requiere una plantilla de cierre aprobada en Meta."
-            ),
-        )
     close_message: Message | None = None
-    try:
-        await send_text_message(
-            phone_id=tenant.whatsapp_phone_id,
-            token=tenant.whatsapp_token,
-            to=conv.phone,
-            text=settings.MANUAL_CLOSE_NOTICE_TEXT,
-        )
-    except Exception as exc:
-        logger.exception("Could not notify user before closing conv %s", conversation_id)
-        raise HTTPException(
-            status_code=502,
-            detail="No se pudo avisar al usuario; la conversación no fue cerrada.",
-        ) from exc
+    if window_open:
+        try:
+            await send_text_message(
+                phone_id=tenant.whatsapp_phone_id,
+                token=tenant.whatsapp_token,
+                to=conv.phone,
+                text=settings.MANUAL_CLOSE_NOTICE_TEXT,
+            )
+        except Exception as exc:
+            logger.exception("Could not notify user before closing conv %s", conversation_id)
+            raise HTTPException(
+                status_code=502,
+                detail="No se pudo avisar al usuario; la conversación no fue cerrada.",
+            ) from exc
 
-    close_message = Message(
-        id=uuid.uuid4(),
-        conversation_id=conversation_id,
-        sender_type=SenderType.BOT,
-        content=settings.MANUAL_CLOSE_NOTICE_TEXT,
-        message_type="text",
-        status=MessageStatus.PROCESSED,
-        created_at=now,
-    )
-    db.add(close_message)
+        close_message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            sender_type=SenderType.BOT,
+            content=settings.MANUAL_CLOSE_NOTICE_TEXT,
+            message_type="text",
+            status=MessageStatus.PROCESSED,
+            created_at=now,
+        )
+        db.add(close_message)
+    else:
+        # Window expired: WhatsApp would reject a free-form notice. Close
+        # silently instead of blocking the agent's "Cerrar" action.
+        logger.info(
+            "Closing conv %s with window expired — skipping notice", conversation_id,
+        )
 
     await db.execute(
         update(Conversation)
@@ -1037,6 +1087,7 @@ async def reopen_conversation(
             to=conv.phone,
             template_name=tenant.whatsapp_template_name,
             language=tenant.whatsapp_template_language or "es",
+            body_params=[settings.HUMAN_HANDOFF_TEMPLATE_PARAM_TEXT],
         )
 
     reopen_content = (
@@ -1066,6 +1117,16 @@ async def reopen_conversation(
             handoff_notice_sent_at=now,
             context_started_at=now,
         )
+    )
+    # Release any assignment left open by a previous cycle so exactly one
+    # row stays open per conversation.
+    await db.execute(
+        update(Assignment)
+        .where(
+            Assignment.conversation_id == conversation_id,
+            Assignment.released_at.is_(None),
+        )
+        .values(released_at=now)
     )
     db.add(Assignment(
         id=uuid.uuid4(),

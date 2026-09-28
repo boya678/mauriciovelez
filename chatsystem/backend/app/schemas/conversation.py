@@ -17,6 +17,7 @@ class ConversationOut(BaseModel):
     assigned_agent_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
+    context_started_at: datetime | None = None
     closed_at: datetime | None = None
     last_user_message_at: datetime | None = None
     tags: str | None = None

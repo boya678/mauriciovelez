@@ -237,15 +237,14 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
         if conv is None or conv.status != ConversationStatus.WAITING_HUMAN:
             return True  # Already handled elsewhere
 
-        if not _window_open(conv.last_user_message_at):
-            logger.warning(
-                "Not retrying assignment for conv %s: WhatsApp 24-hour window is closed",
-                conversation_id,
-            )
-            return True
-
-        if not await _ensure_handoff_notice(db, tenant_id, tenant_slug, conv):
-            return False
+        # A free-form notice can only be delivered inside the 24h window
+        # (WhatsApp rejects it otherwise). Window-closed conversations still
+        # get assigned below — without a notice — so they don't pile up
+        # unassigned forever; the agent's own first message will trigger the
+        # approved reopening template (see outgoing_worker.py).
+        if _window_open(conv.last_user_message_at):
+            if not await _ensure_handoff_notice(db, tenant_id, tenant_slug, conv):
+                return False
 
         # _ensure_handoff_notice may commit a newly delivered legacy notice,
         # which releases the row lock. Reacquire it and re-check ownership.
@@ -310,11 +309,13 @@ async def _rescue_waiting_conversations(redis) -> None:
                     .where(
                         Conversation.status == ConversationStatus.WAITING_HUMAN,
                         Conversation.last_user_message_at.is_not(None),
-                        Conversation.last_user_message_at >= (
-                            datetime.now(timezone.utc) - timedelta(hours=24)
-                        ),
                     )
-                    .order_by(Conversation.updated_at.asc())  # FIFO: oldest waiting first
+                    # FIFO by current-cycle start. context_started_at is set once
+                    # when the conversation begins and reset only on CLOSED→reopen
+                    # — unlike updated_at, which resets on every follow-up and would
+                    # unfairly push a long-waiting customer to the back each time
+                    # they write again.
+                    .order_by(Conversation.context_started_at.asc().nulls_first())
                 )
                 waiting = waiting_result.all()
 
@@ -332,8 +333,15 @@ async def _rescue_waiting_conversations(redis) -> None:
                         if conv is None or conv.status != ConversationStatus.WAITING_HUMAN:
                             continue
 
-                        if not await _ensure_handoff_notice(db, tenant_id, slug, conv):
-                            continue
+                        # A free-form notice can only be delivered inside the
+                        # 24h window (WhatsApp rejects it otherwise). Window-closed
+                        # conversations still get assigned below — without a
+                        # notice — so they stop being invisible to agents; the
+                        # agent's own first message will trigger the approved
+                        # reopening template (see outgoing_worker.py).
+                        if _window_open(conv.last_user_message_at):
+                            if not await _ensure_handoff_notice(db, tenant_id, slug, conv):
+                                continue
 
                         conv = await db.scalar(
                             select(Conversation)

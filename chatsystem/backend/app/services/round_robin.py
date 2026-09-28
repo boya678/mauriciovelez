@@ -163,6 +163,17 @@ async def assign_agent(
                     conversation_id,
                 )
                 return None
+            # Release any assignment left open by a previous cycle (e.g. a
+            # conversation that went waiting_human -> human_active -> waiting_human
+            # more than once) so exactly one row stays open per conversation.
+            await db.execute(
+                update(Assignment)
+                .where(
+                    Assignment.conversation_id == conversation_id,
+                    Assignment.released_at.is_(None),
+                )
+                .values(released_at=now)
+            )
             db.add(Assignment(
                 id=uuid.uuid4(),
                 conversation_id=conversation_id,

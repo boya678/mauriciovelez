@@ -1007,26 +1007,31 @@ class ManualCloseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db.commits, 0)
         self.assertEqual(db.added, [])
 
-    async def test_manual_close_outside_24h_is_rejected_not_silent(self):
+    async def test_manual_close_outside_24h_closes_silently(self):
         conv = conversation(
             status=ConversationStatus.HUMAN_ACTIVE,
             last_user_message_at=datetime.now(timezone.utc) - timedelta(hours=25),
         )
         db = FakeSession([conv])
         send = AsyncMock()
+        publish = AsyncMock()
 
-        with patch.object(conversations_api, "send_text_message", send):
-            with self.assertRaises(HTTPException) as raised:
-                await conversations_api._close_conversation_locked(
-                    conv.id,
-                    tenant=self._tenant_context(conv),
-                    db=db,
-                    agent=SimpleNamespace(id=uuid.uuid4()),
-                )
+        with (
+            patch.object(conversations_api, "send_text_message", send),
+            patch.object(conversations_api.manager, "publish", publish),
+        ):
+            await conversations_api._close_conversation_locked(
+                conv.id,
+                tenant=self._tenant_context(conv),
+                db=db,
+                agent=SimpleNamespace(id=uuid.uuid4()),
+            )
 
-        self.assertEqual(raised.exception.status_code, 409)
         send.assert_not_awaited()
-        self.assertEqual(db.commits, 0)
+        self.assertEqual(db.commits, 1)
+        self.assertEqual(db.added, [])
+        # Only the "conversation_closed" broadcast fires — no close_message notice.
+        self.assertEqual(publish.await_count, 1)
 
     async def test_repeated_manual_close_does_not_send_duplicate_farewell(self):
         conv = conversation(status=ConversationStatus.CLOSED)
@@ -1342,6 +1347,7 @@ class RoundRobinConcurrencyTests(unittest.IsolatedAsyncioTestCase):
             FakeExecuteResult(scalar=agent),
             FakeExecuteResult(scalar=0),
             FakeExecuteResult(rowcount=1),
+            FakeExecuteResult(rowcount=0),  # release any previously open assignment
             FakeExecuteResult(rowcount=1),
         )
         redis = self._redis(agent.id)

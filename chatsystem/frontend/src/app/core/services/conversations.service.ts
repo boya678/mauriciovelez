@@ -19,6 +19,9 @@ export class ConversationsService {
   counts() {
     return this.http.get<Record<string, number>>(`${environment.apiUrl}/api/v1/conversations/counts`);
   }
+  mineUnreadCount() {
+    return this.http.get<{ unread_count: number }>(`${environment.apiUrl}/api/v1/conversations/mine/unread-count`);
+  }
   getConversation(id: string) {
     return this.http.get<ConversationDetail>(`${environment.apiUrl}/api/v1/conversations/${id}`);
   }

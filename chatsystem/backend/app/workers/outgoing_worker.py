@@ -288,7 +288,8 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
                 media_id=media_id,
             )
         elif not window_open and template_name:
-            # 24-hour window expired — must use a pre-approved template
+            # 24-hour window expired — must use a pre-approved template.
+            # The template's body placeholder carries the agent's own text.
             logger.info("Window expired for %s — sending template '%s'", phone, template_name)
             await send_template_message(
                 phone_id=phone_id,
@@ -296,6 +297,7 @@ async def _process_entry_locked(redis, entry_id: str, data: dict) -> bool:
                 to=phone,
                 template_name=template_name,
                 language=template_language,
+                body_params=[content] if content and content.strip() else None,
             )
         else:
             if not content or not content.strip():

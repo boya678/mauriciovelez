@@ -15,6 +15,7 @@ export interface Conversation {
   tenant_id: string;
   created_at: string;
   updated_at: string;
+  context_started_at: string | null;
   closed_at: string | null;
   last_user_message_at: string | null;
   window_open: boolean;

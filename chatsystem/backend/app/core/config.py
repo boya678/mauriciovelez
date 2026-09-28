@@ -44,6 +44,7 @@ class Settings(BaseSettings):
         "Voy a transferirte con un agente humano para continuar con tu solicitud. "
         "Un momento, por favor."
     )
+    HUMAN_HANDOFF_TEMPLATE_PARAM_TEXT: str = "Estamos disponibles para atenderte."
     HUMAN_QUEUE_ACK_TEXT: str = (
         "Ya estás en la cola de atención. En este momento no hay un agente "
         "disponible; por favor ten un poco de paciencia. Te atenderemos tan "

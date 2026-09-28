@@ -876,14 +876,7 @@ def renovar_desde_transaccion(
     phone_local = _strip_country_code(phone_orig)
     if not _is_valid_local_phone(phone_local):
         raise HTTPException(status_code=400, detail="No se pudo resolver un celular valido desde el identificador del chat")
-    cliente = db.execute(
-        select(Cliente).where(Cliente.celular == phone_local)
-    ).scalar_one_or_none()
-    if not cliente:
-        raise HTTPException(status_code=404, detail=f"Cliente con celular {phone_local} no registrado")
-
-    if cliente.tipo_cliente != 1:
-        raise HTTPException(status_code=400, detail="Solo se puede renovar clientes de tipo 1")
+    celular_wp = re.sub(r"\D", "", phone_orig) or f"57{phone_local}"
 
     # ── Validar evidencia mínima del comprobante ──────────────────────────────
     # Para renovar desde transacciones exigimos que el análisis IA exista y
@@ -929,7 +922,8 @@ def renovar_desde_transaccion(
             detail=f"El comprobante '{ia_registro.comprobante_num}' ya fue procesado anteriormente para el celular {duplicado.celular}",
         )
 
-    # Comprobante nuevo — registrarlo antes de renovar
+    # ── Registrar el comprobante YA — el dinero nunca se puede perder, pase lo
+    # que pase después (cliente inexistente, tipo incorrecto, etc.) ───────────
     db.add(ComprobanteVip(
         comprobante_num=ia_registro.comprobante_num,
         celular=phone_local,
@@ -938,25 +932,71 @@ def renovar_desde_transaccion(
         message_id=id,
         image_hash=ia_registro.image_hash,
     ))
-    db.flush()
-
-    nueva, era_vip = renovar_cliente(
-        db=db,
-        cliente=cliente,
-        platform_user_id=user.id,
-        usuario=user.usuario,
-        audit_action="RENOVAR_TRANSACCION",
-        audit_entity="transacciones",
-        audit_entity_id=str(id),
-    )
-
+    db.commit()
     _marcar_procesada(db, id)
 
-    if not era_vip:
-        from app.core.live_events import publish_event
-        publish_event("nuevo_vip", {"nombre": cliente.nombre})
+    # ── Renovar cliente existente, o crear uno nuevo VIP si no existe ─────────
+    cliente = db.execute(
+        select(Cliente).where(Cliente.celular == phone_local)
+    ).scalar_one_or_none()
 
-    return {"ok": True, "cliente": cliente.nombre, "nueva_fin": nueva.fin.isoformat()}
+    if cliente:
+        if cliente.tipo_cliente != 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Comprobante registrado, pero el cliente {phone_local} es tipo {cliente.tipo_cliente} y no se puede renovar",
+            )
+        nueva, era_vip = renovar_cliente(
+            db=db,
+            cliente=cliente,
+            platform_user_id=user.id,
+            usuario=user.usuario,
+            audit_action="RENOVAR_TRANSACCION",
+            audit_entity="transacciones",
+            audit_entity_id=str(id),
+        )
+        db.commit()
+        if not era_vip:
+            from app.core.live_events import publish_event
+            publish_event("nuevo_vip", {"nombre": cliente.nombre})
+        return {"ok": True, "cliente": cliente.nombre, "nueva_fin": nueva.fin.isoformat()}
+
+    # Cliente nuevo VIP (mismo flujo que en _finalizar_comprobante)
+    from dateutil.relativedelta import relativedelta
+    from app.models.cuenta_vip import acumular_cuenta_vip
+    from app.models.suscripcion import Suscripcion
+    from app.services.numbers import (
+        assign_number, notificar_codigo_asignado,
+        notificar_nuevo_numero_free, notificar_nuevo_numero_vip,
+    )
+    _seq = db.execute(text("SELECT nextval('seq_vip_codigo')")).scalar()
+    codigo_vip = f"{_seq:05d}"
+    now = datetime.now(timezone.utc)
+    nuevo = Cliente(
+        id=uuid.uuid4(),
+        nombre=phone_local,
+        celular=phone_local,
+        codigo_pais="57",
+        vip=True,
+        enabled=True,
+        tipo_cliente=1,
+        codigo_vip=codigo_vip,
+        saldo=0,
+    )
+    db.add(nuevo)
+    db.flush()
+    free = assign_number(db, nuevo.id, "free")
+    db.add(Suscripcion(cliente_id=nuevo.id, inicio=now, fin=now + relativedelta(months=1), activa=True))
+    acumular_cuenta_vip(db)
+    vip_num = assign_number(db, nuevo.id, "vip")
+    db.flush()
+    db.commit()
+    notificar_nuevo_numero_free(celular_wp, free.number, free.valid_until)
+    notificar_nuevo_numero_vip(celular_wp, vip_num.number, vip_num.valid_until)
+    notificar_codigo_asignado(celular_wp, 1, codigo_vip)
+    from app.core.live_events import publish_event
+    publish_event("nuevo_cliente", {"nombre": nuevo.nombre})
+    return {"ok": True, "cliente": nuevo.nombre, "cliente_creado": True}
 
 
 # ── Acción: Enviar mensaje WhatsApp ──────────────────────────────────────────

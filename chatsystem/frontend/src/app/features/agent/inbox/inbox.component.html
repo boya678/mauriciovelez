@@ -83,7 +83,8 @@
                   {{ conv.phone }}
                 }
               </span>
-              <span class="conv-time">{{ formatDate(conv.updated_at) }}</span>
+              <span class="conv-time">Último mensaje: {{ formatDate(conv.updated_at) }}</span>
+              <span class="conv-time conv-time-started">Iniciado: {{ formatDate(conv.context_started_at || conv.created_at) }}</span>
               @if (conv.last_message_preview) {
                 <span class="conv-preview">{{ conv.last_message_preview }}</span>
               }
