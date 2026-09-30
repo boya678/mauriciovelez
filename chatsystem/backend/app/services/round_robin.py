@@ -154,6 +154,12 @@ async def assign_agent(
                     assigned_agent_id=agent.id,
                     status=ConversationStatus.HUMAN_ACTIVE,
                     updated_at=now,
+                    # Long-waiting conversations rescued after their window
+                    # expired have a stale last_activity_at; without this the
+                    # idle-cleanup job (conversation_lifecycle.py) sees them as
+                    # abandoned and closes them again within its next scan,
+                    # before the agent gets a chance to reply.
+                    last_activity_at=now,
                 )
             )
             if assignment_update.rowcount != 1:
