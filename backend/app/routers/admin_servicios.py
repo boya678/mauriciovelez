@@ -9,9 +9,11 @@ from app.services.servicios_config import (
     get_conferencia_config,
     get_conferencia_vip_config,
     get_numero_relampago_config,
+    get_vip_config,
     set_conferencia_config,
     set_conferencia_vip_config,
     set_numero_relampago_config,
+    set_vip_config,
 )
 
 router = APIRouter(prefix="/admin/servicios", tags=["Admin Servicios"])
@@ -27,6 +29,16 @@ class NumeroRelampagoIn(BaseModel):
     activo: bool
     valor: int = Field(ge=0)
     numero: str = ""
+
+
+class VipOut(BaseModel):
+    activo: bool
+    valor: int
+
+
+class VipIn(BaseModel):
+    activo: bool
+    valor: int = Field(ge=0)
 
 
 class ConferenciaOut(BaseModel):
@@ -93,6 +105,38 @@ def put_numero_relampago(
     db.commit()
 
     return NumeroRelampagoOut(activo=cfg.activo, valor=cfg.valor, numero=cfg.numero)
+
+
+@router.get("/vip", response_model=VipOut)
+def get_vip(
+    db: Session = Depends(get_db),
+    _user=Depends(require_admin),
+):
+    cfg = get_vip_config(db)
+    return VipOut(activo=cfg.activo, valor=cfg.valor)
+
+
+@router.put("/vip", response_model=VipOut)
+def put_vip(
+    payload: VipIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    if payload.activo and payload.valor <= 0:
+        raise HTTPException(status_code=400, detail="Debes ingresar un monto mayor a 0 cuando el servicio esta activo")
+
+    cfg = set_vip_config(db=db, activo=payload.activo, valor=payload.valor)
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="UPDATE",
+        entity="servicios.vip",
+        entity_id="vip",
+        detail={"activo": cfg.activo, "valor": cfg.valor},
+    ))
+    db.commit()
+
+    return VipOut(activo=cfg.activo, valor=cfg.valor)
 
 
 @router.get("/conferencia", response_model=ConferenciaOut)

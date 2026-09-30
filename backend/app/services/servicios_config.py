@@ -13,6 +13,12 @@ class NumeroRelampagoConfig:
 
 
 @dataclass(frozen=True)
+class VipConfig:
+    activo: bool
+    valor: int
+
+
+@dataclass(frozen=True)
 class ConferenciaConfig:
     activo: bool
     valor: int
@@ -31,6 +37,9 @@ class ConferenciaVipConfig:
 KEY_ACTIVO = "servicio_numero_relampago_activo"
 KEY_VALOR = "servicio_numero_relampago_valor"
 KEY_NUMERO = "servicio_numero_relampago_numero"
+
+KEY_VIP_ACTIVO = "servicio_vip_activo"
+KEY_VIP_VALOR = "servicio_vip_valor"
 
 KEY_CONF_ACTIVO = "servicio_conferencia_activo"
 KEY_CONF_VALOR = "servicio_conferencia_valor"
@@ -86,6 +95,33 @@ def set_numero_relampago_config(db: Session, activo: bool, valor: int, numero: s
 
     db.flush()
     return NumeroRelampagoConfig(activo=activo, valor=max(0, int(valor)), numero=numero.strip())
+
+
+def get_vip_config(db: Session) -> VipConfig:
+    p_activo = db.get(Parametro, KEY_VIP_ACTIVO)
+    p_valor = db.get(Parametro, KEY_VIP_VALOR)
+    return VipConfig(
+        activo=_parse_bool(p_activo.valor if p_activo else None, default=False),
+        valor=max(0, _parse_int(p_valor.valor if p_valor else None, default=0)),
+    )
+
+
+def set_vip_config(db: Session, activo: bool, valor: int) -> VipConfig:
+    data = {
+        KEY_VIP_ACTIVO: ("1" if activo else "0", "Servicio VIP (monto alterno) activo (1/0)"),
+        KEY_VIP_VALOR: (str(max(0, int(valor))), "Monto exacto alterno para renovacion/creacion VIP"),
+    }
+
+    for key, (raw_val, desc) in data.items():
+        p = db.get(Parametro, key)
+        if p:
+            p.valor = raw_val
+            p.descripcion = desc
+        else:
+            db.add(Parametro(clave=key, valor=raw_val, descripcion=desc))
+
+    db.flush()
+    return VipConfig(activo=activo, valor=max(0, int(valor)))
 
 
 def get_conferencia_config(db: Session) -> ConferenciaConfig:

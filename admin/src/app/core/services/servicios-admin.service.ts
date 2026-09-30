@@ -8,6 +8,11 @@ export interface NumeroRelampagoConfig {
   numero: string;
 }
 
+export interface VipConfig {
+  activo: boolean;
+  valor: number;
+}
+
 export interface ConferenciaConfig {
   activo: boolean;
   valor: number;
@@ -34,6 +39,14 @@ export class ServiciosAdminService {
 
   updateNumeroRelampago(payload: NumeroRelampagoConfig) {
     return this.http.put<NumeroRelampagoConfig>(`${this.base}/numero-relampago`, payload);
+  }
+
+  getVip() {
+    return this.http.get<VipConfig>(`${this.base}/vip`);
+  }
+
+  updateVip(payload: VipConfig) {
+    return this.http.put<VipConfig>(`${this.base}/vip`, payload);
   }
 
   getConferencia() {

@@ -116,5 +116,9 @@ export class TransaccionesService {
     if (fecha) params = params.set('fecha', fecha);
     return this.http.post<ReprocesarTodoResult>(`${this.base}/reprocesar-todo`, {}, { params });
   }
+
+  reprocesarTodasFechas() {
+    return this.http.post<ReprocesarTodoResult>(`${this.base}/reprocesar-todas-fechas`, {});
+  }
 }
 

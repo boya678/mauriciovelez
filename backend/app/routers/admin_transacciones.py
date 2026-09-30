@@ -25,7 +25,7 @@ from app.models.tipo_cliente import TipoCliente
 from app.models.transaccion_procesada import TransaccionProcesada
 from app.services.chat_phone_resolver import resolve_real_phone_for_message, resolve_real_phone_from_identifier
 from app.services.notification_queue import push as _push_notif
-from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config
+from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config, get_vip_config
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 
@@ -290,6 +290,9 @@ def chequear_comprobante(
             select(ComprobanteVip).where(ComprobanteVip.image_hash == ia.image_hash)
         ).scalars().first()
 
+    if duplicado is not None:
+        _marcar_procesada(db, id)
+
     return ChequeoOut(
         analizado_por_ia=True,
         es_comprobante=ia.es_comprobante,
@@ -342,6 +345,7 @@ def registrar_comprobante(
             select(ComprobanteVip).where(ComprobanteVip.image_hash == ia.image_hash)
         ).scalars().first()
     if duplicado:
+        _marcar_procesada(db, id)
         raise HTTPException(
             status_code=409,
             detail=f"El comprobante '{comprobante_num}' ya está registrado para el celular {duplicado.celular}",
@@ -432,6 +436,7 @@ def _finalizar_comprobante(
     conferencia_cfg = get_conferencia_config(db)
     conferencia_vip_cfg = get_conferencia_vip_config(db)
     relampago_cfg = get_numero_relampago_config(db)
+    vip_cfg = get_vip_config(db)
     cliente_actual = db.execute(
         select(Cliente).where(Cliente.celular == phone_local)
     ).scalar_one_or_none()
@@ -460,8 +465,14 @@ def _finalizar_comprobante(
         and monto is not None
         and int(monto) == conferencia_cfg.valor
     )
+    is_vip_extra = bool(
+        vip_cfg.activo
+        and vip_cfg.valor > 0
+        and monto is not None
+        and int(monto) == vip_cfg.valor
+    )
 
-    if not is_conferencia_vip and not is_conferencia and not is_relampago and (monto is None or int(monto) != settings.VIP_AMOUNT):
+    if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
         return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
                              monto_extraido=monto_float, accion="monto_incorrecto",
                              detalle=f"Monto extraído: {monto_float}, esperado VIP: {settings.VIP_AMOUNT}")
@@ -490,6 +501,7 @@ def _finalizar_comprobante(
         "conferencia_vip" if is_conferencia_vip
         else "conferencia" if is_conferencia
         else "numero_relampago" if is_relampago
+        else "pago vip (servicio)" if is_vip_extra
         else "pago vip"
     )
 
@@ -853,6 +865,16 @@ def reprocesar_todo_del_dia(
     if fecha is None:
         fecha = datetime.now(COL_TZ).date()
     resumen = scheduler._procesar_pagos_automatico(fecha=fecha)
+    return ReprocesarTodoOut(**resumen)
+
+
+@router.post("/reprocesar-todas-fechas", response_model=ReprocesarTodoOut)
+def reprocesar_todas_las_fechas(
+    _user=Depends(require_admin),
+):
+    """Igual que reprocesar-todo, pero sin filtrar por fecha: corre sobre
+    todas las imágenes pendientes de análisis, sin importar el día."""
+    resumen = scheduler._procesar_pagos_automatico(todas_fechas=True)
     return ReprocesarTodoOut(**resumen)
 
 

@@ -43,6 +43,7 @@ from app.services.servicios_config import (
     get_conferencia_config,
     get_conferencia_vip_config,
     get_numero_relampago_config,
+    get_vip_config,
 )
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
@@ -654,7 +655,7 @@ def _marcar_mensaje_procesada(db, msg_id: uuid.UUID) -> None:
     db.commit()
 
 
-def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
+def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = False) -> dict:
     """
     Cada CRON_PAGOS (o bajo demanda para una fecha puntual):
     1. Consulta imágenes de la fecha en chat DB no analizadas aún por la IA.
@@ -666,7 +667,7 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
     4. Si ocurre cualquier error → print en consola, NO se marca nada.
     Retorna {"pendientes": int, "procesados": int, "fecha": str}.
     """
-    resumen = {"pendientes": 0, "procesados": 0, "fecha": str(fecha or datetime.now(COLOMBIA_TZ).date())}
+    resumen = {"pendientes": 0, "procesados": 0, "fecha": "todas" if todas_fechas else str(fecha or datetime.now(COLOMBIA_TZ).date())}
     if not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_API_KEY:
         print("[CRON pagos] Azure OpenAI no configurado, saltando.")
         return resumen
@@ -680,12 +681,13 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
         print(f"[CRON pagos] Schema inválido: {schema}")
         return resumen
 
-    print(f"[CRON pagos] Inicio — {hoy}")
+    print(f"[CRON pagos] Inicio — {'todas las fechas' if todas_fechas else hoy}")
 
     db = SessionLocal()
     chat_db = _SessionChat()
     try:
-        # ── 1. Mensajes con imagen de hoy ───────────────────────────────────
+        # ── 1. Mensajes con imagen (de hoy, o de todas las fechas) ──────────
+        filtro_fecha = "" if todas_fechas else "AND (m.created_at AT TIME ZONE 'America/Bogota')::date = :fecha"
         rows = chat_db.execute(text(f"""
             SELECT
                 m.id,
@@ -695,12 +697,12 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
             FROM {schema}.messages m
             JOIN {schema}.conversations c ON c.id = m.conversation_id
             WHERE m.message_type = 'image'
-              AND (m.created_at AT TIME ZONE 'America/Bogota')::date = :fecha
+              {filtro_fecha}
               AND m.media_content IS NOT NULL
             ORDER BY m.created_at ASC
-        """), {"fecha": hoy}).mappings().all()
+        """), ({} if todas_fechas else {"fecha": hoy})).mappings().all()
 
-        # ── 2. Filtrar los ya analizados (solo contra los IDs de hoy) ─────────
+        # ── 2. Filtrar los ya analizados ─────────────────────────────────────
         today_ids = [r["id"] for r in rows]
         ya_procesados: set[uuid.UUID] = set()
         if today_ids:
@@ -717,6 +719,7 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
         conferencia_cfg = get_conferencia_config(db)
         conferencia_vip_cfg = get_conferencia_vip_config(db)
         relampago_cfg = get_numero_relampago_config(db)
+        vip_cfg = get_vip_config(db)
         print(f"[CRON pagos] {len(pendientes)} imágenes pendientes de análisis")
 
         for row in pendientes:
@@ -851,10 +854,17 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
                 and monto is not None
                 and int(monto) == conferencia_cfg.valor
             )
+            is_vip_extra = bool(
+                vip_cfg.activo
+                and vip_cfg.valor > 0
+                and monto is not None
+                and int(monto) == vip_cfg.valor
+            )
 
-            if not is_conferencia_vip and not is_conferencia and not is_relampago and (monto is None or int(monto) != settings.VIP_AMOUNT):
+            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
                 print(
                     f"[CRON pagos] msg={msg_id}: monto {monto} no coincide con VIP ({settings.VIP_AMOUNT}) "
+                    f"ni VIP alterno ({vip_cfg.valor if vip_cfg.activo else 'inactivo'}) "
                     f"ni relampago ({relampago_cfg.valor if relampago_cfg.activo else 'inactivo'}) "
                     f"ni conferencia ({conferencia_cfg.valor if conferencia_cfg.activo else 'inactivo'}) "
                     f"ni conferencia_vip ({conferencia_vip_cfg.valor if conferencia_vip_cfg.activo else 'inactivo'}), ignorado"
@@ -872,6 +882,7 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
                         "conferencia_vip" if is_conferencia_vip
                         else "conferencia" if is_conferencia
                         else "numero_relampago" if is_relampago
+                        else "pago vip (servicio)" if is_vip_extra
                         else "pago vip"
                     ),
                     message_id=msg_id,
@@ -990,7 +1001,7 @@ def _procesar_pagos_automatico(fecha: date | None = None) -> dict:
     finally:
         chat_db.close()
         db.close()
-        print(f"[CRON pagos] Fin — {hoy}")
+        print(f"[CRON pagos] Fin — {'todas las fechas' if todas_fechas else hoy}")
     return resumen
 
 

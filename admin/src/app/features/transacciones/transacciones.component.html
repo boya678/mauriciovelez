@@ -14,9 +14,21 @@
         }
         Reprocesar todo
       </button>
+      <button class="btn-accion btn-reprocesar-todo" [disabled]="reprocesarTodasFechasLoading()" (click)="reprocesarTodasFechas()"
+              title="Reprocesar con IA todas las pendientes, sin importar la fecha">
+        @if (reprocesarTodasFechasLoading()) {
+          <span class="material-icons-round spin">autorenew</span>
+        } @else {
+          <span class="material-icons-round">smart_toy</span>
+        }
+        REPROCESAR TODAS LAS FECHAS
+      </button>
     </div>
     @if (reprocesarTodoMsg()) {
       <div class="reprocesar-todo-msg">{{ reprocesarTodoMsg() }}</div>
+    }
+    @if (reprocesarTodasFechasMsg()) {
+      <div class="reprocesar-todo-msg">{{ reprocesarTodasFechasMsg() }}</div>
     }
   </div>
 

@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, ServiciosAdminService } from '../../core/services/servicios-admin.service';
+import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, ServiciosAdminService, VipConfig } from '../../core/services/servicios-admin.service';
 
 @Component({
   selector: 'app-servicios',
@@ -16,6 +16,7 @@ export class ServiciosComponent implements OnInit {
   savingRelampago = signal(false);
   savingConferencia = signal(false);
   savingConferenciaVip = signal(false);
+  savingVip = signal(false);
   ok = signal('');
   error = signal('');
 
@@ -39,6 +40,11 @@ export class ServiciosComponent implements OnInit {
     link_youtube: '',
   };
 
+  vip: VipConfig = {
+    activo: false,
+    valor: 0,
+  };
+
   constructor(private svc: ServiciosAdminService) {}
 
   ngOnInit(): void {
@@ -58,7 +64,16 @@ export class ServiciosComponent implements OnInit {
             this.svc.getConferenciaVip().subscribe({
               next: (confVip) => {
                 this.conferenciaVip = { ...confVip };
-                this.loading.set(false);
+                this.svc.getVip().subscribe({
+                  next: (vip) => {
+                    this.vip = { ...vip };
+                    this.loading.set(false);
+                  },
+                  error: () => {
+                    this.loading.set(false);
+                    this.error.set('No fue posible cargar la configuración de VIP.');
+                  },
+                });
               },
               error: () => {
                 this.loading.set(false);
@@ -148,6 +163,29 @@ export class ServiciosComponent implements OnInit {
       },
       error: (err) => {
         this.savingConferenciaVip.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
+      },
+    });
+  }
+
+  guardarVip() {
+    this.savingVip.set(true);
+    this.error.set('');
+    this.ok.set('');
+
+    const payload: VipConfig = {
+      activo: !!this.vip.activo,
+      valor: Math.max(0, Number(this.vip.valor || 0)),
+    };
+
+    this.svc.updateVip(payload).subscribe({
+      next: (cfg) => {
+        this.vip = { ...cfg };
+        this.savingVip.set(false);
+        this.ok.set('Configuración de VIP guardada.');
+      },
+      error: (err) => {
+        this.savingVip.set(false);
         this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
       },
     });

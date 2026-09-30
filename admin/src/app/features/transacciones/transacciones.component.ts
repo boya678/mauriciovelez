@@ -56,6 +56,8 @@ export class TransaccionesComponent implements OnInit {
   // Reprocesar todo el día
   reprocesarTodoLoading = signal(false);
   reprocesarTodoMsg = signal('');
+  reprocesarTodasFechasLoading = signal(false);
+  reprocesarTodasFechasMsg = signal('');
 
   // Acciones que ya ocultan la transacción en el backend (_marcar_procesada)
   private readonly ACCIONES_FINALES = new Set([
@@ -124,6 +126,22 @@ export class TransaccionesComponent implements OnInit {
       error: (err) => {
         this.reprocesarTodoLoading.set(false);
         this.reprocesarTodoMsg.set(err?.error?.detail || 'Error al reprocesar el día');
+      },
+    });
+  }
+
+  reprocesarTodasFechas() {
+    this.reprocesarTodasFechasLoading.set(true);
+    this.reprocesarTodasFechasMsg.set('');
+    this.svc.reprocesarTodasFechas().subscribe({
+      next: (res) => {
+        this.reprocesarTodasFechasLoading.set(false);
+        this.reprocesarTodasFechasMsg.set(`Analizadas ${res.pendientes} pendientes, ${res.procesados} procesadas (todas las fechas).`);
+        this.load();
+      },
+      error: (err) => {
+        this.reprocesarTodasFechasLoading.set(false);
+        this.reprocesarTodasFechasMsg.set(err?.error?.detail || 'Error al reprocesar todas las fechas');
       },
     });
   }

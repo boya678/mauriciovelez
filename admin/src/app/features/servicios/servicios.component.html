@@ -144,4 +144,35 @@
       </div>
     }
   </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>VIP (monto alterno)</h2>
+        <p>Monto adicional al fijo de $30.000 que también renueva o crea cliente VIP.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="vip.activo" />
+      </label>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando configuración...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label>Valor</label>
+          <input type="number" min="0" step="1" [(ngModel)]="vip.valor" placeholder="30000" />
+          <small>Monto exacto alterno que también dispara renovación/creación VIP.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="savingVip()" (click)="guardarVip()">
+          @if (savingVip()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+    }
+  </section>
 </div>
