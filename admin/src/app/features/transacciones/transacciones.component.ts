@@ -58,6 +58,8 @@ export class TransaccionesComponent implements OnInit {
   reprocesarTodoMsg = signal('');
   reprocesarTodasFechasLoading = signal(false);
   reprocesarTodasFechasMsg = signal('');
+  ocultarYaProcesadosLoading = signal(false);
+  ocultarYaProcesadosMsg = signal('');
 
   // Acciones que ya ocultan la transacción en el backend (_marcar_procesada)
   private readonly ACCIONES_FINALES = new Set([
@@ -142,6 +144,22 @@ export class TransaccionesComponent implements OnInit {
       error: (err) => {
         this.reprocesarTodasFechasLoading.set(false);
         this.reprocesarTodasFechasMsg.set(err?.error?.detail || 'Error al reprocesar todas las fechas');
+      },
+    });
+  }
+
+  ocultarYaProcesados() {
+    this.ocultarYaProcesadosLoading.set(true);
+    this.ocultarYaProcesadosMsg.set('');
+    this.svc.ocultarYaProcesados().subscribe({
+      next: (res) => {
+        this.ocultarYaProcesadosLoading.set(false);
+        this.ocultarYaProcesadosMsg.set(`Revisadas ${res.revisados}, ocultadas ${res.ocultados} ya procesadas.`);
+        this.load();
+      },
+      error: (err) => {
+        this.ocultarYaProcesadosLoading.set(false);
+        this.ocultarYaProcesadosMsg.set(err?.error?.detail || 'Error al ocultar ya procesados');
       },
     });
   }

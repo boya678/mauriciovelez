@@ -23,12 +23,24 @@
         }
         REPROCESAR TODAS LAS FECHAS
       </button>
+      <button class="btn-accion btn-reprocesar-todo" [disabled]="ocultarYaProcesadosLoading()" (click)="ocultarYaProcesados()"
+              title="Ocultar las que ya están duplicadas/procesadas pero siguen apareciendo en la lista">
+        @if (ocultarYaProcesadosLoading()) {
+          <span class="material-icons-round spin">autorenew</span>
+        } @else {
+          <span class="material-icons-round">visibility_off</span>
+        }
+        Ocultar ya procesados
+      </button>
     </div>
     @if (reprocesarTodoMsg()) {
       <div class="reprocesar-todo-msg">{{ reprocesarTodoMsg() }}</div>
     }
     @if (reprocesarTodasFechasMsg()) {
       <div class="reprocesar-todo-msg">{{ reprocesarTodasFechasMsg() }}</div>
+    }
+    @if (ocultarYaProcesadosMsg()) {
+      <div class="reprocesar-todo-msg">{{ ocultarYaProcesadosMsg() }}</div>
     }
   </div>
 

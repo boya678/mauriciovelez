@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.core import scheduler
 from app.core.admin_security import get_current_platform_user, require_admin
 from app.core.config import settings
 from app.database import get_chat_db, get_db
@@ -855,27 +854,156 @@ class ReprocesarTodoOut(BaseModel):
     fecha: str
 
 
+def _ids_imagenes_por_fecha(chat_db: Session, schema: str, fecha: date) -> set[uuid.UUID]:
+    rows = chat_db.execute(text(f"""
+        SELECT m.id
+        FROM {schema}.messages m
+        WHERE m.message_type = 'image'
+          AND (m.created_at AT TIME ZONE 'America/Bogota')::date = :fecha
+    """), {"fecha": fecha}).mappings().all()
+    return {r["id"] for r in rows}
+
+
+# Acciones que dejan la transacción oculta/resuelta (igual a ACCIONES_FINALES del front)
+_ACCIONES_FINALES = {
+    "renovado", "cliente_creado", "relampago_registrado",
+    "conferencia_registrada", "conferencia_vip_registrada", "ya_procesado",
+}
+
+
+def _procesar_analizados_pendientes(
+    db: Session, chat_db: Session, user, fecha: Optional[date],
+) -> "ReprocesarTodoOut":
+    """Aplica a cada transacción ya analizada por IA y aún NO oculta el mismo
+    flujo del botón manual 'Procesar' (usa los datos de IA ya guardados, sin
+    volver a llamarla). Las que nunca fueron analizadas se dejan intactas."""
+    schema = settings.DATABASE_SCHEMA_2
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
+        raise ValueError(f"Nombre de schema inválido: {schema}")
+
+    ocultos = set(
+        db.execute(
+            select(TransaccionProcesada.id_externo).where(TransaccionProcesada.estado == False)  # noqa: E712
+        ).scalars().all()
+    )
+    query = select(MensajeIaProcesado)
+    if ocultos:
+        query = query.where(MensajeIaProcesado.message_id.notin_(ocultos))
+    analizados = db.execute(query).scalars().all()
+
+    if fecha is not None:
+        ids_fecha = _ids_imagenes_por_fecha(chat_db, schema, fecha)
+        analizados = [ia for ia in analizados if ia.message_id in ids_fecha]
+
+    procesados = 0
+    for ia in analizados:
+        try:
+            phone_local, celular_wp = _resolver_telefono_transaccion(chat_db, schema, ia.message_id)
+            resultado = _finalizar_comprobante(
+                db=db,
+                id=ia.message_id,
+                user=user,
+                phone_local=phone_local,
+                celular_wp=celular_wp,
+                es_comprobante=ia.es_comprobante,
+                comprobante_num=ia.comprobante_num,
+                monto=ia.monto_extraido,
+                destino_valido=ia.destino_valido,
+                numero_destino=ia.numero_destino,
+                nombre_destino=ia.nombre_destino,
+                image_hash=ia.image_hash,
+                origen="procesar_masivo",
+            )
+            if resultado.accion in _ACCIONES_FINALES:
+                procesados += 1
+        except HTTPException:
+            db.rollback()
+            continue
+        except Exception:
+            db.rollback()
+            continue
+
+    return ReprocesarTodoOut(
+        pendientes=len(analizados),
+        procesados=procesados,
+        fecha="todas" if fecha is None else str(fecha),
+    )
+
+
 @router.post("/reprocesar-todo", response_model=ReprocesarTodoOut)
 def reprocesar_todo_del_dia(
     fecha: Optional[date] = Query(default=None, description="Fecha YYYY-MM-DD (default: hoy en Colombia)"),
-    _user=Depends(require_admin),
+    db: Session = Depends(get_db),
+    chat_db: Session = Depends(get_chat_db),
+    user=Depends(require_admin),
 ):
-    """Corre el mismo pipeline del cron de pagos, pero bajo demanda y solo
-    para las imágenes de la fecha indicada que aún no fueron analizadas."""
+    """Aplica 'Procesar' (sin volver a llamar IA) a todas las transacciones del
+    día ya analizadas y aún no ocultas."""
     if fecha is None:
         fecha = datetime.now(COL_TZ).date()
-    resumen = scheduler._procesar_pagos_automatico(fecha=fecha)
-    return ReprocesarTodoOut(**resumen)
+    return _procesar_analizados_pendientes(db, chat_db, user, fecha=fecha)
 
 
 @router.post("/reprocesar-todas-fechas", response_model=ReprocesarTodoOut)
 def reprocesar_todas_las_fechas(
-    _user=Depends(require_admin),
+    db: Session = Depends(get_db),
+    chat_db: Session = Depends(get_chat_db),
+    user=Depends(require_admin),
 ):
-    """Igual que reprocesar-todo, pero sin filtrar por fecha: corre sobre
-    todas las imágenes pendientes de análisis, sin importar el día."""
-    resumen = scheduler._procesar_pagos_automatico(todas_fechas=True)
-    return ReprocesarTodoOut(**resumen)
+    """Igual que reprocesar-todo, pero sin filtrar por fecha: aplica 'Procesar'
+    a todas las transacciones ya analizadas y aún no ocultas, de cualquier día."""
+    return _procesar_analizados_pendientes(db, chat_db, user, fecha=None)
+
+
+class OcultarYaProcesadosOut(BaseModel):
+    revisados: int
+    ocultados: int
+
+
+@router.post("/ocultar-ya-procesados", response_model=OcultarYaProcesadosOut)
+def ocultar_ya_procesados(
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    """Barrido único: oculta las transacciones que ya están analizadas y cuyo
+    comprobante_num/image_hash ya existe en comprobantes_vip, pero que por el
+    hueco anterior (chequear/registrar/renovar) nunca se marcaron como ocultas."""
+    ya_ocultos = set(
+        db.execute(
+            select(TransaccionProcesada.id_externo).where(TransaccionProcesada.estado == False)  # noqa: E712
+        ).scalars().all()
+    )
+    query = select(MensajeIaProcesado)
+    if ya_ocultos:
+        query = query.where(MensajeIaProcesado.message_id.notin_(ya_ocultos))
+    analizados = db.execute(query).scalars().all()
+
+    ocultados = 0
+    for ia in analizados:
+        duplicado = None
+        if ia.comprobante_num:
+            duplicado = db.execute(
+                select(ComprobanteVip).where(ComprobanteVip.comprobante_num == ia.comprobante_num)
+            ).scalar_one_or_none()
+        if duplicado is None and ia.image_hash:
+            duplicado = db.execute(
+                select(ComprobanteVip).where(ComprobanteVip.image_hash == ia.image_hash)
+            ).scalars().first()
+        if duplicado is not None:
+            _marcar_procesada(db, ia.message_id)
+            ocultados += 1
+
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="OCULTAR_YA_PROCESADOS",
+        entity="transacciones",
+        entity_id="barrido",
+        detail={"revisados": len(analizados), "ocultados": ocultados},
+    ))
+    db.commit()
+
+    return OcultarYaProcesadosOut(revisados=len(analizados), ocultados=ocultados)
 
 
 # ── Acción: Renovar suscripción ───────────────────────────────────────────────
@@ -939,6 +1067,7 @@ def renovar_desde_transaccion(
             )
         ).scalars().first()
     if duplicado:
+        _marcar_procesada(db, id)
         raise HTTPException(
             status_code=409,
             detail=f"El comprobante '{ia_registro.comprobante_num}' ya fue procesado anteriormente para el celular {duplicado.celular}",

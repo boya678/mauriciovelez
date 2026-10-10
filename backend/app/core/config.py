@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     CRON_PAGOS: str = "*/10 * * * *"
     # Validación de destino del comprobante (anti-fraude)
     CUENTA_DESTINO_NUMERO: str = "3225556333"
-    CUENTA_DESTINO_NOMBRES: str = "Mauricio Velez,Luz Alvarez"  # separados por coma
+    CUENTA_DESTINO_NOMBRES: str = "Mauricio Velez,Luz Alvarez,Construcciones Path"  # separados por coma
 
     model_config = SettingsConfigDict(
         env_file=".env",

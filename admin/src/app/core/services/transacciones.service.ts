@@ -120,5 +120,9 @@ export class TransaccionesService {
   reprocesarTodasFechas() {
     return this.http.post<ReprocesarTodoResult>(`${this.base}/reprocesar-todas-fechas`, {});
   }
+
+  ocultarYaProcesados() {
+    return this.http.post<{ revisados: number; ocultados: number }>(`${this.base}/ocultar-ya-procesados`, {});
+  }
 }
 
