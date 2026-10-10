@@ -99,6 +99,19 @@
   background: #f8fafc;
 }
 
+.load-older-btn {
+  align-self: center;
+  margin-bottom: 8px;
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  cursor: pointer;
+  &:disabled { opacity: 0.6; cursor: default; }
+}
+
 .msg-row {
   display: flex;
   &.row-user { justify-content: flex-end; }

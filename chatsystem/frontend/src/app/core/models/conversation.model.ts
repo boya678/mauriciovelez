@@ -27,6 +27,7 @@ export interface Conversation {
 
 export interface ConversationDetail extends Conversation {
   messages: Message[];
+  has_more_messages?: boolean;
 }
 
 import { Message } from './message.model';

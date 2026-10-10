@@ -371,6 +371,7 @@ async def start_conversation(
 @router.get("/{conversation_id}", response_model=ConversationDetail)
 async def get_conversation(
     conversation_id: uuid.UUID,
+    message_limit: int = Query(50, ge=1, le=500),
     tenant: TenantContext = Depends(resolve_tenant),
     db: AsyncSession = Depends(get_tenant_db),
     _agent=Depends(require_agent),
@@ -384,15 +385,60 @@ async def get_conversation(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    msgs = await db.scalars(
+    # Only the most recent page loads by default — long conversations (queue
+    # waits of days/weeks) were sending every message (incl. inline base64
+    # media) on every open, which made the chat slow to load and render.
+    # Older messages are fetched on demand via GET /{id}/messages?before=...
+    recent_msgs = (await db.scalars(
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
-    )
+        .order_by(Message.created_at.desc())
+        .limit(message_limit)
+    )).all()
+    recent_msgs.reverse()
+
     return ConversationDetail(
         **ConversationOut.model_validate(conv).model_dump(),
-        messages=[MessageOut.model_validate(m) for m in msgs.all()],
+        messages=[MessageOut.model_validate(m) for m in recent_msgs],
+        has_more_messages=len(recent_msgs) == message_limit,
     )
+
+
+@router.get("/{conversation_id}/messages", response_model=list[MessageOut])
+async def get_conversation_messages(
+    conversation_id: uuid.UUID,
+    before: datetime | None = Query(None),
+    after: datetime | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    _agent=Depends(require_agent),
+):
+    """Page through a conversation's history: `before` for scrolling up to
+    older messages, `after` for picking up new ones without reloading
+    everything (used instead of a full reload on every WebSocket event)."""
+    if before is None and after is None:
+        raise HTTPException(status_code=422, detail="Provide 'before' or 'after'")
+
+    conv = await db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant.id,
+        )
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    query = select(Message).where(Message.conversation_id == conversation_id)
+    if before is not None:
+        query = query.where(Message.created_at < before).order_by(Message.created_at.desc()).limit(limit)
+    else:
+        query = query.where(Message.created_at > after).order_by(Message.created_at.asc()).limit(limit)
+
+    msgs = (await db.scalars(query)).all()
+    if before is not None:
+        msgs.reverse()
+    return [MessageOut.model_validate(m) for m in msgs]
 
 
 @router.post("/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)

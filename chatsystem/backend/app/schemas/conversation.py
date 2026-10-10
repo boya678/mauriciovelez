@@ -44,6 +44,7 @@ class ConversationList(BaseModel):
 
 class ConversationDetail(ConversationOut):
     messages: list[Any] = []
+    has_more_messages: bool = False
 
 
 class TakeConversationIn(BaseModel):

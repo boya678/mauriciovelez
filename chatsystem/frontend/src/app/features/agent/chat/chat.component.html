@@ -64,6 +64,16 @@
 
     <!-- Messages -->
     <div class="messages" #msgContainer>
+      @if (hasMoreMessages()) {
+        <button
+          class="load-older-btn"
+          type="button"
+          [disabled]="loadingOlder()"
+          (click)="loadOlderMessages()"
+        >
+          {{ loadingOlder() ? 'Cargando…' : 'Cargar mensajes anteriores' }}
+        </button>
+      }
       @for (msg of conv.messages; track msg.id; let i = $index) {
         @if (showDateSeparator(conv.messages, i)) {
           <div class="date-separator">{{ formatDateSeparator(msg.created_at) }}</div>

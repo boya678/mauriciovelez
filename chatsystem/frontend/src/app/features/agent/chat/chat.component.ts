@@ -43,8 +43,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   reopening = signal(false);
   recording = signal(false);
   mediaSending = signal(false);
+  hasMoreMessages = signal(false);
+  loadingOlder = signal(false);
 
   private shouldScroll = false;
+  private preserveScrollHeight: number | null = null;
   private wsSub?: Subscription;
   private mediaRecorder?: MediaRecorder;
   private mediaStream?: MediaStream;
@@ -67,9 +70,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   ngOnInit(): void {
     this.wsSub = this.ws.events$.subscribe((ev) => {
       const id = this.conversation()?.id;
-      if (
+      if (id && ev.type === 'new_message' && ev['conversation_id'] === id) {
+        this.appendNewMessages(id);
+      } else if (
         (
-          ev.type === 'new_message' ||
           ev.type === 'conversation_waiting' ||
           ev.type === 'conversation_assigned' ||
           ev.type === 'conversation_closed'
@@ -89,6 +93,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       next: (detail) => {
         console.log('[chat] loaded', detail);
         this.conversation.set(detail);
+        this.hasMoreMessages.set(!!detail.has_more_messages);
         this.loading.set(false);
         this.shouldScroll = true;
         if (detail.assigned_agent_id === this.auth.getAgentId()) {
@@ -105,7 +110,55 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
+  loadOlderMessages(): void {
+    const conv = this.conversation();
+    if (!conv || this.loadingOlder() || !this.hasMoreMessages() || conv.messages.length === 0) return;
+    const oldest = conv.messages[0];
+    this.loadingOlder.set(true);
+    const container = this.msgContainer?.nativeElement;
+    this.preserveScrollHeight = container ? container.scrollHeight : null;
+    this.conversationsService.getOlderMessages(conv.id, oldest.created_at).subscribe({
+      next: (older) => {
+        this.hasMoreMessages.set(older.length > 0 && older.length >= 50);
+        if (older.length > 0) {
+          this.conversation.set({ ...conv, messages: [...older, ...conv.messages] });
+        }
+        this.loadingOlder.set(false);
+      },
+      error: () => {
+        this.loadingOlder.set(false);
+      },
+    });
+  }
+
+  private appendNewMessages(id: string): void {
+    const conv = this.conversation();
+    if (!conv) return;
+    const last = conv.messages[conv.messages.length - 1];
+    const after = last ? last.created_at : new Date(0).toISOString();
+    this.conversationsService.getNewerMessages(id, after).subscribe({
+      next: (newer) => {
+        if (newer.length === 0) return;
+        const current = this.conversation();
+        if (!current || current.id !== id) return;
+        this.conversation.set({ ...current, messages: [...current.messages, ...newer] });
+        this.shouldScroll = true;
+        if (current.assigned_agent_id === this.auth.getAgentId()) {
+          this.conversationsService.markRead(id).subscribe({
+            next: () => this.conversationRead.emit(id),
+          });
+        }
+      },
+    });
+  }
+
   ngAfterViewChecked(): void {
+    const container = this.msgContainer?.nativeElement;
+    if (this.preserveScrollHeight !== null && container) {
+      container.scrollTop = container.scrollHeight - this.preserveScrollHeight;
+      this.preserveScrollHeight = null;
+      return;
+    }
     if (this.shouldScroll) {
       this.scrollToBottom();
       this.shouldScroll = false;

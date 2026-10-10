@@ -22,8 +22,19 @@ export class ConversationsService {
   mineUnreadCount() {
     return this.http.get<{ unread_count: number }>(`${environment.apiUrl}/api/v1/conversations/mine/unread-count`);
   }
-  getConversation(id: string) {
-    return this.http.get<ConversationDetail>(`${environment.apiUrl}/api/v1/conversations/${id}`);
+  getConversation(id: string, messageLimit = 50) {
+    const params = new HttpParams().set('message_limit', messageLimit);
+    return this.http.get<ConversationDetail>(`${environment.apiUrl}/api/v1/conversations/${id}`, { params });
+  }
+
+  getOlderMessages(id: string, before: string, limit = 50) {
+    const params = new HttpParams().set('before', before).set('limit', limit);
+    return this.http.get<Message[]>(`${environment.apiUrl}/api/v1/conversations/${id}/messages`, { params });
+  }
+
+  getNewerMessages(id: string, after: string) {
+    const params = new HttpParams().set('after', after).set('limit', 200);
+    return this.http.get<Message[]>(`${environment.apiUrl}/api/v1/conversations/${id}/messages`, { params });
   }
 
   markRead(id: string) {
