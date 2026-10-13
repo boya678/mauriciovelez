@@ -89,7 +89,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_contactos_bsuid ON {schema}.contactos (bsui
 CREATE INDEX IF NOT EXISTS idx_conv_status ON {schema}.conversations(status);
 CREATE INDEX IF NOT EXISTS idx_conv_phone ON {schema}.conversations(phone);
 CREATE INDEX IF NOT EXISTS ix_conv_idle_scan ON {schema}.conversations(status, last_activity_at);
+CREATE INDEX IF NOT EXISTS ix_conv_tenant_context_started ON {schema}.conversations(tenant_id, context_started_at);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON {schema}.messages(conversation_id);
+CREATE INDEX IF NOT EXISTS ix_msg_conv_created ON {schema}.messages(conversation_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_assign_agent ON {schema}.assignments(agent_id);
 CREATE INDEX IF NOT EXISTS ix_assign_active_read ON {schema}.assignments(conversation_id, agent_id) WHERE released_at IS NULL;
 """
