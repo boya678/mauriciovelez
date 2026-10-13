@@ -46,6 +46,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   hasMoreMessages = signal(false);
   loadingOlder = signal(false);
 
+  private readonly MAX_MESSAGES_IN_MEMORY = 150;
   private shouldScroll = false;
   private preserveScrollHeight: number | null = null;
   private wsSub?: Subscription;
@@ -141,7 +142,17 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         if (newer.length === 0) return;
         const current = this.conversation();
         if (!current || current.id !== id) return;
-        this.conversation.set({ ...current, messages: [...current.messages, ...newer] });
+        // Keep only the most recent MAX_MESSAGES_IN_MEMORY — a conversation
+        // left open for hours would otherwise accumulate every message (and
+        // its inline base64 media) in memory and the DOM for as long as the
+        // tab stays on it. Older ones remain available via "Cargar mensajes
+        // anteriores", which re-fetches them from the backend.
+        const combined = [...current.messages, ...newer];
+        const trimmed = combined.length > this.MAX_MESSAGES_IN_MEMORY
+          ? combined.slice(combined.length - this.MAX_MESSAGES_IN_MEMORY)
+          : combined;
+        if (trimmed.length < combined.length) this.hasMoreMessages.set(true);
+        this.conversation.set({ ...current, messages: trimmed });
         this.shouldScroll = true;
         if (current.assigned_agent_id === this.auth.getAgentId()) {
           this.conversationsService.markRead(id).subscribe({
