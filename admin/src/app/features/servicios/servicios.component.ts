@@ -150,8 +150,6 @@ export class ServiciosComponent implements OnInit {
       vigencia_dias: Math.max(1, Number(this.relampagoPers.vigencia_dias || 1)),
       rifa_activo: !!this.relampagoPers.rifa_activo,
       rifa_descripcion: (this.relampagoPers.rifa_descripcion || '').trim(),
-      rifa_activo: !!this.relampagoPers.rifa_activo,
-      rifa_descripcion: (this.relampagoPers.rifa_descripcion || '').trim(),
     };
 
     this.svc.updateRelampagoPersonalizado(payload).subscribe({
