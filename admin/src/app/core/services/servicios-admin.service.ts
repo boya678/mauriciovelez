@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
 export interface NumeroRelampagoConfig {
@@ -17,6 +17,8 @@ export interface RelampagoPersonalizadoConfig {
   activo: boolean;
   valor: number;
   vigencia_dias: number;
+  rifa_activo: boolean;
+  rifa_descripcion: string;
 }
 
 export interface ConferenciaConfig {
@@ -61,6 +63,13 @@ export class ServiciosAdminService {
 
   updateRelampagoPersonalizado(payload: RelampagoPersonalizadoConfig) {
     return this.http.put<RelampagoPersonalizadoConfig>(`${this.base}/relampago-personalizado`, payload);
+  }
+
+  exportarNumerosRifa(fechaInicio?: string, fechaFin?: string) {
+    let params = new HttpParams();
+    if (fechaInicio) params = params.set('fecha_inicio', fechaInicio);
+    if (fechaFin) params = params.set('fecha_fin', fechaFin);
+    return this.http.get(`${this.base}/relampago-personalizado/rifa/exportar`, { params, responseType: 'blob' });
   }
 
   getConferencia() {

@@ -598,16 +598,17 @@ def _finalizar_comprobante(
         )
 
     if is_relampago_pers:
-        cliente_rp, asignacion = asignar_relampago_personalizado(db, phone_local, rp_cfg.vigencia_dias)
+        cliente_rp, asignacion, rifa_rp = asignar_relampago_personalizado(db, phone_local, rp_cfg, id)
         db.commit()
         _marcar_procesada(db, id)
-        notificar_relampago_personalizado(celular_wp, asignacion.number)
+        notificar_relampago_personalizado(celular_wp, asignacion.number, rifa_rp)
+        extra_rifa = f" y número de rifa {rifa_rp.numero}" if rifa_rp else ""
         return ReprocesarOut(
             es_comprobante=True,
             comprobante_num=comprobante_num,
             monto_extraido=monto_float,
             accion="relampago_personalizado_asignado",
-            detalle=f"Número relampago {asignacion.number} asignado a {cliente_rp.nombre} hasta {asignacion.valid_until}",
+            detalle=f"Número relampago {asignacion.number}{extra_rifa} asignado a {cliente_rp.nombre} hasta {asignacion.valid_until}",
         )
 
     # ── Renovar o crear cliente ────────────────────────────────────────────

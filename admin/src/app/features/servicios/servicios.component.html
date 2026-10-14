@@ -78,11 +78,44 @@
           <input type="number" min="1" step="1" [(ngModel)]="relampagoPers.vigencia_dias" placeholder="1" />
           <small>Días corridos desde hoy en que el número participa. No se renueva: un nuevo pago asigna otro número.</small>
         </div>
+
+        <div class="field">
+          <label class="switch-wrap">
+            <span>Asignar también número de rifa (0000 a 9999)</span>
+            <input type="checkbox" [(ngModel)]="relampagoPers.rifa_activo" />
+          </label>
+          <small>Se entrega uno por cada pago, en orden, y vuelve a 0000 al llegar a 9999.</small>
+        </div>
+
+        <div class="field">
+          <label>Descripción del sorteo</label>
+          <input type="text" maxlength="200" [(ngModel)]="relampagoPers.rifa_descripcion" placeholder="Sorteo de la moto, 31 de octubre" />
+          <small>Segundo parámetro de la plantilla WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_RIFA. Obligatoria si el número de rifa está activo.</small>
+        </div>
       </div>
 
       <div class="actions">
         <button class="btn-primary" [disabled]="savingRelampagoPers()" (click)="guardarRelampagoPers()">
           @if (savingRelampagoPers()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Descargar números de rifa entregados — desde</label>
+          <input type="date" [(ngModel)]="rifaDesde" />
+        </div>
+
+        <div class="field">
+          <label>Hasta</label>
+          <input type="date" [(ngModel)]="rifaHasta" />
+          <small>Sin fechas descarga los últimos 30 días.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="exportandoRifa()" (click)="descargarNumerosRifa()">
+          @if (exportandoRifa()) { Descargando... } @else { Descargar Excel }
         </button>
       </div>
     }

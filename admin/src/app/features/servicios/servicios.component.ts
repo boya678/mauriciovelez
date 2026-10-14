@@ -18,6 +18,9 @@ export class ServiciosComponent implements OnInit {
   savingConferenciaVip = signal(false);
   savingVip = signal(false);
   savingRelampagoPers = signal(false);
+  exportandoRifa = signal(false);
+  rifaDesde = '';
+  rifaHasta = '';
   ok = signal('');
   error = signal('');
 
@@ -50,6 +53,8 @@ export class ServiciosComponent implements OnInit {
     activo: false,
     valor: 0,
     vigencia_dias: 1,
+    rifa_activo: false,
+    rifa_descripcion: '',
   };
 
   constructor(private svc: ServiciosAdminService) {}
@@ -143,6 +148,10 @@ export class ServiciosComponent implements OnInit {
       activo: !!this.relampagoPers.activo,
       valor: Math.max(0, Number(this.relampagoPers.valor || 0)),
       vigencia_dias: Math.max(1, Number(this.relampagoPers.vigencia_dias || 1)),
+      rifa_activo: !!this.relampagoPers.rifa_activo,
+      rifa_descripcion: (this.relampagoPers.rifa_descripcion || '').trim(),
+      rifa_activo: !!this.relampagoPers.rifa_activo,
+      rifa_descripcion: (this.relampagoPers.rifa_descripcion || '').trim(),
     };
 
     this.svc.updateRelampagoPersonalizado(payload).subscribe({
@@ -154,6 +163,26 @@ export class ServiciosComponent implements OnInit {
       error: (err) => {
         this.savingRelampagoPers.set(false);
         this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
+      },
+    });
+  }
+
+  descargarNumerosRifa() {
+    this.exportandoRifa.set(true);
+    this.error.set('');
+    this.svc.exportarNumerosRifa(this.rifaDesde || undefined, this.rifaHasta || undefined).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `numeros_rifa_${this.rifaDesde || 'inicio'}_a_${this.rifaHasta || 'fin'}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exportandoRifa.set(false);
+      },
+      error: () => {
+        this.exportandoRifa.set(false);
+        this.error.set('No fue posible descargar los números entregados.');
       },
     });
   }

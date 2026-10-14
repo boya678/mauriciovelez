@@ -23,6 +23,8 @@ class RelampagoPersonalizadoConfig:
     activo: bool
     valor: int
     vigencia_dias: int
+    rifa_activo: bool = False
+    rifa_descripcion: str = ""
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,9 @@ KEY_VIP_VALOR = "servicio_vip_valor"
 KEY_RP_ACTIVO = "servicio_relampago_personalizado_activo"
 KEY_RP_VALOR = "servicio_relampago_personalizado_valor"
 KEY_RP_VIGENCIA = "servicio_relampago_personalizado_vigencia_dias"
+KEY_RP_RIFA_ACTIVO = "servicio_relampago_personalizado_rifa_activo"
+KEY_RP_RIFA_DESC = "servicio_relampago_personalizado_rifa_descripcion"
+KEY_RP_RIFA_SIGUIENTE = "servicio_relampago_personalizado_rifa_siguiente"
 
 KEY_CONF_ACTIVO = "servicio_conferencia_activo"
 KEY_CONF_VALOR = "servicio_conferencia_valor"
@@ -139,21 +144,29 @@ def get_relampago_personalizado_config(db: Session) -> RelampagoPersonalizadoCon
     p_activo = db.get(Parametro, KEY_RP_ACTIVO)
     p_valor = db.get(Parametro, KEY_RP_VALOR)
     p_vig = db.get(Parametro, KEY_RP_VIGENCIA)
+    p_rifa_activo = db.get(Parametro, KEY_RP_RIFA_ACTIVO)
+    p_rifa_desc = db.get(Parametro, KEY_RP_RIFA_DESC)
     return RelampagoPersonalizadoConfig(
         activo=_parse_bool(p_activo.valor if p_activo else None, default=False),
         valor=max(0, _parse_int(p_valor.valor if p_valor else None, default=0)),
         vigencia_dias=max(1, _parse_int(p_vig.valor if p_vig else None, default=1)),
+        rifa_activo=_parse_bool(p_rifa_activo.valor if p_rifa_activo else None, default=False),
+        rifa_descripcion=(p_rifa_desc.valor.strip() if p_rifa_desc and p_rifa_desc.valor else ""),
     )
 
 
 def set_relampago_personalizado_config(
     db: Session, activo: bool, valor: int, vigencia_dias: int,
+    rifa_activo: bool = False, rifa_descripcion: str = "",
 ) -> RelampagoPersonalizadoConfig:
     vigencia = max(1, int(vigencia_dias))
+    descripcion = rifa_descripcion.strip()
     data = {
         KEY_RP_ACTIVO: ("1" if activo else "0", "Servicio numero relampago personalizado activo (1/0)"),
         KEY_RP_VALOR: (str(max(0, int(valor))), "Monto exacto que asigna un numero relampago personalizado"),
         KEY_RP_VIGENCIA: (str(vigencia), "Vigencia en dias del numero relampago personalizado"),
+        KEY_RP_RIFA_ACTIVO: ("1" if rifa_activo else "0", "Asignar tambien numero de rifa 0000-9999 (1/0)"),
+        KEY_RP_RIFA_DESC: (descripcion, "Descripcion del sorteo enviada en la notificacion del numero de rifa"),
     }
 
     for key, (raw_val, desc) in data.items():
@@ -165,7 +178,10 @@ def set_relampago_personalizado_config(
             db.add(Parametro(clave=key, valor=raw_val, descripcion=desc))
 
     db.flush()
-    return RelampagoPersonalizadoConfig(activo=activo, valor=max(0, int(valor)), vigencia_dias=vigencia)
+    return RelampagoPersonalizadoConfig(
+        activo=activo, valor=max(0, int(valor)), vigencia_dias=vigencia,
+        rifa_activo=rifa_activo, rifa_descripcion=descripcion,
+    )
 
 
 def get_conferencia_config(db: Session) -> ConferenciaConfig:

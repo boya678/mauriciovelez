@@ -134,6 +134,17 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         ])
         _log_chat(numero_dest, f"[Notificación WhatsApp] ¡Ganador relámpago! Número {numero}, lotería {params['loteria']}, resultado {params['resultado_num']}", msg_id)
 
+    elif type == "notificar_numero_rifa":
+        numero = str(params["numero"])
+        descripcion = str(params["descripcion"])
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_RIFA, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": numero},
+                {"type": "text", "text": descripcion},
+            ]},
+        ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Número de rifa asignado: {numero} ({descripcion})", msg_id)
+
     elif type == "recordatorio_vencimiento":
         msg_id = _send_template(numero_dest, settings.WHATSAPP_VENCIMIENTO_VIP, [])
         _log_chat(numero_dest, "[Notificación WhatsApp] Recordatorio de vencimiento de suscripción VIP", msg_id)

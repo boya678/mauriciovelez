@@ -1,10 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
+import io
+from datetime import date, datetime, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
+
+import openpyxl
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.admin_security import require_admin
 from app.database import get_db
 from app.models.audit_log import AuditLog
+from app.models.cliente import Cliente
+from app.models.numero_rifa_entregado import NumeroRifaEntregado
 from app.services.servicios_config import (
     get_conferencia_config,
     get_conferencia_vip_config,
@@ -47,12 +57,16 @@ class RelampagoPersonalizadoOut(BaseModel):
     activo: bool
     valor: int
     vigencia_dias: int
+    rifa_activo: bool
+    rifa_descripcion: str
 
 
 class RelampagoPersonalizadoIn(BaseModel):
     activo: bool
     valor: int = Field(ge=0)
     vigencia_dias: int = Field(ge=1)
+    rifa_activo: bool = False
+    rifa_descripcion: str = Field(default="", max_length=200)
 
 
 class ConferenciaOut(BaseModel):
@@ -159,7 +173,17 @@ def get_relampago_personalizado(
     _user=Depends(require_admin),
 ):
     cfg = get_relampago_personalizado_config(db)
-    return RelampagoPersonalizadoOut(activo=cfg.activo, valor=cfg.valor, vigencia_dias=cfg.vigencia_dias)
+    return _relampago_personalizado_out(cfg)
+
+
+def _relampago_personalizado_out(cfg) -> RelampagoPersonalizadoOut:
+    return RelampagoPersonalizadoOut(
+        activo=cfg.activo,
+        valor=cfg.valor,
+        vigencia_dias=cfg.vigencia_dias,
+        rifa_activo=cfg.rifa_activo,
+        rifa_descripcion=cfg.rifa_descripcion,
+    )
 
 
 @router.put("/relampago-personalizado", response_model=RelampagoPersonalizadoOut)
@@ -170,12 +194,17 @@ def put_relampago_personalizado(
 ):
     if payload.activo and payload.valor <= 0:
         raise HTTPException(status_code=400, detail="Debes ingresar un monto mayor a 0 cuando el servicio esta activo")
+    descripcion = payload.rifa_descripcion.strip()
+    if payload.activo and payload.rifa_activo and not descripcion:
+        raise HTTPException(status_code=400, detail="Debes ingresar la descripcion del sorteo cuando el numero de rifa esta activo")
 
     cfg = set_relampago_personalizado_config(
         db=db,
         activo=payload.activo,
         valor=payload.valor,
         vigencia_dias=payload.vigencia_dias,
+        rifa_activo=payload.rifa_activo,
+        rifa_descripcion=descripcion,
     )
     db.add(AuditLog(
         platform_user_id=user.id,
@@ -183,11 +212,65 @@ def put_relampago_personalizado(
         action="UPDATE",
         entity="servicios.relampago_personalizado",
         entity_id="relampago_personalizado",
-        detail={"activo": cfg.activo, "valor": cfg.valor, "vigencia_dias": cfg.vigencia_dias},
+        detail={
+            "activo": cfg.activo,
+            "valor": cfg.valor,
+            "vigencia_dias": cfg.vigencia_dias,
+            "rifa_activo": cfg.rifa_activo,
+            "rifa_descripcion": cfg.rifa_descripcion,
+        },
     ))
     db.commit()
 
-    return RelampagoPersonalizadoOut(activo=cfg.activo, valor=cfg.valor, vigencia_dias=cfg.vigencia_dias)
+    return _relampago_personalizado_out(cfg)
+
+
+@router.get("/relampago-personalizado/rifa/exportar")
+def exportar_numeros_rifa(
+    fecha_inicio: Optional[date] = Query(default=None),
+    fecha_fin: Optional[date] = Query(default=None),
+    _user=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    col_tz = ZoneInfo("America/Bogota")
+    if fecha_inicio is None and fecha_fin is None:
+        fecha_fin = datetime.now(col_tz).date()
+        fecha_inicio = fecha_fin - timedelta(days=30)
+
+    fecha_col = func.date(func.timezone("America/Bogota", NumeroRifaEntregado.created_at))
+    q = db.query(NumeroRifaEntregado, Cliente.nombre).outerjoin(
+        Cliente, Cliente.id == NumeroRifaEntregado.cliente_id
+    )
+    if fecha_inicio:
+        q = q.filter(fecha_col >= fecha_inicio)
+    if fecha_fin:
+        q = q.filter(fecha_col <= fecha_fin)
+    filas = q.order_by(NumeroRifaEntregado.created_at.asc(), NumeroRifaEntregado.id.asc()).all()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Numeros de rifa"
+    ws.append(["Fecha", "Número", "Celular", "Nombre", "Descripción del sorteo"])
+    for registro, nombre in filas:
+        ws.append([
+            registro.created_at.astimezone(col_tz).strftime("%d/%m/%Y %H:%M"),
+            registro.numero,
+            registro.celular,
+            nombre or "",
+            registro.descripcion,
+        ])
+        ws.cell(row=ws.max_row, column=2).number_format = "@"
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"numeros_rifa_{fecha_inicio}_a_{fecha_fin}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/conferencia", response_model=ConferenciaOut)

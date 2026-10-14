@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     WHATSAPP_TEMPLATE_GANADOR_RELAMPAGO: str = "relampago_ganador"
     WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_VIP: str = "vip_nuevo_numero"
     WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_FREE: str = "free_nuevo_numero"
+    WHATSAPP_TEMPLATE_NOTIFICACION_NUMERO_RIFA: str = "rifa_nuevo_numero"
     WHATSAPP_TEMPLATE_OTP: str = "codigo_otp"
     WHATSAPP_TEMPLATE_NOTIFICACION_REFERIDO: str = "free_referido"
     WHATSAPP_TEMPLATE_CODIGO: str = "codigo_cliente"

@@ -994,19 +994,20 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
 
             if is_relampago_pers:
                 try:
-                    cliente_rp, asignacion = asignar_relampago_personalizado(db, celular_local, rp_cfg.vigencia_dias)
+                    cliente_rp, asignacion, rifa_rp = asignar_relampago_personalizado(db, celular_local, rp_cfg, msg_id)
                     db.commit()
                 except Exception as exc:
                     db.rollback()
                     print(f"[CRON pagos] ERROR asignando relampago personalizado msg={msg_id} celular={celular_local}: {exc}")
                     continue
                 try:
-                    notificar_relampago_personalizado(celular_wp, asignacion.number)
+                    notificar_relampago_personalizado(celular_wp, asignacion.number, rifa_rp)
                 except Exception as exc:
                     print(f"[CRON pagos] ERROR notificando relampago personalizado msg={msg_id}: {exc}")
                 print(
                     f"[CRON pagos] msg={msg_id}: relampago personalizado {asignacion.number} asignado a "
                     f"{celular_local} hasta {asignacion.valid_until}"
+                    + (f", rifa {rifa_rp.numero}" if rifa_rp else "")
                 )
                 continue
 
