@@ -54,6 +54,43 @@
   <section class="card">
     <div class="card-head">
       <div>
+        <h2>Número relámpago personalizado</h2>
+        <p>Asigna un número del pool al celular que pague este monto (lo crea como cliente básico si no existe) y lo notifica por WhatsApp.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="relampagoPers.activo" />
+      </label>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando configuración...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label>Valor</label>
+          <input type="number" min="0" step="1" [(ngModel)]="relampagoPers.valor" placeholder="12000" />
+          <small>Monto exacto que asigna el número.</small>
+        </div>
+
+        <div class="field">
+          <label>Vigencia (días)</label>
+          <input type="number" min="1" step="1" [(ngModel)]="relampagoPers.vigencia_dias" placeholder="1" />
+          <small>Días corridos desde hoy en que el número participa. No se renueva: un nuevo pago asigna otro número.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="savingRelampagoPers()" (click)="guardarRelampagoPers()">
+          @if (savingRelampagoPers()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+    }
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
         <h2>Conferencia</h2>
         <p>Procesa comprobantes por monto y notifica al cliente con un link de YouTube.</p>
       </div>

@@ -24,7 +24,8 @@ from app.models.tipo_cliente import TipoCliente
 from app.models.transaccion_procesada import TransaccionProcesada
 from app.services.chat_phone_resolver import resolve_real_phone_for_message, resolve_real_phone_from_identifier
 from app.services.notification_queue import push as _push_notif
-from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config, get_vip_config
+from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config, get_relampago_personalizado_config, get_vip_config
+from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 
@@ -390,7 +391,7 @@ class ReprocesarOut(BaseModel):
     es_comprobante: bool
     comprobante_num: Optional[str]
     monto_extraido: Optional[float]
-    accion: str   # renovado | cliente_creado | relampago_registrado | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | destino_invalido | no_es_comprobante | sin_numero
+    accion: str   # renovado | cliente_creado | relampago_registrado | relampago_personalizado_asignado | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | destino_invalido | no_es_comprobante | sin_numero
     detalle: Optional[str] = None
 
 
@@ -436,6 +437,7 @@ def _finalizar_comprobante(
     conferencia_vip_cfg = get_conferencia_vip_config(db)
     relampago_cfg = get_numero_relampago_config(db)
     vip_cfg = get_vip_config(db)
+    rp_cfg = get_relampago_personalizado_config(db)
     cliente_actual = db.execute(
         select(Cliente).where(Cliente.celular == phone_local)
     ).scalar_one_or_none()
@@ -470,8 +472,14 @@ def _finalizar_comprobante(
         and monto is not None
         and int(monto) == vip_cfg.valor
     )
+    is_relampago_pers = bool(
+        rp_cfg.activo
+        and rp_cfg.valor > 0
+        and monto is not None
+        and int(monto) == rp_cfg.valor
+    )
 
-    if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
+    if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
         return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
                              monto_extraido=monto_float, accion="monto_incorrecto",
                              detalle=f"Monto extraído: {monto_float}, esperado VIP: {settings.VIP_AMOUNT}")
@@ -500,6 +508,7 @@ def _finalizar_comprobante(
         "conferencia_vip" if is_conferencia_vip
         else "conferencia" if is_conferencia
         else "numero_relampago" if is_relampago
+        else "numero_relampago_personalizado" if is_relampago_pers
         else "pago vip (servicio)" if is_vip_extra
         else "pago vip"
     )
@@ -586,6 +595,19 @@ def _finalizar_comprobante(
             monto_extraido=monto_float,
             accion="relampago_registrado",
             detalle=f"Registrado como numero_relampago y notificado al cliente con numero {relampago_cfg.numero or 'sin_numero'}",
+        )
+
+    if is_relampago_pers:
+        cliente_rp, asignacion = asignar_relampago_personalizado(db, phone_local, rp_cfg.vigencia_dias)
+        db.commit()
+        _marcar_procesada(db, id)
+        notificar_relampago_personalizado(celular_wp, asignacion.number)
+        return ReprocesarOut(
+            es_comprobante=True,
+            comprobante_num=comprobante_num,
+            monto_extraido=monto_float,
+            accion="relampago_personalizado_asignado",
+            detalle=f"Número relampago {asignacion.number} asignado a {cliente_rp.nombre} hasta {asignacion.valid_until}",
         )
 
     # ── Renovar o crear cliente ────────────────────────────────────────────
@@ -866,7 +888,7 @@ def _ids_imagenes_por_fecha(chat_db: Session, schema: str, fecha: date) -> set[u
 
 # Acciones que dejan la transacción oculta/resuelta (igual a ACCIONES_FINALES del front)
 _ACCIONES_FINALES = {
-    "renovado", "cliente_creado", "relampago_registrado",
+    "renovado", "cliente_creado", "relampago_registrado", "relampago_personalizado_asignado",
     "conferencia_registrada", "conferencia_vip_registrada", "ya_procesado",
 }
 

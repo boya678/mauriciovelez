@@ -19,6 +19,13 @@ class VipConfig:
 
 
 @dataclass(frozen=True)
+class RelampagoPersonalizadoConfig:
+    activo: bool
+    valor: int
+    vigencia_dias: int
+
+
+@dataclass(frozen=True)
 class ConferenciaConfig:
     activo: bool
     valor: int
@@ -40,6 +47,10 @@ KEY_NUMERO = "servicio_numero_relampago_numero"
 
 KEY_VIP_ACTIVO = "servicio_vip_activo"
 KEY_VIP_VALOR = "servicio_vip_valor"
+
+KEY_RP_ACTIVO = "servicio_relampago_personalizado_activo"
+KEY_RP_VALOR = "servicio_relampago_personalizado_valor"
+KEY_RP_VIGENCIA = "servicio_relampago_personalizado_vigencia_dias"
 
 KEY_CONF_ACTIVO = "servicio_conferencia_activo"
 KEY_CONF_VALOR = "servicio_conferencia_valor"
@@ -122,6 +133,39 @@ def set_vip_config(db: Session, activo: bool, valor: int) -> VipConfig:
 
     db.flush()
     return VipConfig(activo=activo, valor=max(0, int(valor)))
+
+
+def get_relampago_personalizado_config(db: Session) -> RelampagoPersonalizadoConfig:
+    p_activo = db.get(Parametro, KEY_RP_ACTIVO)
+    p_valor = db.get(Parametro, KEY_RP_VALOR)
+    p_vig = db.get(Parametro, KEY_RP_VIGENCIA)
+    return RelampagoPersonalizadoConfig(
+        activo=_parse_bool(p_activo.valor if p_activo else None, default=False),
+        valor=max(0, _parse_int(p_valor.valor if p_valor else None, default=0)),
+        vigencia_dias=max(1, _parse_int(p_vig.valor if p_vig else None, default=1)),
+    )
+
+
+def set_relampago_personalizado_config(
+    db: Session, activo: bool, valor: int, vigencia_dias: int,
+) -> RelampagoPersonalizadoConfig:
+    vigencia = max(1, int(vigencia_dias))
+    data = {
+        KEY_RP_ACTIVO: ("1" if activo else "0", "Servicio numero relampago personalizado activo (1/0)"),
+        KEY_RP_VALOR: (str(max(0, int(valor))), "Monto exacto que asigna un numero relampago personalizado"),
+        KEY_RP_VIGENCIA: (str(vigencia), "Vigencia en dias del numero relampago personalizado"),
+    }
+
+    for key, (raw_val, desc) in data.items():
+        p = db.get(Parametro, key)
+        if p:
+            p.valor = raw_val
+            p.descripcion = desc
+        else:
+            db.add(Parametro(clave=key, valor=raw_val, descripcion=desc))
+
+    db.flush()
+    return RelampagoPersonalizadoConfig(activo=activo, valor=max(0, int(valor)), vigencia_dias=vigencia)
 
 
 def get_conferencia_config(db: Session) -> ConferenciaConfig:

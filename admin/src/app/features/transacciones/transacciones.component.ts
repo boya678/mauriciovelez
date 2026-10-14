@@ -63,7 +63,7 @@ export class TransaccionesComponent implements OnInit {
 
   // Acciones que ya ocultan la transacción en el backend (_marcar_procesada)
   private readonly ACCIONES_FINALES = new Set([
-    'renovado', 'cliente_creado', 'relampago_registrado',
+    'renovado', 'cliente_creado', 'relampago_registrado', 'relampago_personalizado_asignado',
     'conferencia_registrada', 'conferencia_vip_registrada', 'ya_procesado',
   ]);
 

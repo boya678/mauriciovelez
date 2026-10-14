@@ -63,28 +63,34 @@ def notificar_codigo_asignado(celular: str, tipo_cliente: int, codigo_vip: str) 
     push("codigo_cliente", celular, {"tipo_cliente": tipo_cliente, "codigo_vip": codigo_vip})
 
 
-def assign_number(db: Session, id_user: uuid.UUID, num_type: str) -> NumberUser:
+def assign_number(
+    db: Session, id_user: uuid.UUID, num_type: str, vigencia_dias: int | None = None,
+) -> NumberUser:
     """
     Asigna un número del pool al usuario para el tipo dado respetando ciclos fijos.
     - El valid_until es siempre el fin del ciclo global (epoch + N*vigencia).
     - Borra la asignación anterior del mismo tipo.
+    - Tipo 'relampago' (pago): vigencia_dias corridos desde hoy, sin borrar los anteriores.
     - Selecciona el siguiente número disponible en orden secuencial (order_index ASC).
     - Si el pool está vacío, resetea todos a disponibles y vuelve desde el inicio.
     - Registra en numbers_historic.
     - Hace flush pero NO commit (responsabilidad del llamador).
     """
-    vigencia, epoch = _get_ciclo_param(db, num_type)
     today = datetime.now(ZoneInfo("America/Bogota")).date()
-    valid_until = calc_valid_until(vigencia, epoch, today)
+    if num_type == "relampago":
+        valid_until = today + timedelta(days=max(1, vigencia_dias or 1) - 1)
+    else:
+        vigencia, epoch = _get_ciclo_param(db, num_type)
+        valid_until = calc_valid_until(vigencia, epoch, today)
 
-    # Eliminar asignación anterior del mismo tipo
-    db.execute(
-        delete(NumberUser).where(
-            NumberUser.id_user == id_user,
-            NumberUser.type == num_type,
+        # Eliminar asignación anterior del mismo tipo
+        db.execute(
+            delete(NumberUser).where(
+                NumberUser.id_user == id_user,
+                NumberUser.type == num_type,
+            )
         )
-    )
-    db.flush()
+        db.flush()
 
     # Obtener el siguiente número disponible en orden secuencial
     selected = db.execute(

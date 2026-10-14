@@ -43,8 +43,10 @@ from app.services.servicios_config import (
     get_conferencia_config,
     get_conferencia_vip_config,
     get_numero_relampago_config,
+    get_relampago_personalizado_config,
     get_vip_config,
 )
+from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 from app.core.live_events import publish_event
@@ -150,6 +152,10 @@ def _notificar_ganador_free(celular: str, numero: str, loteria: str, resultado_n
 
 def _notificar_ganador_vip(celular: str, numero: str, loteria: str, resultado_num: str) -> None:
     push("ganador_vip", celular, {"numero": numero, "loteria": loteria, "resultado_num": resultado_num})
+
+
+def _notificar_ganador_relampago(celular: str, numero: str, loteria: str, resultado_num: str) -> None:
+    push("ganador_relampago", celular, {"numero": numero, "loteria": loteria, "resultado_num": resultado_num})
 
 
 def _procesar_loterias(fecha: date | None = None) -> None:
@@ -266,7 +272,8 @@ def _procesar_loterias(fecha: date | None = None) -> None:
 
                         # ── Notificar ganador ────────────────────────────────
                         cliente_h = db.query(Cliente).filter(Cliente.id == h.id_user).first()
-                        if cliente_h and cliente_h.enabled:
+                        es_relampago_h = h.type == "relampago"
+                        if cliente_h and (cliente_h.enabled or es_relampago_h):
                             celular_wp = f"{cliente_h.codigo_pais or '57'}{cliente_h.celular}" if cliente_h.celular else None
                             # ── Publicar evento live ────────────────────────
                             veces_gano = db.query(NumeroAcierto).join(
@@ -285,7 +292,20 @@ def _procesar_loterias(fecha: date | None = None) -> None:
                                 "tres_directo": "Tres Directo",
                                 "tres_metodo": "Tres Método",
                             }.get(tipo, tipo)
-                            if cliente_h.vip:
+                            if es_relampago_h:
+                                if celular_wp:
+                                    _notificar_ganador_relampago(
+                                        celular=celular_wp,
+                                        numero=h.number,
+                                        loteria=resultado.loteria,
+                                        resultado_num=resultado.resultado,
+                                    )
+                                logger.info(
+                                    "Ganador relampago notificado: %s (%s) — %s %s %s",
+                                    cliente_h.nombre, cliente_h.celular,
+                                    resultado.loteria, resultado.resultado, tipo,
+                                )
+                            elif cliente_h.vip:
                                 if celular_wp:
                                     _notificar_ganador_vip(
                                         celular=celular_wp,
@@ -720,6 +740,7 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
         conferencia_vip_cfg = get_conferencia_vip_config(db)
         relampago_cfg = get_numero_relampago_config(db)
         vip_cfg = get_vip_config(db)
+        rp_cfg = get_relampago_personalizado_config(db)
         print(f"[CRON pagos] {len(pendientes)} imágenes pendientes de análisis")
 
         for row in pendientes:
@@ -860,11 +881,18 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                 and monto is not None
                 and int(monto) == vip_cfg.valor
             )
+            is_relampago_pers = bool(
+                rp_cfg.activo
+                and rp_cfg.valor > 0
+                and monto is not None
+                and int(monto) == rp_cfg.valor
+            )
 
-            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
+            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
                 print(
                     f"[CRON pagos] msg={msg_id}: monto {monto} no coincide con VIP ({settings.VIP_AMOUNT}) "
                     f"ni VIP alterno ({vip_cfg.valor if vip_cfg.activo else 'inactivo'}) "
+                    f"ni relampago personalizado ({rp_cfg.valor if rp_cfg.activo else 'inactivo'}) "
                     f"ni relampago ({relampago_cfg.valor if relampago_cfg.activo else 'inactivo'}) "
                     f"ni conferencia ({conferencia_cfg.valor if conferencia_cfg.activo else 'inactivo'}) "
                     f"ni conferencia_vip ({conferencia_vip_cfg.valor if conferencia_vip_cfg.activo else 'inactivo'}), ignorado"
@@ -882,6 +910,7 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                         "conferencia_vip" if is_conferencia_vip
                         else "conferencia" if is_conferencia
                         else "numero_relampago" if is_relampago
+                        else "numero_relampago_personalizado" if is_relampago_pers
                         else "pago vip (servicio)" if is_vip_extra
                         else "pago vip"
                     ),
@@ -960,6 +989,24 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                 print(
                     f"[CRON pagos] msg={msg_id}: registrado como numero_relampago "
                     f"(monto={monto}, numero={relampago_cfg.numero or 'sin_numero'}, celular={celular_wp})"
+                )
+                continue
+
+            if is_relampago_pers:
+                try:
+                    cliente_rp, asignacion = asignar_relampago_personalizado(db, celular_local, rp_cfg.vigencia_dias)
+                    db.commit()
+                except Exception as exc:
+                    db.rollback()
+                    print(f"[CRON pagos] ERROR asignando relampago personalizado msg={msg_id} celular={celular_local}: {exc}")
+                    continue
+                try:
+                    notificar_relampago_personalizado(celular_wp, asignacion.number)
+                except Exception as exc:
+                    print(f"[CRON pagos] ERROR notificando relampago personalizado msg={msg_id}: {exc}")
+                print(
+                    f"[CRON pagos] msg={msg_id}: relampago personalizado {asignacion.number} asignado a "
+                    f"{celular_local} hasta {asignacion.valid_until}"
                 )
                 continue
 

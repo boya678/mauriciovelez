@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, ServiciosAdminService, VipConfig } from '../../core/services/servicios-admin.service';
+import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, ServiciosAdminService, VipConfig } from '../../core/services/servicios-admin.service';
 
 @Component({
   selector: 'app-servicios',
@@ -17,6 +17,7 @@ export class ServiciosComponent implements OnInit {
   savingConferencia = signal(false);
   savingConferenciaVip = signal(false);
   savingVip = signal(false);
+  savingRelampagoPers = signal(false);
   ok = signal('');
   error = signal('');
 
@@ -45,6 +46,12 @@ export class ServiciosComponent implements OnInit {
     valor: 0,
   };
 
+  relampagoPers: RelampagoPersonalizadoConfig = {
+    activo: false,
+    valor: 0,
+    vigencia_dias: 1,
+  };
+
   constructor(private svc: ServiciosAdminService) {}
 
   ngOnInit(): void {
@@ -67,7 +74,16 @@ export class ServiciosComponent implements OnInit {
                 this.svc.getVip().subscribe({
                   next: (vip) => {
                     this.vip = { ...vip };
-                    this.loading.set(false);
+                    this.svc.getRelampagoPersonalizado().subscribe({
+                      next: (rp) => {
+                        this.relampagoPers = { ...rp };
+                        this.loading.set(false);
+                      },
+                      error: () => {
+                        this.loading.set(false);
+                        this.error.set('No fue posible cargar la configuración de número relámpago personalizado.');
+                      },
+                    });
                   },
                   error: () => {
                     this.loading.set(false);
@@ -113,6 +129,30 @@ export class ServiciosComponent implements OnInit {
       },
       error: (err) => {
         this.savingRelampago.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
+      },
+    });
+  }
+
+  guardarRelampagoPers() {
+    this.savingRelampagoPers.set(true);
+    this.error.set('');
+    this.ok.set('');
+
+    const payload: RelampagoPersonalizadoConfig = {
+      activo: !!this.relampagoPers.activo,
+      valor: Math.max(0, Number(this.relampagoPers.valor || 0)),
+      vigencia_dias: Math.max(1, Number(this.relampagoPers.vigencia_dias || 1)),
+    };
+
+    this.svc.updateRelampagoPersonalizado(payload).subscribe({
+      next: (cfg) => {
+        this.relampagoPers = { ...cfg };
+        this.savingRelampagoPers.set(false);
+        this.ok.set('Configuración de Número relámpago personalizado guardada.');
+      },
+      error: (err) => {
+        this.savingRelampagoPers.set(false);
         this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
       },
     });

@@ -9,10 +9,12 @@ from app.services.servicios_config import (
     get_conferencia_config,
     get_conferencia_vip_config,
     get_numero_relampago_config,
+    get_relampago_personalizado_config,
     get_vip_config,
     set_conferencia_config,
     set_conferencia_vip_config,
     set_numero_relampago_config,
+    set_relampago_personalizado_config,
     set_vip_config,
 )
 
@@ -39,6 +41,18 @@ class VipOut(BaseModel):
 class VipIn(BaseModel):
     activo: bool
     valor: int = Field(ge=0)
+
+
+class RelampagoPersonalizadoOut(BaseModel):
+    activo: bool
+    valor: int
+    vigencia_dias: int
+
+
+class RelampagoPersonalizadoIn(BaseModel):
+    activo: bool
+    valor: int = Field(ge=0)
+    vigencia_dias: int = Field(ge=1)
 
 
 class ConferenciaOut(BaseModel):
@@ -137,6 +151,43 @@ def put_vip(
     db.commit()
 
     return VipOut(activo=cfg.activo, valor=cfg.valor)
+
+
+@router.get("/relampago-personalizado", response_model=RelampagoPersonalizadoOut)
+def get_relampago_personalizado(
+    db: Session = Depends(get_db),
+    _user=Depends(require_admin),
+):
+    cfg = get_relampago_personalizado_config(db)
+    return RelampagoPersonalizadoOut(activo=cfg.activo, valor=cfg.valor, vigencia_dias=cfg.vigencia_dias)
+
+
+@router.put("/relampago-personalizado", response_model=RelampagoPersonalizadoOut)
+def put_relampago_personalizado(
+    payload: RelampagoPersonalizadoIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    if payload.activo and payload.valor <= 0:
+        raise HTTPException(status_code=400, detail="Debes ingresar un monto mayor a 0 cuando el servicio esta activo")
+
+    cfg = set_relampago_personalizado_config(
+        db=db,
+        activo=payload.activo,
+        valor=payload.valor,
+        vigencia_dias=payload.vigencia_dias,
+    )
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="UPDATE",
+        entity="servicios.relampago_personalizado",
+        entity_id="relampago_personalizado",
+        detail={"activo": cfg.activo, "valor": cfg.valor, "vigencia_dias": cfg.vigencia_dias},
+    ))
+    db.commit()
+
+    return RelampagoPersonalizadoOut(activo=cfg.activo, valor=cfg.valor, vigencia_dias=cfg.vigencia_dias)
 
 
 @router.get("/conferencia", response_model=ConferenciaOut)

@@ -13,6 +13,12 @@ export interface VipConfig {
   valor: number;
 }
 
+export interface RelampagoPersonalizadoConfig {
+  activo: boolean;
+  valor: number;
+  vigencia_dias: number;
+}
+
 export interface ConferenciaConfig {
   activo: boolean;
   valor: number;
@@ -47,6 +53,14 @@ export class ServiciosAdminService {
 
   updateVip(payload: VipConfig) {
     return this.http.put<VipConfig>(`${this.base}/vip`, payload);
+  }
+
+  getRelampagoPersonalizado() {
+    return this.http.get<RelampagoPersonalizadoConfig>(`${this.base}/relampago-personalizado`);
+  }
+
+  updateRelampagoPersonalizado(payload: RelampagoPersonalizadoConfig) {
+    return this.http.put<RelampagoPersonalizadoConfig>(`${this.base}/relampago-personalizado`, payload);
   }
 
   getConferencia() {
