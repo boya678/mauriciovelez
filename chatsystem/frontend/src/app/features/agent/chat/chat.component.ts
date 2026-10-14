@@ -45,6 +45,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   mediaSending = signal(false);
   hasMoreMessages = signal(false);
   loadingOlder = signal(false);
+  videoUrls = signal<Record<string, string>>({});
+  loadingVideoIds = signal<Set<string>>(new Set());
 
   private readonly MAX_MESSAGES_IN_MEMORY = 150;
   private shouldScroll = false;
@@ -262,9 +264,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const supportedMime = this.getPreferredAudioMimeType();
       this.recordedChunks = [];
-      this.mediaRecorder = supportedMime
-        ? new MediaRecorder(this.mediaStream, { mimeType: supportedMime })
-        : new MediaRecorder(this.mediaStream);
+      // Voice doesn't need a high bitrate; the browser's default (meant for
+      // general audio) made agent recordings ~8x heavier than the equivalent
+      // WhatsApp voice note.
+      const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: 32000 };
+      if (supportedMime) recorderOptions.mimeType = supportedMime;
+      this.mediaRecorder = new MediaRecorder(this.mediaStream, recorderOptions);
 
       this.mediaRecorder.ondataavailable = (ev: BlobEvent) => {
         if (ev.data && ev.data.size > 0) this.recordedChunks.push(ev.data);
@@ -439,6 +444,13 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     return 'Agente';
   }
 
+  videoSrc(msg: Message): string | null {
+    if (msg.media_content) {
+      return 'data:' + (msg.media_mime_type || 'video/mp4') + ';base64,' + msg.media_content;
+    }
+    return this.videoUrls()[msg.id] ?? null;
+  }
+
   formatTime(iso: string): string {
     const d = new Date(iso);
     const now = new Date();
@@ -498,8 +510,33 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     document.body.appendChild(overlay);
   }
 
+  loadVideo(msg: Message): void {
+    const conv = this.conversation();
+    if (!conv || this.videoUrls()[msg.id] || this.loadingVideoIds().has(msg.id)) return;
+    this.loadingVideoIds.update((ids) => new Set(ids).add(msg.id));
+    this.conversationsService.getMessageMedia(conv.id, msg.id).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        this.videoUrls.update((map) => ({ ...map, [msg.id]: url }));
+        this.loadingVideoIds.update((ids) => {
+          const next = new Set(ids);
+          next.delete(msg.id);
+          return next;
+        });
+      },
+      error: () => {
+        this.loadingVideoIds.update((ids) => {
+          const next = new Set(ids);
+          next.delete(msg.id);
+          return next;
+        });
+      },
+    });
+  }
+
   ngOnDestroy(): void {
     this.cleanupRecorder();
     this.wsSub?.unsubscribe();
+    for (const url of Object.values(this.videoUrls())) URL.revokeObjectURL(url);
   }
 }

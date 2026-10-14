@@ -37,6 +37,13 @@ export class ConversationsService {
     return this.http.get<Message[]>(`${environment.apiUrl}/api/v1/conversations/${id}/messages`, { params });
   }
 
+  getMessageMedia(conversationId: string, messageId: string) {
+    return this.http.get(
+      `${environment.apiUrl}/api/v1/conversations/${conversationId}/messages/${messageId}/media`,
+      { responseType: 'blob' }
+    );
+  }
+
   markRead(id: string) {
     return this.http.post<void>(`${environment.apiUrl}/api/v1/conversations/${id}/read`, {});
   }

@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import desc, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -366,6 +367,16 @@ async def start_conversation(
     return ConversationOut.model_validate(conv)
 
 
+def _serialize_message(m: Message) -> MessageOut:
+    """Video can be 10MB+ of inline base64 — strip it from the list payload
+    and let the frontend fetch it on demand via GET .../media when the agent
+    actually opens it. Images/audio stay inline (small enough not to matter)."""
+    out = MessageOut.model_validate(m)
+    if out.message_type == "video":
+        out.media_content = None
+    return out
+
+
 # ── Detail ────────────────────────────────────────────────────────────────────
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)
@@ -399,7 +410,7 @@ async def get_conversation(
 
     return ConversationDetail(
         **ConversationOut.model_validate(conv).model_dump(),
-        messages=[MessageOut.model_validate(m) for m in recent_msgs],
+        messages=[_serialize_message(m) for m in recent_msgs],
         has_more_messages=len(recent_msgs) == message_limit,
     )
 
@@ -438,7 +449,40 @@ async def get_conversation_messages(
     msgs = (await db.scalars(query)).all()
     if before is not None:
         msgs.reverse()
-    return [MessageOut.model_validate(m) for m in msgs]
+    return [_serialize_message(m) for m in msgs]
+
+
+@router.get("/{conversation_id}/messages/{message_id}/media")
+async def get_message_media(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    tenant: TenantContext = Depends(resolve_tenant),
+    db: AsyncSession = Depends(get_tenant_db),
+    _agent=Depends(require_agent),
+):
+    """Serve a video's raw bytes on demand instead of inline base64 — a single
+    video can be 10MB+, which made opening a conversation containing one slow
+    even after capping how many messages load (see get_conversation)."""
+    conv = await db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant.id,
+        )
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    msg = await db.scalar(
+        select(Message).where(
+            Message.id == message_id,
+            Message.conversation_id == conversation_id,
+        )
+    )
+    if not msg or not msg.media_content:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    raw = base64.b64decode(msg.media_content)
+    return Response(content=raw, media_type=msg.media_mime_type or "application/octet-stream")
 
 
 @router.post("/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)
