@@ -14,6 +14,9 @@ from app.core.admin_security import require_admin
 from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.cliente import Cliente
+from app.models.loteria_resultado import LoteriaResultado
+from app.models.numbers_historic import NumberHistoric
+from app.models.numero_acierto import NumeroAcierto
 from app.models.numero_rifa_entregado import NumeroRifaEntregado
 from app.services.servicios_config import (
     get_conferencia_config,
@@ -260,6 +263,49 @@ def exportar_numeros_rifa(
             registro.descripcion,
         ])
         ws.cell(row=ws.max_row, column=2).number_format = "@"
+
+    # Hoja 2: números relampago asignados y sus aciertos (fecha y lotería hacia la derecha)
+    asignados_q = db.query(NumberHistoric, Cliente.celular, Cliente.nombre).outerjoin(
+        Cliente, Cliente.id == NumberHistoric.id_user
+    ).filter(NumberHistoric.type == "relampago")
+    if fecha_inicio:
+        asignados_q = asignados_q.filter(NumberHistoric.date >= fecha_inicio)
+    if fecha_fin:
+        asignados_q = asignados_q.filter(NumberHistoric.date <= fecha_fin)
+    asignados = asignados_q.order_by(NumberHistoric.date.asc(), NumberHistoric.id.asc()).all()
+
+    aciertos_por_historic: dict[int, list[tuple[date, str]]] = {}
+    if asignados:
+        filas_aciertos = (
+            db.query(NumeroAcierto.historic_id, LoteriaResultado.fecha, LoteriaResultado.loteria)
+            .join(LoteriaResultado, LoteriaResultado.id == NumeroAcierto.resultado_id)
+            .filter(NumeroAcierto.historic_id.in_([h.id for h, _, _ in asignados]))
+            .order_by(LoteriaResultado.fecha.asc(), LoteriaResultado.loteria.asc())
+            .all()
+        )
+        for historic_id, fecha_acierto, loteria in filas_aciertos:
+            aciertos_por_historic.setdefault(historic_id, []).append((fecha_acierto, loteria))
+
+    max_aciertos = max((len(v) for v in aciertos_por_historic.values()), default=0)
+    encabezado = ["Fecha asignación", "Número", "Celular", "Nombre", "Aciertos"]
+    for i in range(1, max_aciertos + 1):
+        encabezado += [f"Acierto {i} - Fecha", f"Acierto {i} - Lotería"]
+
+    ws2 = wb.create_sheet("Numeros asignados")
+    ws2.append(encabezado)
+    for historic, celular, nombre in asignados:
+        aciertos = aciertos_por_historic.get(historic.id, [])
+        fila = [
+            historic.date.strftime("%d/%m/%Y"),
+            historic.number,
+            celular or "",
+            nombre or "",
+            len(aciertos),
+        ]
+        for fecha_acierto, loteria in aciertos:
+            fila += [fecha_acierto.strftime("%d/%m/%Y"), loteria]
+        ws2.append(fila)
+        ws2.cell(row=ws2.max_row, column=2).number_format = "@"
 
     output = io.BytesIO()
     wb.save(output)

@@ -193,6 +193,18 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         ])
         _log_chat(numero_dest, f"[Notificación WhatsApp] Número relámpago: {texto}", msg_id)
 
+    elif type == "notificar_relampago_personalizado":
+        if not settings.WHATSAPP_NOTIFICAR_PERSONALIZADO:
+            logger.warning("WHATSAPP_NOTIFICAR_PERSONALIZADO no configurado")
+            return
+        texto = str(params.get("texto", "Notificacion relampago"))
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_NOTIFICAR_PERSONALIZADO, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": texto},
+            ]},
+        ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Número relámpago personalizado: {texto}", msg_id)
+
     elif type == "notificar_conferencia":
         if not settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
             logger.warning("WHATSAPP_NOTIFICAR_CONFERENCIA no configurado")

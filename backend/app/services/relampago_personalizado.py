@@ -68,8 +68,8 @@ def notificar_relampago_personalizado(
     celular_wp: str, numero: str, rifa: NumeroRifaEntregado | None = None,
 ) -> None:
     """Encola el aviso del número relámpago y, si hay, el del número de rifa."""
-    if settings.WHATSAPP_NOTIFICAR_RELAMPAGO:
+    if settings.WHATSAPP_NOTIFICAR_PERSONALIZADO:
         metodo = numero[:-3] + numero[-3:][::-1] if len(numero) >= 3 else numero[::-1]
-        push("notificar_relampago", celular_wp, {"texto": f"{numero} - {metodo}"})
+        push("notificar_relampago_personalizado", celular_wp, {"texto": f"{numero} - {metodo}"})
     if rifa is not None:
         push("notificar_numero_rifa", celular_wp, {"numero": rifa.numero, "descripcion": rifa.descripcion})
