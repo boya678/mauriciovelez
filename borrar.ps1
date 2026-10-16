@@ -1,5 +1,5 @@
 $body = @{
-    "match[]" = '{namespace="whastshop"}'
+    "match[]" = '{namespace="apisix"}'
 }
 
 Invoke-RestMethod `
