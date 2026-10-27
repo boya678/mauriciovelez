@@ -205,6 +205,17 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         ])
         _log_chat(numero_dest, f"[Notificación WhatsApp] Número relámpago personalizado: {texto}", msg_id)
 
+    elif type == "notificar_tabla_numerologica":
+        if not settings.WHATSAPP_TEMPLATE_NOTIFICACION_ULTIMO_CLICO:
+            logger.warning("WHATSAPP_TEMPLATE_NOTIFICACION_ULTIMO_CLICO no configurado")
+            return
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_ULTIMO_CLICO, [
+            {"type": "header", "parameters": [
+                {"type": "image", "image": {"link": params["url"]}},
+            ]},
+        ])
+        _log_chat(numero_dest, "[Notificación WhatsApp] Tabla numerológica (foto) enviada", msg_id)
+
     elif type == "notificar_conferencia":
         if not settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
             logger.warning("WHATSAPP_NOTIFICAR_CONFERENCIA no configurado")

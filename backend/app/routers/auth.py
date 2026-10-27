@@ -146,6 +146,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         cliente=cliente,
         es_nuevo=es_nuevo,
         disabled_msg=settings.CLIENTE_DISABLED_MSG if not cliente.enabled else None,
+        requiere_referido=not cliente.registro_completado,
     )
 
 
@@ -266,6 +267,22 @@ def _enviar_whatsapp_referido(celular: str, param1: str, param2: str) -> None:
         pass  # notificación no bloqueante
 
 
+def _marcar_registro_completado(cliente: Cliente, db: Session) -> None:
+    if not cliente.registro_completado:
+        cliente.registro_completado = True
+        db.commit()
+
+
+@router.post('/referido/omitir', status_code=200)
+def omitir_referido(
+    current_user: Cliente = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """El cliente no tiene código de referido: no se le vuelve a pedir."""
+    _marcar_registro_completado(current_user, db)
+    return {'ok': True}
+
+
 @router.post('/referido', status_code=200)
 def guardar_referido(
     payload: ReferidoRequest,
@@ -273,6 +290,7 @@ def guardar_referido(
     db: Session = Depends(get_db),
 ):
     """Guarda el código de referido del cliente nuevo (solo una vez, silencioso si no existe)."""
+    _marcar_registro_completado(current_user, db)
     if current_user.referente:
         return {'ok': True}  # ya registrado, no sobrescribir
 

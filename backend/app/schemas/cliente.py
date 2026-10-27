@@ -42,6 +42,7 @@ class LoginResponse(BaseModel):
     cliente: ClienteResponse
     es_nuevo: bool
     disabled_msg: str | None = None
+    requiere_referido: bool = False
 
 
 class VipVerifyRequest(BaseModel):

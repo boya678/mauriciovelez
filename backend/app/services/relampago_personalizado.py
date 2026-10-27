@@ -43,6 +43,7 @@ def asignar_relampago_personalizado(
             codigo_pais="57",
             tipo_cliente=1,
             saldo=0,
+            registro_completado=False,
         )
         db.add(cliente)
         db.flush()

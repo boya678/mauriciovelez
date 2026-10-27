@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     WHATSAPP_NOTIFICAR_RENOVACION: str = ""
     WHATSAPP_NOTIFICAR_RELAMPAGO: str = ""
     WHATSAPP_NOTIFICAR_PERSONALIZADO: str = ""
+    WHATSAPP_TEMPLATE_NOTIFICACION_ULTIMO_CLICO: str = ""
+    PUBLIC_API_URL: str = "https://api.mauricioveleznumerologo.com"
     WHATSAPP_NOTIFICAR_CONFERENCIA: str = ""
     # Cron hora Colombia (minuto hora dom mes dow)
     CRON_NUMEROS: str = "0 8 * * *"        # reasignación de números 08:00 COL
@@ -39,7 +41,9 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_KEY: str = ""
     AZURE_OPENAI_DEPLOYMENT: str = "gpt-4.1-mini"
-    AZURE_OPENAI_TEMPERATURE: float = 0.0
+    AZURE_OPENAI_API_VERSION: str = "2025-04-01-preview"
+    # Vacío = no se envía (gpt-6.1-terra solo admite el valor por defecto)
+    AZURE_OPENAI_TEMPERATURE: str = ""
     VIP_AMOUNT: int = 30000
     CRON_PAGOS: str = "*/10 * * * *"
     # Validación de destino del comprobante (anti-fraude)

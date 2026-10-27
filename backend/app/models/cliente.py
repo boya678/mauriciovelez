@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,6 +27,10 @@ class Cliente(Base):
     ciudad: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     barrio: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # False = creado por un servicio; el portal le pide el referido en su primer ingreso
+    registro_completado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     tipo_cliente: Mapped[int] = mapped_column(
         Integer,
         ForeignKey('tipos_cliente.id', onupdate='CASCADE'),

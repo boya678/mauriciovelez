@@ -44,9 +44,11 @@ from app.services.servicios_config import (
     get_conferencia_vip_config,
     get_numero_relampago_config,
     get_relampago_personalizado_config,
+    get_tabla_numerologica_config,
     get_vip_config,
 )
 from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
+from app.services.tabla_numerologica import notificar_tabla_numerologica, registrar_entrega as registrar_entrega_tabla_numerologica
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 from app.core.live_events import publish_event
@@ -638,6 +640,7 @@ def _crear_cliente_vip(db, celular_local: str, celular_wp: str) -> Cliente:
         tipo_cliente=1,
         codigo_vip=codigo_vip,
         saldo=0,
+        registro_completado=False,
     )
     db.add(nuevo)
     db.flush()
@@ -741,6 +744,7 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
         relampago_cfg = get_numero_relampago_config(db)
         vip_cfg = get_vip_config(db)
         rp_cfg = get_relampago_personalizado_config(db)
+        tn_cfg = get_tabla_numerologica_config(db)
         print(f"[CRON pagos] {len(pendientes)} imágenes pendientes de análisis")
 
         for row in pendientes:
@@ -887,8 +891,14 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                 and monto is not None
                 and int(monto) == rp_cfg.valor
             )
+            is_tabla_num = bool(
+                tn_cfg.activo
+                and tn_cfg.valor > 0
+                and monto is not None
+                and int(monto) == tn_cfg.valor
+            )
 
-            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
+            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_tabla_num and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
                 print(
                     f"[CRON pagos] msg={msg_id}: monto {monto} no coincide con VIP ({settings.VIP_AMOUNT}) "
                     f"ni VIP alterno ({vip_cfg.valor if vip_cfg.activo else 'inactivo'}) "
@@ -911,6 +921,7 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                         else "conferencia" if is_conferencia
                         else "numero_relampago" if is_relampago
                         else "numero_relampago_personalizado" if is_relampago_pers
+                        else "tabla_numerologica" if is_tabla_num
                         else "pago vip (servicio)" if is_vip_extra
                         else "pago vip"
                     ),
@@ -1009,6 +1020,22 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                     f"{celular_local} hasta {asignacion.valid_until}"
                     + (f", rifa {rifa_rp.numero}" if rifa_rp else "")
                 )
+                continue
+
+            if is_tabla_num:
+                try:
+                    registrar_entrega_tabla_numerologica(db, celular_local, msg_id)
+                    db.commit()
+                except Exception as exc:
+                    db.rollback()
+                    print(f"[CRON pagos] ERROR registrando tabla numerologica msg={msg_id} celular={celular_local}: {exc}")
+                    continue
+                try:
+                    if not notificar_tabla_numerologica(db, celular_wp):
+                        print(f"[CRON pagos] msg={msg_id}: tabla numerologica sin foto cargada, no se envió")
+                except Exception as exc:
+                    print(f"[CRON pagos] ERROR notificando tabla numerologica msg={msg_id}: {exc}")
+                print(f"[CRON pagos] msg={msg_id}: tabla numerologica enviada a {celular_local}")
                 continue
 
             # ── 8. Renovar o crear cliente ─────────────────────────────────────

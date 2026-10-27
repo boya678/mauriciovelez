@@ -142,7 +142,15 @@ export class LoginComponent implements OnInit {
     this.authService.login({ ...this.form.value, celular: this.form.value.celular, codigo_pais: this.codigoPais }).subscribe({
       next: res => {
         this.loading.set(false);
-        this.handleLoginSuccess(res);
+        if (res.requiere_referido) {
+          // Cliente creado por un servicio: se le pide el referido en su primer ingreso
+          this.pendingLoginRes = res;
+          this.referidoCode = '';
+          this.referidoError.set('');
+          this.showReferidoModal.set(true);
+        } else {
+          this.handleLoginSuccess(res);
+        }
       },
       error: err => {
         const detail = err?.error?.detail;
@@ -236,6 +244,8 @@ export class LoginComponent implements OnInit {
 
   skipReferido(): void {
     this.showReferidoModal.set(false);
+    // Avisa al backend para no volver a pedir el referido; el ingreso no depende del resultado
+    this.authService.omitirReferido().subscribe({ error: () => {} });
     this.handleLoginSuccess(this.pendingLoginRes);
   }
 

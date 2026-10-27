@@ -18,7 +18,7 @@ def analizar_imagen_con_ia(base64_img: str, mime_type: str) -> dict:
     client = AzureOpenAI(
         azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
         api_key=settings.AZURE_OPENAI_API_KEY,
-        api_version="2024-02-15-preview",
+        api_version=settings.AZURE_OPENAI_API_VERSION,
     )
 
     nombres_autorizados = ", ".join(
@@ -57,9 +57,12 @@ def analizar_imagen_con_ia(base64_img: str, mime_type: str) -> dict:
         "Si no puedes leer con certeza el número o nombre del destinatario, responde null en ese campo."
     )
 
+    extra = {}
+    if settings.AZURE_OPENAI_TEMPERATURE.strip():
+        extra["temperature"] = float(settings.AZURE_OPENAI_TEMPERATURE)
+
     response = client.chat.completions.create(
         model=settings.AZURE_OPENAI_DEPLOYMENT,
-        temperature=settings.AZURE_OPENAI_TEMPERATURE,
         messages=[
             {
                 "role": "user",
@@ -75,7 +78,8 @@ def analizar_imagen_con_ia(base64_img: str, mime_type: str) -> dict:
                 ],
             }
         ],
-        max_tokens=256,
+        max_completion_tokens=1024,
+        **extra,
     )
 
     raw = response.choices[0].message.content.strip()

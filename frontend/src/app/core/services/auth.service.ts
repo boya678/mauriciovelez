@@ -24,6 +24,7 @@ export interface LoginResponse {
   cliente: Cliente;
   es_nuevo: boolean;
   disabled_msg: string | null;
+  requiere_referido?: boolean;
 }
 
 export interface LoginRequest {
@@ -83,6 +84,14 @@ export class AuthService {
     return this.http.post<{ ok: boolean }>(
       `${environment.apiUrl}/auth/referido`,
       { codigo },
+      { headers: this.authHeaders() }
+    );
+  }
+
+  omitirReferido(): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(
+      `${environment.apiUrl}/auth/referido/omitir`,
+      {},
       { headers: this.authHeaders() }
     );
   }

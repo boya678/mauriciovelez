@@ -245,4 +245,64 @@
       </div>
     }
   </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Tabla numerológica</h2>
+        <p>Al pagar este monto se envía por WhatsApp solo la foto configurada (plantilla sin texto variable). No crea clientes ni asigna números.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="tablaNum.activo" />
+      </label>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando configuración...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="field">
+          <label>Valor</label>
+          <input type="number" min="0" step="1" [(ngModel)]="tablaNum.valor" placeholder="10000" />
+          <small>Monto exacto que envía la foto.</small>
+        </div>
+
+        <div class="field">
+          <label>Foto (solo JPG, máx. 5 MB)</label>
+          <input type="file" accept="image/jpeg,.jpg,.jpeg" [disabled]="subiendoFotoTablaNum()" (change)="onFotoTablaNum($event)" />
+          <small>
+            @if (subiendoFotoTablaNum()) { Subiendo foto... }
+            @else if (tablaNum.tiene_foto) { Foto cargada. Sube otra para reemplazarla. }
+            @else { Sin foto cargada. Es obligatoria para activar el servicio. }
+          </small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="savingTablaNum()" (click)="guardarTablaNum()">
+          @if (savingTablaNum()) { Guardando... } @else { Guardar configuración }
+        </button>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Descargar entregas — desde</label>
+          <input type="date" [(ngModel)]="tablaNumDesde" />
+        </div>
+
+        <div class="field">
+          <label>Hasta</label>
+          <input type="date" [(ngModel)]="tablaNumHasta" />
+          <small>Sin fechas descarga los últimos 30 días.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" [disabled]="exportandoTablaNum()" (click)="descargarTablaNum()">
+          @if (exportandoTablaNum()) { Descargando... } @else { Descargar Excel }
+        </button>
+      </div>
+    }
+  </section>
 </div>

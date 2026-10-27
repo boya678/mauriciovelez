@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, ServiciosAdminService, VipConfig } from '../../core/services/servicios-admin.service';
+import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, ServiciosAdminService, TablaNumerologicaConfig, VipConfig } from '../../core/services/servicios-admin.service';
 
 @Component({
   selector: 'app-servicios',
@@ -19,6 +19,11 @@ export class ServiciosComponent implements OnInit {
   savingVip = signal(false);
   savingRelampagoPers = signal(false);
   exportandoRifa = signal(false);
+  savingTablaNum = signal(false);
+  subiendoFotoTablaNum = signal(false);
+  exportandoTablaNum = signal(false);
+  tablaNumDesde = '';
+  tablaNumHasta = '';
   rifaDesde = '';
   rifaHasta = '';
   ok = signal('');
@@ -57,6 +62,12 @@ export class ServiciosComponent implements OnInit {
     rifa_descripcion: '',
   };
 
+  tablaNum: TablaNumerologicaConfig = {
+    activo: false,
+    valor: 0,
+    tiene_foto: false,
+  };
+
   constructor(private svc: ServiciosAdminService) {}
 
   ngOnInit(): void {
@@ -82,7 +93,16 @@ export class ServiciosComponent implements OnInit {
                     this.svc.getRelampagoPersonalizado().subscribe({
                       next: (rp) => {
                         this.relampagoPers = { ...rp };
-                        this.loading.set(false);
+                        this.svc.getTablaNumerologica().subscribe({
+                          next: (tn) => {
+                            this.tablaNum = { ...tn };
+                            this.loading.set(false);
+                          },
+                          error: () => {
+                            this.loading.set(false);
+                            this.error.set('No fue posible cargar la configuración de tabla numerológica.');
+                          },
+                        });
                       },
                       error: () => {
                         this.loading.set(false);
@@ -111,6 +131,78 @@ export class ServiciosComponent implements OnInit {
       error: () => {
         this.loading.set(false);
         this.error.set('No fue posible cargar la configuración de servicios.');
+      },
+    });
+  }
+
+  guardarTablaNum() {
+    this.savingTablaNum.set(true);
+    this.error.set('');
+    this.ok.set('');
+
+    const payload = {
+      activo: !!this.tablaNum.activo,
+      valor: Math.max(0, Number(this.tablaNum.valor || 0)),
+    };
+
+    this.svc.updateTablaNumerologica(payload).subscribe({
+      next: (cfg) => {
+        this.tablaNum = { ...cfg };
+        this.savingTablaNum.set(false);
+        this.ok.set('Configuración de Tabla numerológica guardada.');
+      },
+      error: (err) => {
+        this.savingTablaNum.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
+      },
+    });
+  }
+
+  onFotoTablaNum(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+    this.error.set('');
+    this.ok.set('');
+
+    if (archivo.type !== 'image/jpeg') {
+      input.value = '';
+      this.error.set('La foto debe ser JPG.');
+      return;
+    }
+
+    this.subiendoFotoTablaNum.set(true);
+    this.svc.subirFotoTablaNumerologica(archivo).subscribe({
+      next: (cfg) => {
+        this.tablaNum = { ...this.tablaNum, tiene_foto: cfg.tiene_foto };
+        this.subiendoFotoTablaNum.set(false);
+        input.value = '';
+        this.ok.set('Foto de Tabla numerológica guardada.');
+      },
+      error: (err) => {
+        this.subiendoFotoTablaNum.set(false);
+        input.value = '';
+        this.error.set(err?.error?.detail || 'No fue posible subir la foto.');
+      },
+    });
+  }
+
+  descargarTablaNum() {
+    this.exportandoTablaNum.set(true);
+    this.error.set('');
+    this.svc.exportarTablaNumerologica(this.tablaNumDesde || undefined, this.tablaNumHasta || undefined).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tabla_numerologica_${this.tablaNumDesde || 'inicio'}_a_${this.tablaNumHasta || 'fin'}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exportandoTablaNum.set(false);
+      },
+      error: () => {
+        this.exportandoTablaNum.set(false);
+        this.error.set('No fue posible descargar las entregas.');
       },
     });
   }

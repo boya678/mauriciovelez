@@ -28,6 +28,12 @@ class RelampagoPersonalizadoConfig:
 
 
 @dataclass(frozen=True)
+class TablaNumerologicaConfig:
+    activo: bool
+    valor: int
+
+
+@dataclass(frozen=True)
 class ConferenciaConfig:
     activo: bool
     valor: int
@@ -56,6 +62,9 @@ KEY_RP_VIGENCIA = "servicio_relampago_personalizado_vigencia_dias"
 KEY_RP_RIFA_ACTIVO = "servicio_relampago_personalizado_rifa_activo"
 KEY_RP_RIFA_DESC = "servicio_relampago_personalizado_rifa_descripcion"
 KEY_RP_RIFA_SIGUIENTE = "servicio_relampago_personalizado_rifa_siguiente"
+
+KEY_TN_ACTIVO = "servicio_tabla_numerologica_activo"
+KEY_TN_VALOR = "servicio_tabla_numerologica_valor"
 
 KEY_CONF_ACTIVO = "servicio_conferencia_activo"
 KEY_CONF_VALOR = "servicio_conferencia_valor"
@@ -182,6 +191,33 @@ def set_relampago_personalizado_config(
         activo=activo, valor=max(0, int(valor)), vigencia_dias=vigencia,
         rifa_activo=rifa_activo, rifa_descripcion=descripcion,
     )
+
+
+def get_tabla_numerologica_config(db: Session) -> TablaNumerologicaConfig:
+    p_activo = db.get(Parametro, KEY_TN_ACTIVO)
+    p_valor = db.get(Parametro, KEY_TN_VALOR)
+    return TablaNumerologicaConfig(
+        activo=_parse_bool(p_activo.valor if p_activo else None, default=False),
+        valor=max(0, _parse_int(p_valor.valor if p_valor else None, default=0)),
+    )
+
+
+def set_tabla_numerologica_config(db: Session, activo: bool, valor: int) -> TablaNumerologicaConfig:
+    data = {
+        KEY_TN_ACTIVO: ("1" if activo else "0", "Servicio tabla numerologica activo (1/0)"),
+        KEY_TN_VALOR: (str(max(0, int(valor))), "Monto exacto que envia la foto de la tabla numerologica"),
+    }
+
+    for key, (raw_val, desc) in data.items():
+        p = db.get(Parametro, key)
+        if p:
+            p.valor = raw_val
+            p.descripcion = desc
+        else:
+            db.add(Parametro(clave=key, valor=raw_val, descripcion=desc))
+
+    db.flush()
+    return TablaNumerologicaConfig(activo=activo, valor=max(0, int(valor)))
 
 
 def get_conferencia_config(db: Session) -> ConferenciaConfig:

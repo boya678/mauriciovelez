@@ -3,22 +3,11 @@
   "to": "573215332978",
   "type": "template",
   "template": {
-    "name": "promo_5000",
+    "name": "tauro",
     "language": {
       "code": "es_co"
     },
     "components": [
-            {
-        "type": "header",
-        "parameters": [
-          {
-            "type": "video",
-            "video": {
-              "link": "https://res.cloudinary.com/dfpy0exz1/video/upload/v1791475304/Video_Numero_online-video-cutter.com_f9rzaq.mp4" 
-            }
-          }
-        ]
-      },
       {
         "type": "body",
         "parameters": []
