@@ -42,6 +42,11 @@ def _get_llm(temperature: float = 0.3, max_tokens: int = 400) -> AzureChatOpenAI
         "api_version": settings.AZURE_OPENAI_API_VERSION,
         "api_key": settings.AZURE_OPENAI_API_KEY,
         "max_tokens": max_tokens,
+        # Reasoning-family deployments (e.g. gpt-6.1-terra) default to a
+        # reasoning_effort that Azure rejects outright whenever tools are
+        # bound ("Function tools with reasoning_effort are not supported").
+        # "none" disables that path so tool calls keep working.
+        "reasoning_effort": "none",
     }
     temp_env = (settings.AZURE_OPENAI_TEMPERATURE or "").strip()
     if temp_env:
