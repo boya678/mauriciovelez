@@ -50,7 +50,7 @@ from app.services.servicios_config import (
 )
 from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
 from app.services.tabla_numerologica import notificar_tabla_numerologica, registrar_entrega as registrar_entrega_tabla_numerologica
-from app.services.rifa_enumerada import boletas_por_pagar, marcar_boletas_pagadas
+from app.services.rifa_enumerada import boletas_por_pagar, marcar_boletas_pagadas, notificar_pago, subir_comprobante
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 from app.core.live_events import publish_event
@@ -1061,7 +1061,10 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                     db.rollback()
                     print(f"[CRON pagos] ERROR marcando boletas pagadas msg={msg_id} celular={celular_local}: {exc}")
                     continue
-                print(f"[CRON pagos] msg={msg_id}: rifa enumerada, {pagadas} boleta(s) pagadas por {celular_local}")
+                print(f"[CRON pagos] msg={msg_id}: rifa enumerada, {len(pagadas)} boleta(s) pagadas por {celular_local}")
+                if pagadas:
+                    notificar_pago(celular_local, pagadas)
+                    subir_comprobante(celular_local, comprobante_num, base64_img, mime_type)
                 continue
 
             # ── 8. Renovar o crear cliente ─────────────────────────────────────

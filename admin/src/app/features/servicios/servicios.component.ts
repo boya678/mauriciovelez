@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, RifaEnumeradaConfig, RifaEnumeradaLote, ServiciosAdminService, TablaNumerologicaConfig, VipConfig } from '../../core/services/servicios-admin.service';
+import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, RifaEnumeradaBoleta, RifaEnumeradaConfig, RifaEnumeradaLote, ServiciosAdminService, TablaNumerologicaConfig, VipConfig } from '../../core/services/servicios-admin.service';
 
 @Component({
   selector: 'app-servicios',
@@ -20,6 +20,12 @@ export class ServiciosComponent implements OnInit, OnDestroy {
   exportandoRe = signal(false);
   loteRe = signal<RifaEnumeradaLote | null>(null);
   incluirRepetidosRe = false;
+  cantidadGuardadaRe = 1;
+  celularRetiro = '';
+  buscandoRetiro = signal(false);
+  retirando = signal(false);
+  boletasRetiro = signal<RifaEnumeradaBoleta[] | null>(null);
+  seleccionRetiro = signal<number[]>([]);
   reDesde = '';
   reHasta = '';
   private pollRe: ReturnType<typeof setInterval> | null = null;
@@ -159,7 +165,10 @@ export class ServiciosComponent implements OnInit, OnDestroy {
 
   cargarRifaEnum() {
     this.svc.getRifaEnumerada().subscribe({
-      next: (cfg) => (this.rifaEnum = { ...cfg }),
+      next: (cfg) => {
+        this.rifaEnum = { ...cfg };
+        this.cantidadGuardadaRe = cfg.cantidad;
+      },
       error: () => this.error.set('No fue posible cargar la configuración de rifa enumerada.'),
     });
     this.svc.getUltimoLoteRifaEnumerada().subscribe({
@@ -170,7 +179,9 @@ export class ServiciosComponent implements OnInit, OnDestroy {
 
   private setLoteRe(lote: RifaEnumeradaLote | null) {
     this.loteRe.set(lote);
-    if (lote?.estado === 'enviando') this.iniciarPollRe();
+    // Tras el aviso las solicitudes siguen llegando; se refresca hasta que todos pidan sus boletas.
+    const esperandoSolicitudes = lote?.estado === 'finalizado' && lote.solicitaron < lote.avisos_enviados;
+    if (lote?.estado === 'enviando' || esperandoSolicitudes) this.iniciarPollRe();
     else this.detenerPollRe();
   }
 
@@ -183,7 +194,7 @@ export class ServiciosComponent implements OnInit, OnDestroy {
         return;
       }
       this.svc.getLoteRifaEnumerada(lote.id).subscribe({ next: (l) => this.setLoteRe(l) });
-    }, 3000);
+    }, 5000);
   }
 
   private detenerPollRe() {
@@ -191,9 +202,8 @@ export class ServiciosComponent implements OnInit, OnDestroy {
     this.pollRe = null;
   }
 
-  boletasAEnviarRe(lote: RifaEnumeradaLote): number {
-    const celulares = lote.validas - (this.incluirRepetidosRe ? 0 : lote.ya_recibieron);
-    return Math.max(0, celulares) * Math.max(1, Number(this.rifaEnum.cantidad || 1));
+  celularesAEnviarRe(lote: RifaEnumeradaLote): number {
+    return Math.max(0, lote.validas - (this.incluirRepetidosRe ? 0 : lote.ya_recibieron));
   }
 
   guardarRifaEnum() {
@@ -208,6 +218,7 @@ export class ServiciosComponent implements OnInit, OnDestroy {
     this.svc.updateRifaEnumerada(payload).subscribe({
       next: (cfg) => {
         this.rifaEnum = { ...cfg };
+        this.cantidadGuardadaRe = cfg.cantidad;
         this.savingRe.set(false);
         this.ok.set('Configuración de Rifa enumerada guardada.');
       },
@@ -274,8 +285,12 @@ export class ServiciosComponent implements OnInit, OnDestroy {
   enviarRifaEnum() {
     const lote = this.loteRe();
     if (!lote) return;
-    const total = this.boletasAEnviarRe(lote);
-    if (!confirm(`Se enviarán ${total} boletas por WhatsApp. ¿Continuar?`)) return;
+    if (Math.max(1, Number(this.rifaEnum.cantidad || 1)) !== this.cantidadGuardadaRe) {
+      this.error.set('Cambiaste "Boletas por celular" pero no lo guardaste. Pulsa "Guardar configuración" antes de enviar.');
+      return;
+    }
+    const total = this.celularesAEnviarRe(lote);
+    if (!confirm(`Se enviará el aviso a ${total} celulares. Cada uno recibirá ${this.cantidadGuardadaRe} boletas cuando presione SOLICITAR BOLETAS. ¿Continuar?`)) return;
     this.enviandoRe.set(true);
     this.error.set('');
     this.ok.set('');
@@ -287,6 +302,63 @@ export class ServiciosComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.enviandoRe.set(false);
         this.error.set(err?.error?.detail || 'No fue posible iniciar el envío.');
+      },
+    });
+  }
+
+  retirable(b: RifaEnumeradaBoleta): boolean {
+    return b.estado_envio === 'enviada' && !b.pagada && !b.retirada;
+  }
+
+  estadoBoletaRe(b: RifaEnumeradaBoleta): string {
+    if (b.retirada) return 'Retirada';
+    if (b.pagada) return 'Pagada';
+    if (b.estado_envio === 'error') return 'No enviada';
+    if (b.estado_envio === 'pendiente') return 'Pendiente de envío';
+    return 'Sin pagar';
+  }
+
+  toggleRetiro(id: number) {
+    const actual = this.seleccionRetiro();
+    this.seleccionRetiro.set(actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id]);
+  }
+
+  buscarRetiro() {
+    this.buscandoRetiro.set(true);
+    this.error.set('');
+    this.ok.set('');
+    this.boletasRetiro.set(null);
+    this.seleccionRetiro.set([]);
+    this.svc.getBoletasCelularRifaEnumerada(this.celularRetiro.trim()).subscribe({
+      next: (res) => {
+        this.boletasRetiro.set(res.boletas);
+        this.buscandoRetiro.set(false);
+      },
+      error: (err) => {
+        this.buscandoRetiro.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible consultar las boletas.');
+      },
+    });
+  }
+
+  retirarSeleccion() {
+    const boletas = this.boletasRetiro() || [];
+    const ids = this.seleccionRetiro();
+    if (!ids.length) return;
+    const numeros = boletas.filter((b) => ids.includes(b.id)).map((b) => b.numero).join(', ');
+    if (!confirm(`Se retirarán las boletas ${numeros} del celular ${this.celularRetiro.trim()}, se les avisará por WhatsApp y los números volverán al pool. ¿Continuar?`)) return;
+    this.retirando.set(true);
+    this.error.set('');
+    this.ok.set('');
+    this.svc.retirarBoletasRifaEnumerada(this.celularRetiro.trim(), ids).subscribe({
+      next: (res) => {
+        this.retirando.set(false);
+        this.ok.set(`Boletas retiradas: ${res.numeros.join(', ')}.`);
+        this.buscarRetiro();
+      },
+      error: (err) => {
+        this.retirando.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible retirar las boletas.');
       },
     });
   }

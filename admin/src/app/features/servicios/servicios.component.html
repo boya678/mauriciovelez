@@ -310,7 +310,7 @@
     <div class="card-head">
       <div>
         <h2>Rifa enumerada</h2>
-        <p>Se sube un Excel con celulares y a cada uno se le envía por WhatsApp la boleta con su número (0000–9999, en desorden). Al pagar este monto, las boletas de ese celular quedan pagadas. No crea clientes.</p>
+        <p>Se sube un Excel con celulares y a cada uno se le envía por WhatsApp un aviso con el botón SOLICITAR BOLETAS. Cuando lo presiona, recibe sus boletas con número (0000–9999, en desorden). Al pagar este monto, las boletas de ese celular quedan pagadas. No crea clientes.</p>
       </div>
       <label class="switch-wrap">
         <span>Activo</span>
@@ -387,37 +387,78 @@
             </label>
           }
 
-          <p>Se enviarán <strong>{{ boletasAEnviarRe(lote) }}</strong> boletas (máximo 40 mensajes por segundo).</p>
+          <p>Se enviará el aviso a <strong>{{ celularesAEnviarRe(lote) }}</strong> celulares (máximo 40 mensajes por segundo). Cada uno recibirá {{ cantidadGuardadaRe }} boletas cuando presione SOLICITAR BOLETAS.</p>
 
           <div class="actions">
-            <button class="btn-primary" [disabled]="enviandoRe() || boletasAEnviarRe(lote) === 0" (click)="enviarRifaEnum()">
+            <button class="btn-primary" [disabled]="enviandoRe() || celularesAEnviarRe(lote) === 0" (click)="enviarRifaEnum()">
               @if (enviandoRe()) { Iniciando... } @else { Enviar }
             </button>
           </div>
         } @else {
           <p>
-            @if (lote.estado === 'enviando') { <strong>Enviando...</strong> } @else { <strong>Envío finalizado.</strong> }
-            {{ lote.enviadas }} enviadas · {{ lote.errores_total }} no enviadas · {{ lote.pendientes }} pendientes de {{ lote.boletas_total }}.
+            @if (lote.estado === 'enviando') { <strong>Enviando avisos...</strong> } @else { <strong>Avisos enviados.</strong> }
+            {{ lote.avisos_enviados }} enviados · {{ lote.errores_total }} no enviados · {{ lote.avisos_pendientes }} pendientes de {{ lote.avisos_total }}.
           </p>
-          @if (lote.boletas_total > 0) {
-            <progress [value]="lote.enviadas + lote.errores_total" [max]="lote.boletas_total"></progress>
+          @if (lote.avisos_total > 0) {
+            <progress [value]="lote.avisos_enviados + lote.errores_total" [max]="lote.avisos_total"></progress>
           }
+          <p>
+            Solicitaron boletas: <strong>{{ lote.solicitaron }}</strong> de {{ lote.avisos_enviados }}.
+            Boletas entregadas: <strong>{{ lote.boletas_enviadas }}</strong>.
+          </p>
 
           @if (lote.errores_total > 0) {
             <details>
-              <summary>Ver boletas no enviadas ({{ lote.errores_total }})</summary>
+              <summary>Ver avisos no enviados ({{ lote.errores_total }})</summary>
               <table class="tabla-re">
-                <thead><tr><th>Celular</th><th>Boleta</th><th>Motivo</th></tr></thead>
+                <thead><tr><th>Celular</th><th>Motivo</th></tr></thead>
                 <tbody>
                   @for (e of lote.errores; track $index) {
-                    <tr><td>{{ e.celular }}</td><td>{{ e.numero }}</td><td>{{ e.error }}</td></tr>
+                    <tr><td>{{ e.celular }}</td><td>{{ e.error }}</td></tr>
                   }
                 </tbody>
               </table>
-              @if (lote.errores_total > lote.errores.length) { <small>Se muestran las primeras {{ lote.errores.length }}; el Excel incluye todas.</small> }
+              @if (lote.errores_total > lote.errores.length) { <small>Se muestran los primeros {{ lote.errores.length }}; el Excel incluye todos.</small> }
             </details>
           }
         }
+      </div>
+    }
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Retirar boletas — celular</label>
+        <input type="text" inputmode="numeric" [(ngModel)]="celularRetiro" placeholder="3001234567" (keyup.enter)="buscarRetiro()" />
+        <small>Solo se pueden retirar boletas enviadas y sin pagar. Vuelven al pool y se avisa por WhatsApp.</small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" [disabled]="buscandoRetiro() || !celularRetiro.trim()" (click)="buscarRetiro()">
+        @if (buscandoRetiro()) { Consultando... } @else { Consultar boletas }
+      </button>
+    </div>
+
+    @if (boletasRetiro(); as boletas) {
+      <div class="lote-re">
+        <table class="tabla-re">
+          <thead><tr><th></th><th>Boleta</th><th>Estado</th><th>Enviada</th></tr></thead>
+          <tbody>
+            @for (b of boletas; track b.id) {
+              <tr>
+                <td><input type="checkbox" [disabled]="!retirable(b) || retirando()" [checked]="seleccionRetiro().includes(b.id)" (change)="toggleRetiro(b.id)" /></td>
+                <td>{{ b.numero }}</td>
+                <td>{{ estadoBoletaRe(b) }}</td>
+                <td>{{ b.fecha || '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <div class="actions">
+          <button class="btn-primary" [disabled]="retirando() || !seleccionRetiro().length" (click)="retirarSeleccion()">
+            @if (retirando()) { Retirando... } @else { Retirar ({{ seleccionRetiro().length }}) }
+          </button>
+        </div>
       </div>
     }
 

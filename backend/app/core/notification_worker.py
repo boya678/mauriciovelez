@@ -216,6 +216,30 @@ def _dispatch(type: str, celular: str, params: dict) -> None:
         ])
         _log_chat(numero_dest, "[Notificación WhatsApp] Tabla numerológica (foto) enviada", msg_id)
 
+    elif type == "rifa_enumerada_pagada":
+        if not settings.WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA_PAGADA:
+            logger.warning("WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA_PAGADA no configurado")
+            return
+        numeros = str(params["numeros"])
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA_PAGADA, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": numeros},
+            ]},
+        ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Pago registrado para las boletas {numeros}", msg_id)
+
+    elif type == "rifa_enumerada_retirada":
+        if not settings.WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA_RETIRADA:
+            logger.warning("WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA_RETIRADA no configurado")
+            return
+        numeros = str(params["numeros"])
+        msg_id = _send_template(numero_dest, settings.WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA_RETIRADA, [
+            {"type": "body", "parameters": [
+                {"type": "text", "text": numeros},
+            ]},
+        ])
+        _log_chat(numero_dest, f"[Notificación WhatsApp] Boletas retiradas: {numeros}", msg_id)
+
     elif type == "notificar_conferencia":
         if not settings.WHATSAPP_NOTIFICAR_CONFERENCIA:
             logger.warning("WHATSAPP_NOTIFICAR_CONFERENCIA no configurado")

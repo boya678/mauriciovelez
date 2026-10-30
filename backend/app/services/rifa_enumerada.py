@@ -1,6 +1,9 @@
 """Servicio 'Rifa enumerada': boletas con número (0000-9999 barajado) enviadas por WhatsApp."""
+import base64
 import hashlib
 import logging
+import random
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.database import SessionLocal
 from app.models.parametro import Parametro
-from app.models.rifa_enumerada import RifaEnumeradaBase, RifaEnumeradaBoleta, RifaEnumeradaLote, RifaEnumeradaNumero
+from app.models.rifa_enumerada import RifaEnumeradaAviso, RifaEnumeradaBase, RifaEnumeradaBoleta, RifaEnumeradaLote, RifaEnumeradaNumero
 from app.services.rifa_enumerada_util import render_boleta
 from app.services.servicios_config import KEY_RE_SIGUIENTE
 
@@ -125,21 +128,25 @@ class _Limitador:
             time.sleep(espera)
 
 
-def _enviar_plantilla(http: httpx.Client, limitador: _Limitador, celular: str, numero: str, url_imagen: str):
-    """Retorna (ok, wamid, error)."""
-    cuerpo = {
-        "messaging_product": "whatsapp",
-        "to": celular,
+# Un solo limitador para todo el servicio: el tope de 40 mensajes por segundo no se supera ni con envíos simultáneos.
+_LIMITADOR = _Limitador(MAX_MPS)
+
+
+def _contenido_aviso() -> dict:
+    return {
         "type": "template",
-        "template": {
-            "name": settings.WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA,
-            "language": {"code": "es_CO"},
-            "components": [
-                {"type": "header", "parameters": [{"type": "image", "image": {"link": url_imagen}}]},
-                {"type": "body", "parameters": [{"type": "text", "text": numero}]},
-            ],
-        },
+        "template": {"name": settings.WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA, "language": {"code": "es_CO"}},
     }
+
+
+def contenido_boleta(url_imagen: str, numero: str) -> dict:
+    # Mensaje normal, no plantilla: solo es válido dentro de la ventana de 24 h que abre el botón.
+    return {"type": "image", "image": {"link": url_imagen, "caption": f"Boleta {numero}"}}
+
+
+def _enviar_mensaje(http: httpx.Client, limitador: _Limitador, celular: str, contenido: dict):
+    """Retorna (ok, wamid, error)."""
+    cuerpo = {"messaging_product": "whatsapp", "to": celular, **contenido}
     cabeceras = {"Authorization": f"Bearer {settings.WHATSAPP_TOKEN}", "Content-Type": "application/json"}
     url = f"https://graph.facebook.com/v25.0/{settings.WHATSAPP_PHONE_ID}/messages"
 
@@ -168,54 +175,44 @@ def _enviar_plantilla(http: httpx.Client, limitador: _Limitador, celular: str, n
     return False, None, "sin respuesta"
 
 
-def _registrar_envio_en_blob(contenedor, boleta_id: int, celular: str, numero: str, url_origen: str) -> None:
-    """Deja la boleta enviada en envios/{celular}/ para consultarla por número de WhatsApp."""
+def _nombre_envio(celular: str, numero: str, boleta_id: int, retirada: bool = False) -> str:
     # El hash sale del id de la boleta: un mismo número reenviado al mismo celular no se pisa.
     corto = hashlib.sha1(str(boleta_id).encode()).hexdigest()[:6]
+    return f"envios/{celular}/{numero}_{corto}{'_retirada' if retirada else ''}.jpg"
+
+
+def _registrar_envio_en_blob(contenedor, boleta_id: int, celular: str, numero: str, url_origen: str) -> None:
+    """Deja la boleta enviada en envios/{celular}/ para consultarla por número de WhatsApp."""
     try:
-        contenedor.get_blob_client(f"envios/{celular}/{numero}_{corto}.jpg").start_copy_from_url(url_origen)
+        contenedor.get_blob_client(_nombre_envio(celular, numero, boleta_id)).start_copy_from_url(url_origen)
     except Exception:
         logger.warning("No se pudo copiar la boleta %s de %s a envios/", numero, celular, exc_info=True)
 
 
-def _procesar_boleta(boleta_id: int, ctx: dict) -> None:
+def _procesar_aviso(aviso_id: int, http: httpx.Client) -> None:
     db = SessionLocal()
     try:
-        boleta = db.get(RifaEnumeradaBoleta, boleta_id)
-        if boleta is None or boleta.estado_envio != "pendiente":
+        aviso = db.get(RifaEnumeradaAviso, aviso_id)
+        if aviso is None or aviso.estado != "pendiente":
             return
 
-        nombre = _nombre_blob(ctx["version"], boleta.numero)
-        try:
-            if nombre not in ctx["existentes"]:
-                url = _subir_imagen(ctx["contenedor"], ctx["version"], boleta.numero, ctx["base"])
-                ctx["existentes"].add(nombre)
-            else:
-                url = f"{ctx['contenedor'].url}/{nombre}"
-        except Exception as exc:
-            boleta.estado_envio = "error"
-            boleta.error = f"imagen: {exc}"[:300]
-            db.commit()
-            return
-
-        ok, wamid, error = _enviar_plantilla(ctx["http"], ctx["limitador"], boleta.celular, boleta.numero, url)
+        ok, wamid, error = _enviar_mensaje(http, _LIMITADOR, aviso.celular, _contenido_aviso())
         if ok:
-            boleta.estado_envio = "enviada"
-            boleta.wamid = wamid
-            boleta.enviada_at = datetime.now(timezone.utc)
+            aviso.estado = "enviado"
+            aviso.wamid = wamid
+            aviso.enviado_at = datetime.now(timezone.utc)
         else:
-            boleta.estado_envio = "error"
-            boleta.error = error
+            aviso.estado = "error"
+            aviso.error = error
         db.commit()
 
         if ok:
-            _registrar_envio_en_blob(ctx["contenedor"], boleta.id, boleta.celular, boleta.numero, url)
             from app.core.notification_worker import _log_chat
 
-            _log_chat(boleta.celular, f"[Notificación WhatsApp] Rifa enumerada: boleta {boleta.numero}", wamid)
+            _log_chat(aviso.celular, "[Notificación WhatsApp] Rifa enumerada: boletas listas, esperando que las solicite", wamid)
     except Exception:
         db.rollback()
-        logger.exception("Error procesando boleta %s", boleta_id)
+        logger.exception("Error enviando el aviso %s", aviso_id)
     finally:
         db.close()
 
@@ -225,9 +222,9 @@ def _finalizar(lote_id: int, motivo_error: str | None = None) -> None:
     try:
         if motivo_error:
             db.execute(
-                update(RifaEnumeradaBoleta)
-                .where(RifaEnumeradaBoleta.lote_id == lote_id, RifaEnumeradaBoleta.estado_envio == "pendiente")
-                .values(estado_envio="error", error=f"proceso interrumpido: {motivo_error}"[:300])
+                update(RifaEnumeradaAviso)
+                .where(RifaEnumeradaAviso.lote_id == lote_id, RifaEnumeradaAviso.estado == "pendiente")
+                .values(estado="error", error=f"proceso interrumpido: {motivo_error}"[:300])
             )
         db.execute(
             update(RifaEnumeradaLote)
@@ -242,43 +239,16 @@ def _finalizar(lote_id: int, motivo_error: str | None = None) -> None:
 def _ejecutar_lote(lote_id: int) -> None:
     db = SessionLocal()
     try:
-        base = db.get(RifaEnumeradaBase, BASE_ID)
-        if base is None:
-            raise RuntimeError("no hay imagen base")
-        base_bytes, version = bytes(base.imagen_data), version_base(base)
-        rondas: dict[int, list[int]] = {}
-        for boleta_id, ronda in db.execute(
-            select(RifaEnumeradaBoleta.id, RifaEnumeradaBoleta.ronda)
-            .where(RifaEnumeradaBoleta.lote_id == lote_id, RifaEnumeradaBoleta.estado_envio == "pendiente")
-            .order_by(RifaEnumeradaBoleta.ronda, RifaEnumeradaBoleta.id)
-        ).all():
-            rondas.setdefault(ronda, []).append(boleta_id)
+        ids = db.execute(
+            select(RifaEnumeradaAviso.id)
+            .where(RifaEnumeradaAviso.lote_id == lote_id, RifaEnumeradaAviso.estado == "pendiente")
+            .order_by(RifaEnumeradaAviso.id)
+        ).scalars().all()
     finally:
         db.close()
 
-    contenedor = _contenedor()
-    prefijo = f"boletas/v{version}/"
-    ctx = {
-        "base": base_bytes,
-        "version": version,
-        "contenedor": contenedor,
-        "existentes": {b.name for b in contenedor.list_blobs(name_starts_with=prefijo)},
-        "limitador": _Limitador(MAX_MPS),
-        "http": httpx.Client(),
-    }
-    try:
-        orden = sorted(rondas)
-        for posicion, ronda in enumerate(orden):
-            inicio = time.monotonic()
-            with ThreadPoolExecutor(max_workers=TRABAJADORES) as pool:
-                list(pool.map(lambda bid: _procesar_boleta(bid, ctx), rondas[ronda]))
-            # Cada celular recibe su siguiente boleta con al menos 6 s de diferencia.
-            if posicion < len(orden) - 1:
-                sobra = ESPACIO_RONDAS_S - (time.monotonic() - inicio)
-                if sobra > 0:
-                    time.sleep(sobra)
-    finally:
-        ctx["http"].close()
+    with httpx.Client() as http, ThreadPoolExecutor(max_workers=TRABAJADORES) as pool:
+        list(pool.map(lambda aviso_id: _procesar_aviso(aviso_id, http), ids))
     _finalizar(lote_id)
 
 
@@ -319,15 +289,131 @@ def boletas_por_pagar(db: Session, celular_local: str) -> int:
         select(func.count()).select_from(RifaEnumeradaBoleta).where(
             RifaEnumeradaBoleta.celular_local == celular_local,
             RifaEnumeradaBoleta.pagada.is_(False),
+            RifaEnumeradaBoleta.retirada.is_(False),
         )
     ).scalar_one()
 
 
-def marcar_boletas_pagadas(db: Session, celular_local: str, comprobante_num: str, monto: Decimal | None) -> int:
-    """Marca como pagadas todas las boletas pendientes de pago del celular. NO hace commit."""
-    resultado = db.execute(
+def marcar_boletas_pagadas(db: Session, celular_local: str, comprobante_num: str, monto: Decimal | None) -> list[str]:
+    """Un comprobante paga solo las boletas de un envío (la cantidad de su lote), las más antiguas primero.
+    Retorna los números pagados. NO hace commit."""
+    sin_pagar = (
+        RifaEnumeradaBoleta.celular_local == celular_local,
+        RifaEnumeradaBoleta.pagada.is_(False),
+        RifaEnumeradaBoleta.retirada.is_(False),
+    )
+    primera = db.execute(
+        select(RifaEnumeradaLote.cantidad)
+        .join(RifaEnumeradaBoleta, RifaEnumeradaBoleta.lote_id == RifaEnumeradaLote.id)
+        .where(*sin_pagar)
+        .order_by(RifaEnumeradaBoleta.id)
+        .limit(1)
+    ).first()
+    if primera is None:
+        return []
+    filas = db.execute(
+        select(RifaEnumeradaBoleta.id, RifaEnumeradaBoleta.numero)
+        .where(*sin_pagar)
+        .order_by(RifaEnumeradaBoleta.id)
+        .limit(max(1, primera[0]))
+    ).all()
+    db.execute(
         update(RifaEnumeradaBoleta)
-        .where(RifaEnumeradaBoleta.celular_local == celular_local, RifaEnumeradaBoleta.pagada.is_(False))
+        .where(RifaEnumeradaBoleta.id.in_([fila[0] for fila in filas]))
         .values(pagada=True, pagada_at=datetime.now(timezone.utc), comprobante_num=comprobante_num, pago_monto=monto)
     )
-    return resultado.rowcount
+    return [fila[1] for fila in filas]
+
+
+def _texto_numeros(numeros: list[str]) -> str:
+    return f"{', '.join(numeros[:-1])} y {numeros[-1]}" if len(numeros) > 1 else numeros[0]
+
+
+def notificar_pago(celular_local: str, numeros: list[str]) -> None:
+    """Encola el aviso de WhatsApp con las boletas que quedaron pagadas."""
+    from app.services import notification_queue
+
+    notification_queue.push("rifa_enumerada_pagada", f"57{celular_local}", {"numeros": _texto_numeros(numeros)})
+
+
+# ── Retiro de boletas ───────────────────────────────────────────────────────────────────────
+
+def devolver_al_pool(db: Session, numeros: list[str]) -> None:
+    """Mezcla al azar los números retirados con los que aún no se entregan en esta vuelta. NO hace commit."""
+    puntero = db.execute(
+        select(Parametro).where(Parametro.clave == KEY_RE_SIGUIENTE).with_for_update()
+    ).scalar_one()
+    indice = int(puntero.valor) % TOTAL_NUMEROS
+    lista = db.execute(select(RifaEnumeradaNumero.numero).order_by(RifaEnumeradaNumero.orden)).scalars().all()
+
+    retirados = set(numeros)
+    entregados = [n for n in lista[:indice] if n not in retirados]
+    devueltos = [n for n in lista[:indice] if n in retirados]
+    if not devueltos:  # ya están en la parte sin entregar
+        return
+    pendientes = lista[indice:] + devueltos
+    random.shuffle(pendientes)
+
+    nueva = entregados + pendientes
+    cambios = [{"numero": n, "orden": i} for i, n in enumerate(nueva) if lista[i] != n]
+    if cambios:
+        db.execute(update(RifaEnumeradaNumero), cambios)
+    puntero.valor = str(len(entregados))
+
+
+def retirar_boletas(db: Session, celular_local: str, boleta_ids: list[int], usuario: str) -> list[RifaEnumeradaBoleta]:
+    """Retira boletas enviadas y sin pagar y devuelve sus números al pool. NO hace commit."""
+    boletas = db.execute(
+        select(RifaEnumeradaBoleta)
+        .where(
+            RifaEnumeradaBoleta.id.in_(boleta_ids),
+            RifaEnumeradaBoleta.celular_local == celular_local,
+            RifaEnumeradaBoleta.estado_envio == "enviada",
+            RifaEnumeradaBoleta.pagada.is_(False),
+            RifaEnumeradaBoleta.retirada.is_(False),
+        )
+        .order_by(RifaEnumeradaBoleta.id)
+    ).scalars().all()
+    if not boletas:
+        return []
+    ahora = datetime.now(timezone.utc)
+    for boleta in boletas:
+        boleta.retirada = True
+        boleta.retirada_at = ahora
+        boleta.retirada_por = usuario[:100]
+    devolver_al_pool(db, [b.numero for b in boletas])
+    return boletas
+
+
+def notificar_retiro(celular_local: str, numeros: list[str]) -> None:
+    """Encola el aviso de WhatsApp con las boletas retiradas."""
+    from app.services import notification_queue
+
+    notification_queue.push("rifa_enumerada_retirada", f"57{celular_local}", {"numeros": _texto_numeros(numeros)})
+
+
+def renombrar_blob_retirada(celular: str, numero: str, boleta_id: int) -> None:
+    """Marca con _retirada la copia de la boleta en envios/{celular}/. No interrumpe el retiro si falla."""
+    try:
+        contenedor = _contenedor()
+        origen = contenedor.get_blob_client(_nombre_envio(celular, numero, boleta_id))
+        destino = contenedor.get_blob_client(_nombre_envio(celular, numero, boleta_id, retirada=True))
+        if destino.start_copy_from_url(origen.url)["copy_status"] == "success":
+            origen.delete_blob()
+    except Exception:
+        logger.warning("No se pudo renombrar la boleta %s de %s como retirada", numero, celular, exc_info=True)
+
+
+def subir_comprobante(celular_local: str, comprobante_num: str, imagen_b64: str, mime: str) -> None:
+    """Guarda el comprobante procesado junto a las boletas del celular. No interrumpe el pago si falla."""
+    try:
+        from azure.storage.blob import ContentSettings
+
+        datos = base64.b64decode(imagen_b64)
+        corto = hashlib.sha1(datos).hexdigest()[:6]
+        extension = {"image/png": "png", "image/webp": "webp"}.get(mime, "jpg")
+        numero = re.sub(r"[^A-Za-z0-9_-]", "", comprobante_num)[:40] or "sin_numero"
+        blob = _contenedor().get_blob_client(f"envios/57{celular_local}/comprobante_{numero}_{corto}.{extension}")
+        blob.upload_blob(datos, overwrite=True, content_settings=ContentSettings(content_type=mime))
+    except Exception:
+        logger.warning("No se pudo subir el comprobante %s de %s", comprobante_num, celular_local, exc_info=True)

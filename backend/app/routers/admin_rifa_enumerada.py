@@ -1,5 +1,6 @@
 import io
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -15,13 +16,15 @@ from app.core.admin_security import require_admin
 from app.core.config import settings
 from app.database import get_db
 from app.models.audit_log import AuditLog
-from app.models.rifa_enumerada import RifaEnumeradaBase, RifaEnumeradaBoleta, RifaEnumeradaLote
+from app.models.rifa_enumerada import RifaEnumeradaAviso, RifaEnumeradaBase, RifaEnumeradaBoleta, RifaEnumeradaLote
 from app.services.rifa_enumerada import (
     BASE_ID,
     MAX_MPS,
     hay_lote_enviando,
     iniciar_lote,
-    tomar_numeros,
+    notificar_retiro,
+    renombrar_blob_retirada,
+    retirar_boletas,
     verificar_blob_publico,
 )
 from app.services.rifa_enumerada_util import leer_celulares
@@ -59,7 +62,6 @@ class FilaInvalida(BaseModel):
 
 class ErrorEnvio(BaseModel):
     celular: str
-    numero: str
     error: Optional[str]
 
 
@@ -73,11 +75,45 @@ class LoteOut(BaseModel):
     duplicadas: int
     ya_recibieron: int
     invalidas_detalle: list[FilaInvalida]
-    boletas_total: int
-    enviadas: int
-    pendientes: int
+    avisos_total: int
+    avisos_enviados: int
+    avisos_pendientes: int
     errores_total: int
+    solicitaron: int
+    boletas_enviadas: int
     errores: list[ErrorEnvio]
+
+
+class BoletaOut(BaseModel):
+    id: int
+    numero: str
+    estado_envio: str
+    pagada: bool
+    retirada: bool
+    fecha: Optional[str]
+
+
+class BoletasCelularOut(BaseModel):
+    celular: str
+    boletas: list[BoletaOut]
+
+
+class RetirarIn(BaseModel):
+    celular: str
+    boleta_ids: list[int] = Field(min_length=1, max_length=100)
+
+
+class RetirarOut(BaseModel):
+    numeros: list[str]
+
+
+def _celular_local(valor: str) -> str:
+    digitos = re.sub(r"\D", "", valor)
+    if len(digitos) == 12 and digitos.startswith("57"):
+        digitos = digitos[2:]
+    if len(digitos) != 10:
+        raise HTTPException(status_code=400, detail="El celular debe tener 10 dígitos (con o sin 57)")
+    return digitos
 
 
 def _out(db: Session, cfg) -> RifaEnumeradaOut:
@@ -89,7 +125,8 @@ def _out(db: Session, cfg) -> RifaEnumeradaOut:
     )
 
 
-def _celulares_con_boletas(db: Session, celulares: list[str]) -> set[str]:
+def _celulares_atendidos(db: Session, celulares: list[str]) -> set[str]:
+    """Celulares que ya recibieron un aviso o boletas en algún lote."""
     encontrados: set[str] = set()
     for i in range(0, len(celulares), 1000):
         trozo = celulares[i:i + 1000]
@@ -98,25 +135,40 @@ def _celulares_con_boletas(db: Session, celulares: list[str]) -> set[str]:
                 select(RifaEnumeradaBoleta.celular).where(RifaEnumeradaBoleta.celular.in_(trozo)).distinct()
             ).scalars().all()
         )
+        encontrados.update(
+            db.execute(
+                select(RifaEnumeradaAviso.celular)
+                .where(RifaEnumeradaAviso.celular.in_(trozo), RifaEnumeradaAviso.estado == "enviado")
+                .distinct()
+            ).scalars().all()
+        )
     return encontrados
 
 
 def _lote_out(db: Session, lote: RifaEnumeradaLote) -> LoteOut:
     por_estado = dict(
         db.execute(
-            select(RifaEnumeradaBoleta.estado_envio, func.count())
-            .where(RifaEnumeradaBoleta.lote_id == lote.id)
-            .group_by(RifaEnumeradaBoleta.estado_envio)
+            select(RifaEnumeradaAviso.estado, func.count())
+            .where(RifaEnumeradaAviso.lote_id == lote.id)
+            .group_by(RifaEnumeradaAviso.estado)
         ).all()
     )
     errores = db.execute(
-        select(RifaEnumeradaBoleta.celular, RifaEnumeradaBoleta.numero, RifaEnumeradaBoleta.error)
-        .where(RifaEnumeradaBoleta.lote_id == lote.id, RifaEnumeradaBoleta.estado_envio == "error")
-        .order_by(RifaEnumeradaBoleta.id)
+        select(RifaEnumeradaAviso.celular, RifaEnumeradaAviso.error)
+        .where(RifaEnumeradaAviso.lote_id == lote.id, RifaEnumeradaAviso.estado == "error")
+        .order_by(RifaEnumeradaAviso.id)
         .limit(ERRORES_VISIBLES)
     ).all()
+    solicitaron = db.execute(
+        select(func.count()).select_from(RifaEnumeradaAviso)
+        .where(RifaEnumeradaAviso.lote_id == lote.id, RifaEnumeradaAviso.solicitada_at.is_not(None))
+    ).scalar_one()
+    boletas_enviadas = db.execute(
+        select(func.count()).select_from(RifaEnumeradaBoleta)
+        .where(RifaEnumeradaBoleta.lote_id == lote.id, RifaEnumeradaBoleta.estado_envio == "enviada")
+    ).scalar_one()
     ya_recibieron = (
-        len(_celulares_con_boletas(db, lote.celulares.split())) if lote.estado == "cargado" else 0
+        len(_celulares_atendidos(db, lote.celulares.split())) if lote.estado == "cargado" else 0
     )
     return LoteOut(
         id=lote.id,
@@ -128,11 +180,13 @@ def _lote_out(db: Session, lote: RifaEnumeradaLote) -> LoteOut:
         duplicadas=lote.duplicadas,
         ya_recibieron=ya_recibieron,
         invalidas_detalle=[FilaInvalida(**f) for f in json.loads(lote.invalidas_json or "[]")],
-        boletas_total=sum(por_estado.values()),
-        enviadas=por_estado.get("enviada", 0),
-        pendientes=por_estado.get("pendiente", 0),
+        avisos_total=sum(por_estado.values()),
+        avisos_enviados=por_estado.get("enviado", 0),
+        avisos_pendientes=por_estado.get("pendiente", 0),
         errores_total=por_estado.get("error", 0),
-        errores=[ErrorEnvio(celular=c, numero=n, error=e) for c, n, e in errores],
+        solicitaron=solicitaron,
+        boletas_enviadas=boletas_enviadas,
+        errores=[ErrorEnvio(celular=c, error=e) for c, e in errores],
     )
 
 
@@ -295,7 +349,7 @@ def enviar_lote(
 
     celulares = lote.celulares.split()
     if not payload.incluir_repetidos:
-        previos = _celulares_con_boletas(db, celulares)
+        previos = _celulares_atendidos(db, celulares)
         celulares = [c for c in celulares if c not in previos]
     if not celulares:
         raise HTTPException(status_code=400, detail="Todos los celulares ya recibieron boletas")
@@ -305,24 +359,11 @@ def enviar_lote(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Almacenamiento de im\u00e1genes: {exc}")
 
-    numeros = tomar_numeros(db, len(celulares) * cfg.cantidad)
     ahora = datetime.now(timezone.utc)
-    filas = []
-    indice = 0
-    for ronda in range(1, cfg.cantidad + 1):
-        for celular in celulares:
-            filas.append({
-                "lote_id": lote.id,
-                "celular": celular,
-                "celular_local": celular[-10:],
-                "numero": numeros[indice],
-                "ronda": ronda,
-                "estado_envio": "pendiente",
-                "pagada": False,
-                "created_at": ahora,
-            })
-            indice += 1
-    db.bulk_insert_mappings(RifaEnumeradaBoleta, filas)
+    db.bulk_insert_mappings(RifaEnumeradaAviso, [
+        {"lote_id": lote.id, "celular": c, "celular_local": c[-10:], "estado": "pendiente", "created_at": ahora}
+        for c in celulares
+    ])
 
     lote.estado = "enviando"
     lote.cantidad = cfg.cantidad
@@ -334,12 +375,72 @@ def enviar_lote(
         action="CREATE",
         entity="servicios.rifa_enumerada",
         entity_id=str(lote.id),
-        detail={"celulares": len(celulares), "boletas": len(filas), "max_mps": MAX_MPS},
+        detail={"avisos": len(celulares), "cantidad": cfg.cantidad, "max_mps": MAX_MPS},
     ))
     db.commit()
 
     iniciar_lote(lote.id)
     return _lote_out(db, lote)
+
+
+@router.get("/celular/{celular}", response_model=BoletasCelularOut)
+def boletas_de_celular(
+    celular: str,
+    db: Session = Depends(get_db),
+    _user=Depends(require_admin),
+):
+    local = _celular_local(celular)
+    boletas = db.execute(
+        select(RifaEnumeradaBoleta).where(RifaEnumeradaBoleta.celular_local == local).order_by(RifaEnumeradaBoleta.id)
+    ).scalars().all()
+    if not boletas:
+        raise HTTPException(status_code=404, detail="Ese celular no tiene boletas")
+    return BoletasCelularOut(
+        celular=f"57{local}",
+        boletas=[
+            BoletaOut(
+                id=b.id,
+                numero=b.numero,
+                estado_envio=b.estado_envio,
+                pagada=b.pagada,
+                retirada=b.retirada,
+                fecha=b.enviada_at.astimezone(COL_TZ).strftime("%d/%m/%Y %H:%M") if b.enviada_at else None,
+            )
+            for b in boletas
+        ],
+    )
+
+
+@router.post("/retirar", response_model=RetirarOut)
+def retirar(
+    payload: RetirarIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    local = _celular_local(payload.celular)
+    ids = sorted(set(payload.boleta_ids))
+    boletas = retirar_boletas(db, local, ids, user.usuario)
+    if len(boletas) != len(ids):
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Alguna boleta ya no se puede retirar (está pagada, ya fue retirada o no se envió). Consulta el celular de nuevo.",
+        )
+    numeros = [b.numero for b in boletas]
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="UPDATE",
+        entity="servicios.rifa_enumerada",
+        entity_id=local,
+        detail={"retiro_boletas": numeros},
+    ))
+    db.commit()
+
+    notificar_retiro(local, numeros)
+    for b in boletas:
+        renombrar_blob_retirada(b.celular, b.numero, b.id)
+    return RetirarOut(numeros=numeros)
 
 
 @router.get("/exportar")
@@ -368,7 +469,7 @@ def exportar_boletas(
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Boletas"
-    ws.append(["Fecha env\u00edo", "Celular", "Boleta", "Estado env\u00edo", "Pagada", "Fecha pago", "Comprobante", "Monto pago", "Error"])
+    ws.append(["Fecha env\u00edo", "Celular", "Boleta", "Estado env\u00edo", "Pagada", "Fecha pago", "Comprobante", "Monto pago", "Error", "Retirada", "Fecha retiro", "Retirada por"])
     for b in boletas:
         ws.append([
             _fecha(b.enviada_at or b.created_at),
@@ -380,15 +481,30 @@ def exportar_boletas(
             b.comprobante_num or "",
             float(b.pago_monto) if b.pago_monto is not None else "",
             b.error or "",
+            "Sí" if b.retirada else "No",
+            _fecha(b.retirada_at),
+            b.retirada_por or "",
         ])
         ws.cell(row=ws.max_row, column=3).number_format = "@"
 
-    ws2 = wb.create_sheet("No enviados")
-    ws2.append(["Celular", "Boleta", "Error"])
-    for b in boletas:
-        if b.estado_envio == "error":
-            ws2.append([b.celular, b.numero, b.error or ""])
-            ws2.cell(row=ws2.max_row, column=2).number_format = "@"
+    ws2 = wb.create_sheet("Avisos")
+    ws2.append(["Fecha aviso", "Celular", "Aviso", "Solicitó boletas", "Fecha solicitud", "Error"])
+    avisos_q = select(RifaEnumeradaAviso)
+    fecha_aviso_col = func.date(func.timezone("America/Bogota", RifaEnumeradaAviso.created_at))
+    if fecha_inicio:
+        avisos_q = avisos_q.where(fecha_aviso_col >= fecha_inicio)
+    if fecha_fin:
+        avisos_q = avisos_q.where(fecha_aviso_col <= fecha_fin)
+    estados_aviso = {"enviado": "Enviado", "pendiente": "Pendiente", "error": "No enviado"}
+    for a in db.execute(avisos_q.order_by(RifaEnumeradaAviso.id)).scalars().all():
+        ws2.append([
+            _fecha(a.enviado_at or a.created_at),
+            a.celular,
+            estados_aviso.get(a.estado, a.estado),
+            "Sí" if a.solicitada_at else "No",
+            _fecha(a.solicitada_at),
+            a.error or "",
+        ])
 
     salida = io.BytesIO()
     wb.save(salida)

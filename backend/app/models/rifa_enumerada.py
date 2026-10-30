@@ -50,12 +50,29 @@ class RifaEnumeradaLote(Base):
     finalizado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class RifaEnumeradaAviso(Base):
+    """Aviso 'boletas listas' enviado a un celular; las boletas se entregan cuando pulsa SOLICITAR BOLETAS."""
+    __tablename__ = "rifa_enum_avisos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lote_id: Mapped[int] = mapped_column(Integer, ForeignKey("rifa_enum_lotes.id", ondelete="CASCADE"), nullable=False, index=True)
+    celular: Mapped[str] = mapped_column(String(20), nullable=False)
+    celular_local: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    estado: Mapped[str] = mapped_column(String(10), nullable=False, default="pendiente")  # pendiente | enviado | error
+    wamid: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    enviado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    solicitada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_ahora)
+
+
 class RifaEnumeradaBoleta(Base):
     """Una boleta entregada a un celular: qué número, si se envió y si se pagó."""
     __tablename__ = "rifa_enum_boletas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lote_id: Mapped[int] = mapped_column(Integer, ForeignKey("rifa_enum_lotes.id", ondelete="CASCADE"), nullable=False)
+    aviso_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("rifa_enum_avisos.id", ondelete="SET NULL"), nullable=True, index=True)
     celular: Mapped[str] = mapped_column(String(20), nullable=False)
     celular_local: Mapped[str] = mapped_column(String(10), nullable=False)
     numero: Mapped[str] = mapped_column(String(4), nullable=False)
@@ -68,4 +85,7 @@ class RifaEnumeradaBoleta(Base):
     pagada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     comprobante_num: Mapped[str | None] = mapped_column(String(200), nullable=True)
     pago_monto: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    retirada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    retirada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retirada_por: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_ahora)

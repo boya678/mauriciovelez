@@ -26,6 +26,20 @@ export interface RifaEnumeradaConfig {
   tiene_base: boolean;
 }
 
+export interface RifaEnumeradaBoleta {
+  id: number;
+  numero: string;
+  estado_envio: string;
+  pagada: boolean;
+  retirada: boolean;
+  fecha: string | null;
+}
+
+export interface RifaEnumeradaBoletasCelular {
+  celular: string;
+  boletas: RifaEnumeradaBoleta[];
+}
+
 export interface RifaEnumeradaLote {
   id: number;
   estado: 'cargado' | 'enviando' | 'finalizado';
@@ -36,11 +50,13 @@ export interface RifaEnumeradaLote {
   duplicadas: number;
   ya_recibieron: number;
   invalidas_detalle: { fila: number; valor: string }[];
-  boletas_total: number;
-  enviadas: number;
-  pendientes: number;
+  avisos_total: number;
+  avisos_enviados: number;
+  avisos_pendientes: number;
   errores_total: number;
-  errores: { celular: string; numero: string; error: string | null }[];
+  solicitaron: number;
+  boletas_enviadas: number;
+  errores: { celular: string; error: string | null }[];
 }
 
 export interface RelampagoPersonalizadoConfig {
@@ -138,6 +154,14 @@ export class ServiciosAdminService {
 
   enviarLoteRifaEnumerada(id: number, incluirRepetidos: boolean) {
     return this.http.post<RifaEnumeradaLote>(`${this.base}/rifa-enumerada/lote/${id}/enviar`, { incluir_repetidos: incluirRepetidos });
+  }
+
+  getBoletasCelularRifaEnumerada(celular: string) {
+    return this.http.get<RifaEnumeradaBoletasCelular>(`${this.base}/rifa-enumerada/celular/${encodeURIComponent(celular)}`);
+  }
+
+  retirarBoletasRifaEnumerada(celular: string, boletaIds: number[]) {
+    return this.http.post<{ numeros: string[] }>(`${this.base}/rifa-enumerada/retirar`, { celular, boleta_ids: boletaIds });
   }
 
   exportarRifaEnumerada(fechaInicio?: string, fechaFin?: string) {

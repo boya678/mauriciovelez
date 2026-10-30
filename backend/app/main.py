@@ -28,6 +28,7 @@ from app.routers import admin_servicios
 from app.routers import admin_tabla_numerologica
 from app.routers import admin_rifa_enumerada
 from app.services import rifa_enumerada
+from app.services import rifa_enumerada_solicitudes
 from app.core import scheduler
 from app.core import notification_worker
 
@@ -37,9 +38,12 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     notification_worker.start()
     rifa_enumerada.reanudar_lotes()
+    rifa_enumerada_solicitudes.start()
+    rifa_enumerada_solicitudes.reanudar_entregas()
     yield
     scheduler.stop()
     notification_worker.stop()
+    rifa_enumerada_solicitudes.stop()
 
 
 app = FastAPI(title="Mauricio Velez API", version="1.0.0", lifespan=lifespan)

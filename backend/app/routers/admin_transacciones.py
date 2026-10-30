@@ -25,7 +25,7 @@ from app.models.transaccion_procesada import TransaccionProcesada
 from app.services.chat_phone_resolver import resolve_real_phone_for_message, resolve_real_phone_from_identifier
 from app.services.notification_queue import push as _push_notif
 from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config, get_relampago_personalizado_config, get_rifa_enumerada_config, get_tabla_numerologica_config, get_vip_config
-from app.services.rifa_enumerada import boletas_por_pagar, marcar_boletas_pagadas
+from app.services.rifa_enumerada import boletas_por_pagar, marcar_boletas_pagadas, notificar_pago, subir_comprobante
 from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
 from app.services.tabla_numerologica import notificar_tabla_numerologica, registrar_entrega as registrar_entrega_tabla_numerologica
 from app.services.suscripciones import renovar_cliente
@@ -412,6 +412,7 @@ def _finalizar_comprobante(
     image_hash: Optional[str],
     origen: str,
     correccion_manual: Optional[dict] = None,
+    chat_db: Optional[Session] = None,
 ) -> ReprocesarOut:
     """Lógica posterior al análisis IA: gates de monto/destino, registro de
     comprobante y renovación/creación de cliente. Compartida por el endpoint
@@ -652,12 +653,21 @@ def _finalizar_comprobante(
         pagadas = marcar_boletas_pagadas(db, phone_local, comprobante_num, monto)
         db.commit()
         _marcar_procesada(db, id)
+        if pagadas:
+            notificar_pago(phone_local, pagadas)
+        if pagadas and chat_db is not None:
+            media = chat_db.execute(
+                text(f"SELECT media_content, media_mime_type FROM {settings.DATABASE_SCHEMA_2}.messages WHERE id = :id"),
+                {"id": id},
+            ).mappings().first()
+            if media and media["media_content"]:
+                subir_comprobante(phone_local, comprobante_num, media["media_content"], media["media_mime_type"] or "image/jpeg")
         return ReprocesarOut(
             es_comprobante=True,
             comprobante_num=comprobante_num,
             monto_extraido=monto_float,
             accion="rifa_enumerada_pagada",
-            detalle=f"{pagadas} boleta(s) marcadas como pagadas",
+            detalle=f"{len(pagadas)} boleta(s) marcadas como pagadas",
         )
 
     # ── Renovar o crear cliente ────────────────────────────────────────────
@@ -834,6 +844,7 @@ def reprocesar_con_ia(
         nombre_destino=nombre_destino,
         image_hash=image_hash,
         origen="reprocesar",
+        chat_db=chat_db,
     )
 
 
@@ -915,6 +926,7 @@ def procesar_sin_ia(
         image_hash=ia.image_hash,
         origen="procesar_manual_corregido" if correccion else "procesar_sin_ia",
         correccion_manual=correccion or None,
+        chat_db=chat_db,
     )
 
 
@@ -986,6 +998,7 @@ def _procesar_analizados_pendientes(
                 nombre_destino=ia.nombre_destino,
                 image_hash=ia.image_hash,
                 origen="procesar_masivo",
+                chat_db=chat_db,
             )
             if resultado.accion in _ACCIONES_FINALES:
                 procesados += 1

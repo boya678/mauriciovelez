@@ -3,11 +3,22 @@
   "to": "573215332978",
   "type": "template",
   "template": {
-    "name": "tauro",
+    "name": "aviso_3010",
     "language": {
       "code": "es_co"
     },
     "components": [
+      {
+        "type": "header",
+        "parameters": [
+          {
+            "type": "video",
+            "video": {
+              "link": "https://res.cloudinary.com/dfpy0exz1/video/upload/v1793380175/video_mauricio_nelwja.mp4" 
+            }
+          }
+        ]
+      },
       {
         "type": "body",
         "parameters": []
