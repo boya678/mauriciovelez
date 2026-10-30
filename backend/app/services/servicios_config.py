@@ -34,6 +34,13 @@ class TablaNumerologicaConfig:
 
 
 @dataclass(frozen=True)
+class RifaEnumeradaConfig:
+    activo: bool
+    valor: int
+    cantidad: int
+
+
+@dataclass(frozen=True)
 class ConferenciaConfig:
     activo: bool
     valor: int
@@ -65,6 +72,11 @@ KEY_RP_RIFA_SIGUIENTE = "servicio_relampago_personalizado_rifa_siguiente"
 
 KEY_TN_ACTIVO = "servicio_tabla_numerologica_activo"
 KEY_TN_VALOR = "servicio_tabla_numerologica_valor"
+
+KEY_RE_ACTIVO = "servicio_rifa_enum_activo"
+KEY_RE_VALOR = "servicio_rifa_enum_valor"
+KEY_RE_CANTIDAD = "servicio_rifa_enum_cantidad"
+KEY_RE_SIGUIENTE = "servicio_rifa_enum_siguiente"
 
 KEY_CONF_ACTIVO = "servicio_conferencia_activo"
 KEY_CONF_VALOR = "servicio_conferencia_valor"
@@ -218,6 +230,37 @@ def set_tabla_numerologica_config(db: Session, activo: bool, valor: int) -> Tabl
 
     db.flush()
     return TablaNumerologicaConfig(activo=activo, valor=max(0, int(valor)))
+
+
+def get_rifa_enumerada_config(db: Session) -> RifaEnumeradaConfig:
+    p_activo = db.get(Parametro, KEY_RE_ACTIVO)
+    p_valor = db.get(Parametro, KEY_RE_VALOR)
+    p_cantidad = db.get(Parametro, KEY_RE_CANTIDAD)
+    return RifaEnumeradaConfig(
+        activo=_parse_bool(p_activo.valor if p_activo else None, default=False),
+        valor=max(0, _parse_int(p_valor.valor if p_valor else None, default=0)),
+        cantidad=max(1, _parse_int(p_cantidad.valor if p_cantidad else None, default=1)),
+    )
+
+
+def set_rifa_enumerada_config(db: Session, activo: bool, valor: int, cantidad: int) -> RifaEnumeradaConfig:
+    cantidad = max(1, int(cantidad))
+    data = {
+        KEY_RE_ACTIVO: ("1" if activo else "0", "Servicio rifa enumerada activo (1/0)"),
+        KEY_RE_VALOR: (str(max(0, int(valor))), "Monto exacto que marca como pagadas las boletas de la rifa enumerada"),
+        KEY_RE_CANTIDAD: (str(cantidad), "Boletas que se envian a cada celular en la rifa enumerada"),
+    }
+
+    for key, (raw_val, desc) in data.items():
+        p = db.get(Parametro, key)
+        if p:
+            p.valor = raw_val
+            p.descripcion = desc
+        else:
+            db.add(Parametro(clave=key, valor=raw_val, descripcion=desc))
+
+    db.flush()
+    return RifaEnumeradaConfig(activo=activo, valor=max(0, int(valor)), cantidad=cantidad)
 
 
 def get_conferencia_config(db: Session) -> ConferenciaConfig:

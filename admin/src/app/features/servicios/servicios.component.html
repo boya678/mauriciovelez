@@ -305,4 +305,139 @@
       </div>
     }
   </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Rifa enumerada</h2>
+        <p>Se sube un Excel con celulares y a cada uno se le envía por WhatsApp la boleta con su número (0000–9999, en desorden). Al pagar este monto, las boletas de ese celular quedan pagadas. No crea clientes.</p>
+      </div>
+      <label class="switch-wrap">
+        <span>Activo</span>
+        <input type="checkbox" [(ngModel)]="rifaEnum.activo" />
+      </label>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Valor</label>
+        <input type="number" min="0" step="1" [(ngModel)]="rifaEnum.valor" placeholder="25000" />
+        <small>Monto exacto del comprobante que marca las boletas como pagadas.</small>
+      </div>
+
+      <div class="field">
+        <label>Boletas por celular</label>
+        <input type="number" min="1" max="100" step="1" [(ngModel)]="rifaEnum.cantidad" />
+        <small>Cantidad de boletas que recibe cada celular (1 a 100).</small>
+      </div>
+
+      <div class="field">
+        <label>Imagen base (JPG o PNG, máx. 5 MB)</label>
+        <input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" [disabled]="subiendoBaseRe()" (change)="onBaseRifaEnum($event)" />
+        <small>
+          @if (subiendoBaseRe()) { Subiendo imagen... }
+          @else if (rifaEnum.tiene_base) { Imagen cargada. Sube otra para reemplazarla. }
+          @else { Sin imagen. Es obligatoria para activar el servicio. }
+        </small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" [disabled]="savingRe()" (click)="guardarRifaEnum()">
+        @if (savingRe()) { Guardando... } @else { Guardar configuración }
+      </button>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Excel de celulares (.xlsx)</label>
+        <input type="file" accept=".xlsx" [disabled]="cargandoExcelRe() || loteRe()?.estado === 'enviando'" (change)="onExcelRifaEnum($event)" />
+        <small>
+          @if (cargandoExcelRe()) { Leyendo Excel... }
+          @else { Primera hoja, primera columna, sin contar la cabecera. Máx. 5 MB. }
+        </small>
+      </div>
+    </div>
+
+    @if (loteRe(); as lote) {
+      <div class="lote-re">
+        <h3>Lote #{{ lote.id }} — {{ lote.archivo }}</h3>
+
+        @if (lote.estado === 'cargado') {
+          <p>
+            {{ lote.total_filas }} filas: <strong>{{ lote.validas }}</strong> celulares válidos,
+            {{ lote.invalidas }} inválidos, {{ lote.duplicadas }} repetidos en el archivo.
+            @if (lote.ya_recibieron > 0) { <br />{{ lote.ya_recibieron }} ya recibieron boletas antes. }
+          </p>
+
+          @if (lote.invalidas_detalle.length) {
+            <details>
+              <summary>Ver filas inválidas</summary>
+              <ul>
+                @for (f of lote.invalidas_detalle; track f.fila) { <li>Fila {{ f.fila }}: {{ f.valor }}</li> }
+              </ul>
+              @if (lote.invalidas > lote.invalidas_detalle.length) { <small>Se muestran las primeras {{ lote.invalidas_detalle.length }}.</small> }
+            </details>
+          }
+
+          @if (lote.ya_recibieron > 0) {
+            <label class="check-re">
+              <input type="checkbox" [(ngModel)]="incluirRepetidosRe" />
+              Incluir a quienes ya recibieron boletas
+            </label>
+          }
+
+          <p>Se enviarán <strong>{{ boletasAEnviarRe(lote) }}</strong> boletas (máximo 40 mensajes por segundo).</p>
+
+          <div class="actions">
+            <button class="btn-primary" [disabled]="enviandoRe() || boletasAEnviarRe(lote) === 0" (click)="enviarRifaEnum()">
+              @if (enviandoRe()) { Iniciando... } @else { Enviar }
+            </button>
+          </div>
+        } @else {
+          <p>
+            @if (lote.estado === 'enviando') { <strong>Enviando...</strong> } @else { <strong>Envío finalizado.</strong> }
+            {{ lote.enviadas }} enviadas · {{ lote.errores_total }} no enviadas · {{ lote.pendientes }} pendientes de {{ lote.boletas_total }}.
+          </p>
+          @if (lote.boletas_total > 0) {
+            <progress [value]="lote.enviadas + lote.errores_total" [max]="lote.boletas_total"></progress>
+          }
+
+          @if (lote.errores_total > 0) {
+            <details>
+              <summary>Ver boletas no enviadas ({{ lote.errores_total }})</summary>
+              <table class="tabla-re">
+                <thead><tr><th>Celular</th><th>Boleta</th><th>Motivo</th></tr></thead>
+                <tbody>
+                  @for (e of lote.errores; track $index) {
+                    <tr><td>{{ e.celular }}</td><td>{{ e.numero }}</td><td>{{ e.error }}</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (lote.errores_total > lote.errores.length) { <small>Se muestran las primeras {{ lote.errores.length }}; el Excel incluye todas.</small> }
+            </details>
+          }
+        }
+      </div>
+    }
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Descargar registro — desde</label>
+        <input type="date" [(ngModel)]="reDesde" />
+      </div>
+
+      <div class="field">
+        <label>Hasta</label>
+        <input type="date" [(ngModel)]="reHasta" />
+        <small>Sin fechas descarga los últimos 30 días.</small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" [disabled]="exportandoRe()" (click)="descargarRifaEnum()">
+        @if (exportandoRe()) { Descargando... } @else { Descargar Excel }
+      </button>
+    </div>
+  </section>
 </div>

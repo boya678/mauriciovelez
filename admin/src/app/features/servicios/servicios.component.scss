@@ -141,3 +141,41 @@
 .loading {
   color: var(--text-muted, #8b8fa8);
 }
+
+.lote-re {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border, #2e3147);
+  border-radius: 8px;
+  color: var(--text, #e4e6f1);
+  font-size: 0.9rem;
+
+  h3 { margin: 0; font-size: 0.95rem; }
+  p { margin: 0; }
+  ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+  progress { width: 100%; }
+  summary { cursor: pointer; }
+  small { color: var(--text-muted, #8b8fa8); }
+}
+
+.check-re {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.tabla-re {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+
+  th, td {
+    text-align: left;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--border, #2e3147);
+    font-size: 0.82rem;
+  }
+}

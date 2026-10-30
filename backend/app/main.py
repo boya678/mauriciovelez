@@ -26,6 +26,8 @@ from app.routers import admin_transacciones
 from app.routers import admin_comprobantes
 from app.routers import admin_servicios
 from app.routers import admin_tabla_numerologica
+from app.routers import admin_rifa_enumerada
+from app.services import rifa_enumerada
 from app.core import scheduler
 from app.core import notification_worker
 
@@ -34,6 +36,7 @@ from app.core import notification_worker
 async def lifespan(app: FastAPI):
     scheduler.start()
     notification_worker.start()
+    rifa_enumerada.reanudar_lotes()
     yield
     scheduler.stop()
     notification_worker.stop()
@@ -74,6 +77,7 @@ app.include_router(admin_comprobantes.router)
 app.include_router(admin_servicios.router)
 app.include_router(admin_tabla_numerologica.router)
 app.include_router(admin_tabla_numerologica.public_router)
+app.include_router(admin_rifa_enumerada.router)
 
 
 @app.get("/health")

@@ -45,10 +45,12 @@ from app.services.servicios_config import (
     get_numero_relampago_config,
     get_relampago_personalizado_config,
     get_tabla_numerologica_config,
+    get_rifa_enumerada_config,
     get_vip_config,
 )
 from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
 from app.services.tabla_numerologica import notificar_tabla_numerologica, registrar_entrega as registrar_entrega_tabla_numerologica
+from app.services.rifa_enumerada import boletas_por_pagar, marcar_boletas_pagadas
 from app.services.suscripciones import renovar_cliente
 from app.services.vision_ia import analizar_imagen_con_ia
 from app.core.live_events import publish_event
@@ -745,6 +747,7 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
         vip_cfg = get_vip_config(db)
         rp_cfg = get_relampago_personalizado_config(db)
         tn_cfg = get_tabla_numerologica_config(db)
+        re_cfg = get_rifa_enumerada_config(db)
         print(f"[CRON pagos] {len(pendientes)} imágenes pendientes de análisis")
 
         for row in pendientes:
@@ -897,8 +900,14 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                 and monto is not None
                 and int(monto) == tn_cfg.valor
             )
+            is_rifa_enum = bool(
+                re_cfg.activo
+                and re_cfg.valor > 0
+                and monto is not None
+                and int(monto) == re_cfg.valor
+            )
 
-            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_tabla_num and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
+            if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_tabla_num and not is_rifa_enum and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
                 print(
                     f"[CRON pagos] msg={msg_id}: monto {monto} no coincide con VIP ({settings.VIP_AMOUNT}) "
                     f"ni VIP alterno ({vip_cfg.valor if vip_cfg.activo else 'inactivo'}) "
@@ -907,6 +916,11 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                     f"ni conferencia ({conferencia_cfg.valor if conferencia_cfg.activo else 'inactivo'}) "
                     f"ni conferencia_vip ({conferencia_vip_cfg.valor if conferencia_vip_cfg.activo else 'inactivo'}), ignorado"
                 )
+                continue
+
+            # Sin boletas por pagar no se registra ni se oculta: el comprobante queda pendiente.
+            if is_rifa_enum and boletas_por_pagar(db, celular_local) == 0:
+                print(f"[CRON pagos] msg={msg_id}: rifa enumerada, {celular_local} no tiene boletas por pagar; queda pendiente")
                 continue
 
             # ── 6. Intentar registrar comprobante único ─────────────────────────
@@ -922,6 +936,7 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                         else "numero_relampago" if is_relampago
                         else "numero_relampago_personalizado" if is_relampago_pers
                         else "tabla_numerologica" if is_tabla_num
+                        else "rifa_enumerada" if is_rifa_enum
                         else "pago vip (servicio)" if is_vip_extra
                         else "pago vip"
                     ),
@@ -1036,6 +1051,17 @@ def _procesar_pagos_automatico(fecha: date | None = None, todas_fechas: bool = F
                 except Exception as exc:
                     print(f"[CRON pagos] ERROR notificando tabla numerologica msg={msg_id}: {exc}")
                 print(f"[CRON pagos] msg={msg_id}: tabla numerologica enviada a {celular_local}")
+                continue
+
+            if is_rifa_enum:
+                try:
+                    pagadas = marcar_boletas_pagadas(db, celular_local, comprobante_num, monto)
+                    db.commit()
+                except Exception as exc:
+                    db.rollback()
+                    print(f"[CRON pagos] ERROR marcando boletas pagadas msg={msg_id} celular={celular_local}: {exc}")
+                    continue
+                print(f"[CRON pagos] msg={msg_id}: rifa enumerada, {pagadas} boleta(s) pagadas por {celular_local}")
                 continue
 
             # ── 8. Renovar o crear cliente ─────────────────────────────────────

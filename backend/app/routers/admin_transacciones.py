@@ -24,7 +24,8 @@ from app.models.tipo_cliente import TipoCliente
 from app.models.transaccion_procesada import TransaccionProcesada
 from app.services.chat_phone_resolver import resolve_real_phone_for_message, resolve_real_phone_from_identifier
 from app.services.notification_queue import push as _push_notif
-from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config, get_relampago_personalizado_config, get_tabla_numerologica_config, get_vip_config
+from app.services.servicios_config import get_conferencia_config, get_conferencia_vip_config, get_numero_relampago_config, get_relampago_personalizado_config, get_rifa_enumerada_config, get_tabla_numerologica_config, get_vip_config
+from app.services.rifa_enumerada import boletas_por_pagar, marcar_boletas_pagadas
 from app.services.relampago_personalizado import asignar_relampago_personalizado, notificar_relampago_personalizado
 from app.services.tabla_numerologica import notificar_tabla_numerologica, registrar_entrega as registrar_entrega_tabla_numerologica
 from app.services.suscripciones import renovar_cliente
@@ -392,7 +393,7 @@ class ReprocesarOut(BaseModel):
     es_comprobante: bool
     comprobante_num: Optional[str]
     monto_extraido: Optional[float]
-    accion: str   # renovado | cliente_creado | relampago_registrado | relampago_personalizado_asignado | tabla_numerologica_enviada | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | destino_invalido | no_es_comprobante | sin_numero
+    accion: str   # renovado | cliente_creado | relampago_registrado | relampago_personalizado_asignado | tabla_numerologica_enviada | rifa_enumerada_pagada | rifa_sin_boletas | conferencia_registrada | conferencia_vip_registrada | ya_procesado | monto_incorrecto | destino_invalido | no_es_comprobante | sin_numero
     detalle: Optional[str] = None
 
 
@@ -440,6 +441,7 @@ def _finalizar_comprobante(
     vip_cfg = get_vip_config(db)
     rp_cfg = get_relampago_personalizado_config(db)
     tn_cfg = get_tabla_numerologica_config(db)
+    re_cfg = get_rifa_enumerada_config(db)
     cliente_actual = db.execute(
         select(Cliente).where(Cliente.celular == phone_local)
     ).scalar_one_or_none()
@@ -486,8 +488,14 @@ def _finalizar_comprobante(
         and monto is not None
         and int(monto) == tn_cfg.valor
     )
+    is_rifa_enum = bool(
+        re_cfg.activo
+        and re_cfg.valor > 0
+        and monto is not None
+        and int(monto) == re_cfg.valor
+    )
 
-    if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_tabla_num and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
+    if not is_conferencia_vip and not is_conferencia and not is_relampago and not is_relampago_pers and not is_tabla_num and not is_rifa_enum and not is_vip_extra and (monto is None or int(monto) != settings.VIP_AMOUNT):
         return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
                              monto_extraido=monto_float, accion="monto_incorrecto",
                              detalle=f"Monto extraído: {monto_float}, esperado VIP: {settings.VIP_AMOUNT}")
@@ -512,12 +520,19 @@ def _finalizar_comprobante(
                              monto_extraido=monto_float, accion="ya_procesado",
                              detalle=f"Ya procesado para {duplicado.celular}")
 
+    # Sin boletas por pagar no se registra ni se oculta: el comprobante queda pendiente.
+    if is_rifa_enum and boletas_por_pagar(db, phone_local) == 0:
+        return ReprocesarOut(es_comprobante=True, comprobante_num=comprobante_num,
+                             monto_extraido=monto_float, accion="rifa_sin_boletas",
+                             detalle="El celular no tiene boletas por pagar; el comprobante queda pendiente")
+
     descripcion = (
         "conferencia_vip" if is_conferencia_vip
         else "conferencia" if is_conferencia
         else "numero_relampago" if is_relampago
         else "numero_relampago_personalizado" if is_relampago_pers
         else "tabla_numerologica" if is_tabla_num
+        else "rifa_enumerada" if is_rifa_enum
         else "pago vip (servicio)" if is_vip_extra
         else "pago vip"
     )
@@ -631,6 +646,18 @@ def _finalizar_comprobante(
             monto_extraido=monto_float,
             accion="tabla_numerologica_enviada",
             detalle="Foto de la tabla numerológica enviada" if enviada else "Registrado, pero no hay foto cargada para enviar",
+        )
+
+    if is_rifa_enum:
+        pagadas = marcar_boletas_pagadas(db, phone_local, comprobante_num, monto)
+        db.commit()
+        _marcar_procesada(db, id)
+        return ReprocesarOut(
+            es_comprobante=True,
+            comprobante_num=comprobante_num,
+            monto_extraido=monto_float,
+            accion="rifa_enumerada_pagada",
+            detalle=f"{pagadas} boleta(s) marcadas como pagadas",
         )
 
     # ── Renovar o crear cliente ────────────────────────────────────────────
@@ -912,7 +939,7 @@ def _ids_imagenes_por_fecha(chat_db: Session, schema: str, fecha: date) -> set[u
 
 # Acciones que dejan la transacción oculta/resuelta (igual a ACCIONES_FINALES del front)
 _ACCIONES_FINALES = {
-    "renovado", "cliente_creado", "relampago_registrado", "relampago_personalizado_asignado", "tabla_numerologica_enviada",
+    "renovado", "cliente_creado", "relampago_registrado", "relampago_personalizado_asignado", "tabla_numerologica_enviada", "rifa_enumerada_pagada",
     "conferencia_registrada", "conferencia_vip_registrada", "ya_procesado",
 }
 

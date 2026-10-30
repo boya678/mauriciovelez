@@ -16,3 +16,4 @@ Pillow==10.4.0
 python-multipart==0.0.9
 redis==5.0.8
 openai>=1.45.0
+azure-storage-blob>=12.19.0

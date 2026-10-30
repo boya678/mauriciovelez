@@ -19,6 +19,30 @@ export interface TablaNumerologicaConfig {
   tiene_foto: boolean;
 }
 
+export interface RifaEnumeradaConfig {
+  activo: boolean;
+  valor: number;
+  cantidad: number;
+  tiene_base: boolean;
+}
+
+export interface RifaEnumeradaLote {
+  id: number;
+  estado: 'cargado' | 'enviando' | 'finalizado';
+  archivo: string;
+  total_filas: number;
+  validas: number;
+  invalidas: number;
+  duplicadas: number;
+  ya_recibieron: number;
+  invalidas_detalle: { fila: number; valor: string }[];
+  boletas_total: number;
+  enviadas: number;
+  pendientes: number;
+  errores_total: number;
+  errores: { celular: string; numero: string; error: string | null }[];
+}
+
 export interface RelampagoPersonalizadoConfig {
   activo: boolean;
   valor: number;
@@ -82,6 +106,45 @@ export class ServiciosAdminService {
     if (fechaInicio) params = params.set('fecha_inicio', fechaInicio);
     if (fechaFin) params = params.set('fecha_fin', fechaFin);
     return this.http.get(`${this.base}/tabla-numerologica/exportar`, { params, responseType: 'blob' });
+  }
+
+  getRifaEnumerada() {
+    return this.http.get<RifaEnumeradaConfig>(`${this.base}/rifa-enumerada`);
+  }
+
+  updateRifaEnumerada(payload: { activo: boolean; valor: number; cantidad: number }) {
+    return this.http.put<RifaEnumeradaConfig>(`${this.base}/rifa-enumerada`, payload);
+  }
+
+  subirBaseRifaEnumerada(imagen: File) {
+    const form = new FormData();
+    form.append('imagen', imagen);
+    return this.http.post<RifaEnumeradaConfig>(`${this.base}/rifa-enumerada/base`, form);
+  }
+
+  cargarExcelRifaEnumerada(archivo: File) {
+    const form = new FormData();
+    form.append('archivo', archivo);
+    return this.http.post<RifaEnumeradaLote>(`${this.base}/rifa-enumerada/lote`, form);
+  }
+
+  getUltimoLoteRifaEnumerada() {
+    return this.http.get<RifaEnumeradaLote | null>(`${this.base}/rifa-enumerada/lote/ultimo`);
+  }
+
+  getLoteRifaEnumerada(id: number) {
+    return this.http.get<RifaEnumeradaLote>(`${this.base}/rifa-enumerada/lote/${id}`);
+  }
+
+  enviarLoteRifaEnumerada(id: number, incluirRepetidos: boolean) {
+    return this.http.post<RifaEnumeradaLote>(`${this.base}/rifa-enumerada/lote/${id}/enviar`, { incluir_repetidos: incluirRepetidos });
+  }
+
+  exportarRifaEnumerada(fechaInicio?: string, fechaFin?: string) {
+    let params = new HttpParams();
+    if (fechaInicio) params = params.set('fecha_inicio', fechaInicio);
+    if (fechaFin) params = params.set('fecha_fin', fechaFin);
+    return this.http.get(`${this.base}/rifa-enumerada/exportar`, { params, responseType: 'blob' });
   }
 
   getRelampagoPersonalizado() {

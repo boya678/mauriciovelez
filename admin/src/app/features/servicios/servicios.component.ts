@@ -1,8 +1,8 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, ServiciosAdminService, TablaNumerologicaConfig, VipConfig } from '../../core/services/servicios-admin.service';
+import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, RelampagoPersonalizadoConfig, RifaEnumeradaConfig, RifaEnumeradaLote, ServiciosAdminService, TablaNumerologicaConfig, VipConfig } from '../../core/services/servicios-admin.service';
 
 @Component({
   selector: 'app-servicios',
@@ -11,8 +11,18 @@ import { ConferenciaConfig, ConferenciaVipConfig, NumeroRelampagoConfig, Relampa
   templateUrl: './servicios.component.html',
   styleUrl: './servicios.component.scss',
 })
-export class ServiciosComponent implements OnInit {
+export class ServiciosComponent implements OnInit, OnDestroy {
   loading = signal(false);
+  savingRe = signal(false);
+  subiendoBaseRe = signal(false);
+  cargandoExcelRe = signal(false);
+  enviandoRe = signal(false);
+  exportandoRe = signal(false);
+  loteRe = signal<RifaEnumeradaLote | null>(null);
+  incluirRepetidosRe = false;
+  reDesde = '';
+  reHasta = '';
+  private pollRe: ReturnType<typeof setInterval> | null = null;
   savingRelampago = signal(false);
   savingConferencia = signal(false);
   savingConferenciaVip = signal(false);
@@ -68,13 +78,25 @@ export class ServiciosComponent implements OnInit {
     tiene_foto: false,
   };
 
+  rifaEnum: RifaEnumeradaConfig = {
+    activo: false,
+    valor: 0,
+    cantidad: 1,
+    tiene_base: false,
+  };
+
   constructor(private svc: ServiciosAdminService) {}
 
   ngOnInit(): void {
     this.cargar();
   }
 
+  ngOnDestroy(): void {
+    this.detenerPollRe();
+  }
+
   cargar() {
+    this.cargarRifaEnum();
     this.loading.set(true);
     this.error.set('');
     this.ok.set('');
@@ -131,6 +153,160 @@ export class ServiciosComponent implements OnInit {
       error: () => {
         this.loading.set(false);
         this.error.set('No fue posible cargar la configuración de servicios.');
+      },
+    });
+  }
+
+  cargarRifaEnum() {
+    this.svc.getRifaEnumerada().subscribe({
+      next: (cfg) => (this.rifaEnum = { ...cfg }),
+      error: () => this.error.set('No fue posible cargar la configuración de rifa enumerada.'),
+    });
+    this.svc.getUltimoLoteRifaEnumerada().subscribe({
+      next: (lote) => this.setLoteRe(lote),
+      error: () => this.setLoteRe(null),
+    });
+  }
+
+  private setLoteRe(lote: RifaEnumeradaLote | null) {
+    this.loteRe.set(lote);
+    if (lote?.estado === 'enviando') this.iniciarPollRe();
+    else this.detenerPollRe();
+  }
+
+  private iniciarPollRe() {
+    if (this.pollRe) return;
+    this.pollRe = setInterval(() => {
+      const lote = this.loteRe();
+      if (!lote) {
+        this.detenerPollRe();
+        return;
+      }
+      this.svc.getLoteRifaEnumerada(lote.id).subscribe({ next: (l) => this.setLoteRe(l) });
+    }, 3000);
+  }
+
+  private detenerPollRe() {
+    if (this.pollRe) clearInterval(this.pollRe);
+    this.pollRe = null;
+  }
+
+  boletasAEnviarRe(lote: RifaEnumeradaLote): number {
+    const celulares = lote.validas - (this.incluirRepetidosRe ? 0 : lote.ya_recibieron);
+    return Math.max(0, celulares) * Math.max(1, Number(this.rifaEnum.cantidad || 1));
+  }
+
+  guardarRifaEnum() {
+    this.savingRe.set(true);
+    this.error.set('');
+    this.ok.set('');
+    const payload = {
+      activo: !!this.rifaEnum.activo,
+      valor: Math.max(0, Number(this.rifaEnum.valor || 0)),
+      cantidad: Math.min(100, Math.max(1, Number(this.rifaEnum.cantidad || 1))),
+    };
+    this.svc.updateRifaEnumerada(payload).subscribe({
+      next: (cfg) => {
+        this.rifaEnum = { ...cfg };
+        this.savingRe.set(false);
+        this.ok.set('Configuración de Rifa enumerada guardada.');
+      },
+      error: (err) => {
+        this.savingRe.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible guardar la configuración.');
+      },
+    });
+  }
+
+  onBaseRifaEnum(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+    this.error.set('');
+    this.ok.set('');
+    if (archivo.type !== 'image/jpeg' && archivo.type !== 'image/png') {
+      input.value = '';
+      this.error.set('La imagen debe ser JPG o PNG.');
+      return;
+    }
+    this.subiendoBaseRe.set(true);
+    this.svc.subirBaseRifaEnumerada(archivo).subscribe({
+      next: (cfg) => {
+        this.rifaEnum = { ...this.rifaEnum, tiene_base: cfg.tiene_base };
+        this.subiendoBaseRe.set(false);
+        input.value = '';
+        this.ok.set('Imagen base de Rifa enumerada guardada.');
+      },
+      error: (err) => {
+        this.subiendoBaseRe.set(false);
+        input.value = '';
+        this.error.set(err?.error?.detail || 'No fue posible subir la imagen.');
+      },
+    });
+  }
+
+  onExcelRifaEnum(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+    this.error.set('');
+    this.ok.set('');
+    if (!archivo.name.toLowerCase().endsWith('.xlsx')) {
+      input.value = '';
+      this.error.set('El archivo debe ser un Excel .xlsx.');
+      return;
+    }
+    this.cargandoExcelRe.set(true);
+    this.svc.cargarExcelRifaEnumerada(archivo).subscribe({
+      next: (lote) => {
+        this.setLoteRe(lote);
+        this.cargandoExcelRe.set(false);
+        input.value = '';
+      },
+      error: (err) => {
+        this.cargandoExcelRe.set(false);
+        input.value = '';
+        this.error.set(err?.error?.detail || 'No fue posible leer el Excel.');
+      },
+    });
+  }
+
+  enviarRifaEnum() {
+    const lote = this.loteRe();
+    if (!lote) return;
+    const total = this.boletasAEnviarRe(lote);
+    if (!confirm(`Se enviarán ${total} boletas por WhatsApp. ¿Continuar?`)) return;
+    this.enviandoRe.set(true);
+    this.error.set('');
+    this.ok.set('');
+    this.svc.enviarLoteRifaEnumerada(lote.id, this.incluirRepetidosRe).subscribe({
+      next: (l) => {
+        this.setLoteRe(l);
+        this.enviandoRe.set(false);
+      },
+      error: (err) => {
+        this.enviandoRe.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible iniciar el envío.');
+      },
+    });
+  }
+
+  descargarRifaEnum() {
+    this.exportandoRe.set(true);
+    this.error.set('');
+    this.svc.exportarRifaEnumerada(this.reDesde || undefined, this.reHasta || undefined).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rifa_enumerada_${this.reDesde || 'inicio'}_a_${this.reHasta || 'fin'}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exportandoRe.set(false);
+      },
+      error: () => {
+        this.exportandoRe.set(false);
+        this.error.set('No fue posible descargar el Excel.');
       },
     });
   }

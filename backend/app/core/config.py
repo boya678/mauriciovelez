@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     WHATSAPP_NOTIFICAR_RELAMPAGO: str = ""
     WHATSAPP_NOTIFICAR_PERSONALIZADO: str = ""
     WHATSAPP_TEMPLATE_NOTIFICACION_ULTIMO_CLICO: str = ""
+    WHATSAPP_TEMPLATE_NOTIFICACION_RIFA_ENUMERADA: str = ""
+    RIFA_BLOB_STORAGE_CONNECTION_STRING: str = ""
+    RIFA_CONTAINER: str = ""
     PUBLIC_API_URL: str = "https://api.mauricioveleznumerologo.com"
     WHATSAPP_NOTIFICAR_CONFERENCIA: str = ""
     # Cron hora Colombia (minuto hora dom mes dow)
