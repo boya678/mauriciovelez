@@ -11,6 +11,7 @@ Design constraints:
 """
 import hashlib
 import hmac
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -29,6 +30,45 @@ from app.services.whatsapp import parse_incoming_message
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 logger = logging.getLogger(__name__)
+
+# See ESPECIFICACION_REDIS_RIFA_ENUMERADA.md — a separate system (not this
+# one) consumes this list via BLPOP to assign and send raffle tickets.
+# chatsystem's only job here is to detect the button/typed reply and RPUSH;
+# no dedup, no reply to the user, no other list or format.
+RIFA_ENUMERADA_LIST = "rifa_enumerada:solicitudes"
+RIFA_BOTON_TEXTO = "solicitar boletas"
+
+
+def _extract_rifa_requests(payload: dict) -> list[dict]:
+    """Find 'SOLICITAR BOLETAS' button taps (or typed equivalents) in a raw
+    Meta webhook payload. Each dict has the RPUSH-ready {"celular",
+    "contexto_wamid"} plus "wamid" (the triggering message's own id, used only
+    to exclude it from the normal chat pipeline — never sent to Redis)."""
+    requests: list[dict] = []
+    for entry in payload.get("entry", []):
+        for change in entry.get("changes", []):
+            for msg in change.get("value", {}).get("messages", []):
+                msg_type = msg.get("type", "")
+                if msg_type == "button":
+                    text_value = msg.get("button", {}).get("text") or ""
+                elif msg_type == "text":
+                    text_value = msg.get("text", {}).get("body") or ""
+                else:
+                    continue
+
+                if text_value.strip().lower() != RIFA_BOTON_TEXTO:
+                    continue
+
+                celular = msg.get("from") or ""
+                if not celular:
+                    continue
+
+                request_data: dict = {"celular": celular, "wamid": msg.get("id", "")}
+                contexto_wamid = msg.get("context", {}).get("id")
+                if contexto_wamid:
+                    request_data["contexto_wamid"] = contexto_wamid
+                requests.append(request_data)
+    return requests
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -140,7 +180,31 @@ async def receive_webhook(
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON")
 
+    # Rifa enumerada: isolated side-channel, independent of the chat pipeline
+    # below. A failure here must never break normal message ingestion.
+    rifa_wamids: set[str] = set()
+    try:
+        rifa_requests = _extract_rifa_requests(payload)
+        if rifa_requests:
+            rifa_redis = await get_redis()
+            for rifa_req in rifa_requests:
+                rifa_wamids.add(rifa_req["wamid"])
+                to_push = {"celular": rifa_req["celular"]}
+                if "contexto_wamid" in rifa_req:
+                    to_push["contexto_wamid"] = rifa_req["contexto_wamid"]
+                await rifa_redis.rpush(RIFA_ENUMERADA_LIST, json.dumps(to_push, ensure_ascii=False))
+                logger.info(
+                    "Rifa enumerada: solicitud encolada celular=%s contexto=%s",
+                    rifa_req["celular"], rifa_req.get("contexto_wamid"),
+                )
+    except Exception:
+        logger.exception("Rifa enumerada: no se pudo encolar la solicitud")
+
     messages = parse_incoming_message(payload)
+    if rifa_wamids:
+        # The raffle-ticket request is handled entirely by the external rifa
+        # system — the chatsystem bot must not see it or reply to it.
+        messages = [m for m in messages if m.get("external_id") not in rifa_wamids]
     if not messages:
         # Status updates or other events — just ack
         return {"status": "ok"}
