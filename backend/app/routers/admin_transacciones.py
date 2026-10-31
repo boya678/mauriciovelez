@@ -230,6 +230,15 @@ def _marcar_procesada(db: Session, id_externo: uuid.UUID) -> None:
     db.commit()
 
 
+def _comprobante_por_hash(db: Session, image_hash: Optional[str]) -> Optional[ComprobanteVip]:
+    """Control previo a procesar: comprobante ya registrado con esta misma imagen, si existe."""
+    if not image_hash:
+        return None
+    return db.execute(
+        select(ComprobanteVip).where(ComprobanteVip.image_hash == image_hash)
+    ).scalars().first()
+
+
 def _get_phone_from_chat(chat_db: Session, schema: str, msg_id: uuid.UUID) -> Optional[str]:
     return resolve_real_phone_for_message(chat_db, schema, msg_id)
 
@@ -330,6 +339,11 @@ def registrar_comprobante(
     if not ia:
         raise HTTPException(status_code=400, detail="Esta imagen aún no fue analizada por la IA")
 
+    previo = _comprobante_por_hash(db, ia.image_hash)
+    if previo is not None:
+        _marcar_procesada(db, id)
+        raise HTTPException(status_code=409, detail=f"Imagen ya procesada para el celular {previo.celular}")
+
     if not ia.es_comprobante:
         raise HTTPException(status_code=400, detail="La IA no identificó esta imagen como un comprobante de pago")
 
@@ -418,6 +432,13 @@ def _finalizar_comprobante(
     comprobante y renovación/creación de cliente. Compartida por el endpoint
     que llama a la IA y por el que continúa el proceso sin volver a llamarla."""
     monto_float = float(monto) if monto is not None else None
+
+    previo = _comprobante_por_hash(db, image_hash)
+    if previo is not None:
+        _marcar_procesada(db, id)
+        return ReprocesarOut(es_comprobante=True, comprobante_num=previo.comprobante_num,
+                             monto_extraido=monto_float, accion="ya_procesado",
+                             detalle=f"Imagen ya procesada para {previo.celular}")
 
     if not es_comprobante:
         return ReprocesarOut(es_comprobante=False, comprobante_num=None,
@@ -789,6 +810,12 @@ def reprocesar_con_ia(
     # ── 2. Calcular hash ──────────────────────────────────────────────────────
     image_hash = hashlib.sha256(_b64.b64decode(base64_img)).hexdigest()
 
+    previo = _comprobante_por_hash(db, image_hash)
+    if previo is not None:
+        _marcar_procesada(db, id)
+        return ReprocesarOut(es_comprobante=True, comprobante_num=previo.comprobante_num,
+                             accion="ya_procesado", detalle=f"Imagen ya procesada para {previo.celular}")
+
     # ── 3. Llamar a la IA ─────────────────────────────────────────────────────
     try:
         resultado_ia = analizar_imagen_con_ia(base64_img, mime_type)
@@ -874,6 +901,12 @@ def procesar_sin_ia(
     ).scalar_one_or_none()
     if not ia:
         raise HTTPException(status_code=400, detail="Esta imagen aún no fue analizada por la IA")
+
+    previo = _comprobante_por_hash(db, ia.image_hash)
+    if previo is not None:
+        _marcar_procesada(db, id)
+        return ReprocesarOut(es_comprobante=True, comprobante_num=previo.comprobante_num,
+                             accion="ya_procesado", detalle=f"Imagen ya procesada para {previo.celular}")
 
     es_comprobante = payload.es_comprobante_manual if payload.es_comprobante_manual is not None else ia.es_comprobante
     if not es_comprobante:
@@ -1126,6 +1159,11 @@ def renovar_desde_transaccion(
             status_code=400,
             detail="Debes chequear o reprocesar la imagen antes de renovar",
         )
+
+    previo = _comprobante_por_hash(db, ia_registro.image_hash)
+    if previo is not None:
+        _marcar_procesada(db, id)
+        raise HTTPException(status_code=409, detail=f"Imagen ya procesada para el celular {previo.celular}")
 
     if not ia_registro.comprobante_num:
         raise HTTPException(
