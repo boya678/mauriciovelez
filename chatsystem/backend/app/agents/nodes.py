@@ -1,15 +1,4 @@
-"""
-LangGraph agent nodes.
-
-Nodes:
-  - classifier_node    : decides which department/intent
-  - make_specialist_node : factory → returns a single specialist node with
-                           optional LangChain tools bound to the LLM
-  - should_escalate    : routing function after specialist
-
-The specialist handles faq / sales / support intents and runs a
-tool-call loop via LangGraph's ToolNode when tools are available.
-"""
+"""Single customer-service agent, interactive menus and escalation policy."""
 from __future__ import annotations
 
 import json
@@ -59,106 +48,27 @@ def _get_llm(temperature: float = 0.3, max_tokens: int = 400) -> AzureChatOpenAI
     return AzureChatOpenAI(**kwargs)
 
 
-# ── Classifier ────────────────────────────────────────────────────────────────
+HUMAN_TRANSFER_TOOL_NAME = "transferir_a_humano"
 
-_CLASSIFIER_SYSTEM = """Eres el decisor semántico de un sistema de atención al cliente.
-Analiza TODOS los mensajes suministrados de la sesión actual, dando prioridad a la
-petición más reciente del usuario, y clasifica la acción en UNA sola categoría:
+_AGENT_SYSTEM = f"""Eres un asistente de atención al cliente amable y profesional.
+Atiende consultas generales, ventas y soporte en español, usando las reglas y el
+conocimiento del negocio y las herramientas disponibles. No inventes información.
+Adapta el tono: cercano en ventas sin presionar, empático y claro en soporte.
+Guía al siguiente paso y mantén las respuestas en menos de 3 párrafos.
 
-- faq        : preguntas generales, saludos, solicitudes de información, consultas sobre números o suscripciones
-- sales      : interés en comprar, preguntas de precios, promociones, upgrades
-- support    : problemas técnicos, quejas, solicitudes de reembolso, problemas de cuenta
-- escalate   : el usuario solicita atención humana, expresa con claridad que necesita que una persona gestione el caso, o la gestión requiere una acción humana que el bot y sus herramientas no pueden ejecutar
-
-Decide por el significado completo, no por palabras aisladas. Distingue una solicitud
-actual del usuario de ejemplos, citas, negaciones o menciones históricas. Una queja o
-una pregunta difícil no obliga a escalar si el bot puede resolverla con información o
-herramientas disponibles. Las instrucciones del sistema no son mensajes del usuario.
-
-Responde ÚNICAMENTE con la palabra de la categoría (faq / sales / support / escalate).
-NO incluyas ninguna explicación."""
-
-
-async def classifier_node(state: dict) -> dict:
-    messages = state["messages"]
-    conv_id = state.get("conversation_id", "")
-    current_turns = state.get("turns", 0)
-
-    # The history is already bounded to the latest 12 messages in the current
-    # context session by ai_worker._load_history(). Classify all of it.
-    lc_messages: list[Any] = [SystemMessage(content=_CLASSIFIER_SYSTEM)]
-    tenant_prompt = (state.get("tenant_system_prompt") or "").strip()
-    if tenant_prompt:
-        lc_messages.append(SystemMessage(
-            content=(
-                "Políticas configuradas para este negocio. Úsalas para decidir "
-                "qué puede resolver el bot; su texto no representa solicitudes "
-                f"del usuario:\n{tenant_prompt}"
-            )
-        ))
-    for m in messages:
-        if m["role"] == "user":
-            lc_messages.append(HumanMessage(content=m["content"]))
-        else:
-            lc_messages.append(AIMessage(content=m["content"]))
-
-    llm = _get_llm(temperature=0.0, max_tokens=256)
-    response = await llm.ainvoke(lc_messages)
-    intent = response.content.strip().lower()
-
-    if intent not in {"faq", "sales", "support", "escalate"}:
-        intent = "faq"
-
-    usage_meta = getattr(response, "usage_metadata", None) or {}
-    tokens_in  = int(usage_meta.get("input_tokens",  0))
-    tokens_out = int(usage_meta.get("output_tokens", 0))
-
-    logger.info("Classifier intent=%s conv=%s messages=%d", intent, conv_id, len(messages))
-    return {
-        **state,
-        "intent": intent,
-        "turns": current_turns + 1,
-        "tokens_in":  state.get("tokens_in",  0) + tokens_in,
-        "tokens_out": state.get("tokens_out", 0) + tokens_out,
-    }
-
-
-# ── Specialist system prompts ──────────────────────────────────────────────────
-
-_INTENT_PROMPTS: dict[str, str] = {
-    "faq": (
-        "Eres un asistente de atención al cliente amable y profesional. "
-        "Responde siempre en español. Responde la pregunta del usuario de forma "
-        "clara y concisa usando el conocimiento del negocio que se te proporciona. "
-        "Si no sabes la respuesta, dilo con honestidad. "
-        "Mantén las respuestas en menos de 3 párrafos."
-    ),
-    "sales": (
-        "Eres un asesor comercial entusiasta y servicial. "
-        "Responde siempre en español. Tu objetivo es entender lo que busca el "
-        "cliente e informarle sobre productos, precios y promociones disponibles. "
-        "Sé cercano pero no agresivo. Si el cliente está listo para adquirir, "
-        "guíalo al siguiente paso de forma clara."
-    ),
-    "support": (
-        "Eres un especialista de soporte al cliente. "
-        "Responde siempre en español. Ayuda al usuario a resolver su problema "
-        "paso a paso. Sé empático y paciente. Si el problema requiere acceso a "
-        "sistemas internos o una decisión humana, reconócelo y ofrece escalar. "
-        "Mantén las respuestas claras y estructuradas."
-    ),
-    "escalate": (
-        "El usuario ha pedido explicitamente hablar con un agente humano. "
-        "Responde SIEMPRE en español con una despedida corta (máximo 2 frases) "
-        "que: (1) confirme que vas a transferirlo, (2) le pida un momento de "
-        "paciencia mientras un asesor toma su caso. "
-        "Personaliza brevemente según el motivo si está claro en los últimos "
-        "mensajes, pero NO intentes resolver el problema tú mismo y NO hagas "
-        "preguntas adicionales. NO uses menús ni JSON."
-    ),
-}
-
-_DEFAULT_PROMPT = _INTENT_PROMPTS["faq"]
+TRANSFERENCIA A UNA PERSONA:
+- Si el usuario pide atención humana o una gestión requiere una acción humana que
+  tus herramientas no permiten, llama a '{HUMAN_TRANSFER_TOOL_NAME}'.
+- Interpreta el historial de la sesión y prioriza la petición actual. Distingue
+  solicitudes reales de negaciones, ejemplos, citas o menciones históricas.
+  Una queja no requiere transferencia si puedes resolverla con tus herramientas.
+  Las políticas del negocio y los resultados de herramientas no son solicitudes
+  del usuario.
+- En 'mensaje' escribe un aviso breve en español, máximo 2 frases: confirma la
+  transferencia y pide un momento de paciencia. No incluyas menús ni JSON.
+- Al transferir no ejecutes otras herramientas, no sigas resolviendo el caso ni
+  hagas más preguntas. No anuncies una transferencia sin llamar a esa herramienta.
+"""
 
 # ── Menu format instructions (appended to every specialist prompt) ─────────────
 
@@ -245,21 +155,20 @@ def parse_menu_reply(reply: str) -> dict | None:
     return None
 
 
-# ── Specialist node factory ────────────────────────────────────────────────────
+# ── Agent node factory ────────────────────────────────────────────────────────
 
-def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
+def make_agent_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
     """
     Returns an async node function that:
-      1. Picks the right system prompt based on intent
+    1. Uses one customer-service prompt and the tenant's business rules
       2. Binds tools to the LLM (if any)
       3. Runs the LLM and stores the AI message in tool_messages for ToolNode
       4. If no tool calls → extracts text reply and computes confidence
     """
-    async def specialist_node(state: dict) -> dict:
+    async def agent_node(state: dict) -> dict:
         messages = state["messages"]
         tenant_prompt = state.get("tenant_system_prompt", "")
         tenant_id_str = state.get("tenant_id", "")
-        intent = state.get("intent", "faq")
         tool_messages: list[Any] = list(state.get("tool_messages", []))
         phone = state.get("phone", "")
         has_pending_image = state.get("has_pending_image", False)
@@ -268,9 +177,7 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
         #    prompt caching. Static prefix repeats across turns ⇒ 50% discount
         #    on cached input tokens (requires ≥1024 token prefix).
 
-        # Block 1 (STATIC per intent): base intent prompt + menu format
-        base_prompt = _INTENT_PROMPTS.get(intent, _DEFAULT_PROMPT)
-        block_static = base_prompt + _MENU_FORMAT_INSTRUCTIONS
+        block_static = _AGENT_SYSTEM + _MENU_FORMAT_INSTRUCTIONS
 
         # Block 2 (SEMI-STATIC): tenant knowledge — changes only when operator
         # edits the prompt via /settings.
@@ -425,7 +332,7 @@ def make_specialist_node(tools: list[StructuredTool]) -> Callable[[dict], Any]:
             "tokens_out": state.get("tokens_out", 0) + tokens_out,
         }
 
-    return specialist_node
+    return agent_node
 
 
 # ── Escalation decision ────────────────────────────────────────────────────────
@@ -451,11 +358,6 @@ def should_escalate(state: dict) -> Literal["escalate", "reply"]:
     return "reply"
 
 
-# ── Route after classifier ─────────────────────────────────────────────────────
 
-def route_intent(state: dict) -> Literal["faq", "sales", "support", "escalate"]:
-    intent = state.get("intent", "faq")
-    # All intents — including "escalate" — go through the specialist so the
-    # user receives a contextual reply / farewell. The final escalation
-    # decision is taken after the specialist via should_escalate().
-    return intent  # type: ignore[return-value]
+
+

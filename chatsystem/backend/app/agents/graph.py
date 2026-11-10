@@ -2,9 +2,9 @@
 LangGraph conversation graph with Azure OpenAI.
 
 Graph flow (with tools):
-  START → classifier → route_intent →
-    specialist → tool_node (if tool_calls) → specialist (loop)
-               → should_escalate → escalate | END
+    START → agent → tool_node (if tool_calls) → agent (loop)
+                                → should_escalate → escalate | END
+        tool_node → escalate (when a human transfer is requested)
     escalate → END
 
 State schema:
@@ -27,9 +27,8 @@ from langchain_core.tools import StructuredTool
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.nodes import (
-    classifier_node,
-    make_specialist_node,
-    route_intent,
+    HUMAN_TRANSFER_TOOL_NAME,
+    make_agent_node,
     should_escalate,
 )
 
@@ -70,9 +69,9 @@ async def escalate_node(state: ChatState) -> ChatState:
     }
 
 
-# ── Route after specialist: tool call or done ─────────────────────────────────
+# ── Route after agent: tool call or done ──────────────────────────────────────
 
-def _route_after_specialist(state: ChatState) -> str:
+def _route_after_agent(state: ChatState) -> str:
     """If the LLM emitted tool_calls, go to tool_node; otherwise check escalation."""
     pending = state.get("tool_messages", [])
     if pending and hasattr(pending[-1], "tool_calls") and pending[-1].tool_calls:
@@ -81,6 +80,11 @@ def _route_after_specialist(state: ChatState) -> str:
 
 
 # ── Graph definition ──────────────────────────────────────────────────────────
+
+async def _human_transfer(mensaje: str) -> str:
+    """Transfiere a un asesor humano con un aviso breve para el usuario."""
+    return mensaje.strip()
+
 
 def _make_tool_executor(tools: list[StructuredTool]) -> Any:
     """
@@ -107,6 +111,21 @@ def _make_tool_executor(tools: list[StructuredTool]) -> Any:
             logger.warning("tool_executor: no AIMessage with tool_calls found")
             return state  # type: ignore[return-value]
 
+        transfer_call = next(
+            (call for call in last_ai.tool_calls if call["name"] == HUMAN_TRANSFER_TOOL_NAME),
+            None,
+        )
+        if transfer_call is not None:
+            notice = await tool_map[HUMAN_TRANSFER_TOOL_NAME].ainvoke(transfer_call["args"])
+            return {
+                **state,
+                "intent": "escalate",
+                "confidence": 1.0,
+                "bot_reply": notice,
+                "interactive_payload": None,
+                "tool_messages": [],
+            }
+
         results: list[ToolMessage] = []
         for tc in last_ai.tool_calls:
             tool = tool_map.get(tc["name"])
@@ -127,41 +146,31 @@ def _make_tool_executor(tools: list[StructuredTool]) -> Any:
 
 
 def build_graph(tools: list[StructuredTool] | None = None) -> Any:
-    tools = tools or []
-    specialist_node = make_specialist_node(tools)
-    tool_executor = _make_tool_executor(tools) if tools else None
+    agent_tools = [
+        tool for tool in (tools or []) if tool.name != HUMAN_TRANSFER_TOOL_NAME
+    ]
+    agent_tools.append(StructuredTool.from_function(
+        coroutine=_human_transfer,
+        name=HUMAN_TRANSFER_TOOL_NAME,
+    ))
+    agent_node = make_agent_node(agent_tools)
+    tool_executor = _make_tool_executor(agent_tools)
 
     graph = StateGraph(ChatState)
 
-    graph.add_node("classifier", classifier_node)
-    graph.add_node("specialist", specialist_node)
+    graph.add_node("agent", agent_node)
     graph.add_node("escalate", escalate_node)
-
-    if tool_executor:
-        graph.add_node("tool_node", tool_executor)
-        graph.add_edge("tool_node", "specialist")
-
-    graph.add_edge(START, "classifier")
-
+    graph.add_node("tool_node", tool_executor)
+    graph.add_edge(START, "agent")
     graph.add_conditional_edges(
-        "classifier",
-        route_intent,
-        {
-            "faq": "specialist",
-            "sales": "specialist",
-            "support": "specialist",
-            # Even for explicit escalation we go through the specialist first
-            # so the user receives a contextual farewell. should_escalate then
-            # routes to the escalate node which flips needs_escalation=True.
-            "escalate": "specialist",
-        },
+        "tool_node",
+        lambda state: "escalate" if state.get("intent") == "escalate" else "agent",
+        {"escalate": "escalate", "agent": "agent"},
     )
 
-    edges: dict[str, str] = {"escalate": "escalate", "reply": END}
-    if tool_executor:
-        edges["tool_node"] = "tool_node"
-
-    graph.add_conditional_edges("specialist", _route_after_specialist, edges)
+    graph.add_conditional_edges("agent", _route_after_agent, {
+        "escalate": "escalate", "reply": END, "tool_node": "tool_node",
+    })
     graph.add_edge("escalate", END)
 
     return graph.compile()
@@ -202,7 +211,8 @@ async def run_graph(
         "tenant_id": tenant_id,
         "conversation_id": conversation_id,
         "phone": phone,
-        "turns": turns,
+        "turns": turns + 1,
+        "intent": "general",
         "needs_escalation": False,
         "lc_tools": tools or [],
         "tool_messages": [],
