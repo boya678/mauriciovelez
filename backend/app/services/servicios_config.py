@@ -77,6 +77,7 @@ KEY_RE_ACTIVO = "servicio_rifa_enum_activo"
 KEY_RE_VALOR = "servicio_rifa_enum_valor"
 KEY_RE_CANTIDAD = "servicio_rifa_enum_cantidad"
 KEY_RE_SIGUIENTE = "servicio_rifa_enum_siguiente"
+KEY_RE_ENTREGA = "servicio_rifa_enum_entrega"
 
 KEY_CONF_ACTIVO = "servicio_conferencia_activo"
 KEY_CONF_VALOR = "servicio_conferencia_valor"
@@ -261,6 +262,21 @@ def set_rifa_enumerada_config(db: Session, activo: bool, valor: int, cantidad: i
 
     db.flush()
     return RifaEnumeradaConfig(activo=activo, valor=max(0, int(valor)), cantidad=cantidad)
+
+
+def get_rifa_enumerada_entrega_abierta(db: Session) -> bool:
+    """Abierta por defecto; cerrada, quien pulsa SOLICITAR BOLETAS recibe el aviso de ronda finalizada."""
+    p = db.get(Parametro, KEY_RE_ENTREGA)
+    return _parse_bool(p.valor if p else None, default=True)
+
+
+def set_rifa_enumerada_entrega(db: Session, abierta: bool) -> None:
+    p = db.get(Parametro, KEY_RE_ENTREGA)
+    if p:
+        p.valor = "1" if abierta else "0"
+    else:
+        db.add(Parametro(clave=KEY_RE_ENTREGA, valor="1" if abierta else "0", descripcion="Entrega de boletas de la rifa enumerada abierta (1/0)"))
+    db.flush()
 
 
 def get_conferencia_config(db: Session) -> ConferenciaConfig:

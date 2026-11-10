@@ -24,6 +24,7 @@ export interface RifaEnumeradaConfig {
   valor: number;
   cantidad: number;
   tiene_base: boolean;
+  entrega_abierta: boolean;
 }
 
 export interface RifaEnumeradaBoleta {
@@ -33,6 +34,7 @@ export interface RifaEnumeradaBoleta {
   pagada: boolean;
   retirada: boolean;
   fecha: string | null;
+  error: string | null;
 }
 
 export interface RifaEnumeradaBoletasCelular {
@@ -132,6 +134,10 @@ export class ServiciosAdminService {
     return this.http.put<RifaEnumeradaConfig>(`${this.base}/rifa-enumerada`, payload);
   }
 
+  updateEntregaRifaEnumerada(abierta: boolean) {
+    return this.http.put<RifaEnumeradaConfig>(`${this.base}/rifa-enumerada/entrega`, { abierta });
+  }
+
   subirBaseRifaEnumerada(imagen: File) {
     const form = new FormData();
     form.append('imagen', imagen);
@@ -162,6 +168,18 @@ export class ServiciosAdminService {
 
   retirarBoletasRifaEnumerada(celular: string, boletaIds: number[]) {
     return this.http.post<{ numeros: string[] }>(`${this.base}/rifa-enumerada/retirar`, { celular, boleta_ids: boletaIds });
+  }
+
+  enviarManualRifaEnumerada(celular: string, cantidad: number) {
+    return this.http.post<{ numeros: string[] }>(`${this.base}/rifa-enumerada/manual/enviar`, { celular, cantidad });
+  }
+
+  pagarManualRifaEnumerada(celular: string, boletaIds: number[]) {
+    return this.http.post<{ numeros: string[] }>(`${this.base}/rifa-enumerada/manual/pagar`, { celular, boleta_ids: boletaIds });
+  }
+
+  reenviarRifaEnumerada(celular: string, soloNoPagadas: boolean) {
+    return this.http.post<{ numeros: string[] }>(`${this.base}/rifa-enumerada/manual/reenviar`, { celular, solo_no_pagadas: soloNoPagadas });
   }
 
   exportarRifaEnumerada(fechaInicio?: string, fechaFin?: string) {

@@ -22,6 +22,10 @@ export class ServiciosComponent implements OnInit, OnDestroy {
   incluirRepetidosRe = false;
   cantidadGuardadaRe = 1;
   celularRetiro = '';
+  cantidadManual = 1;
+  soloNoPagadasRe = false;
+  accionRe = signal(false);
+  private timerRetiro: ReturnType<typeof setTimeout> | null = null;
   buscandoRetiro = signal(false);
   retirando = signal(false);
   boletasRetiro = signal<RifaEnumeradaBoleta[] | null>(null);
@@ -89,6 +93,7 @@ export class ServiciosComponent implements OnInit, OnDestroy {
     valor: 0,
     cantidad: 1,
     tiene_base: false,
+    entrega_abierta: true,
   };
 
   constructor(private svc: ServiciosAdminService) {}
@@ -99,6 +104,7 @@ export class ServiciosComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.detenerPollRe();
+    if (this.timerRetiro) clearTimeout(this.timerRetiro);
   }
 
   cargar() {
@@ -204,6 +210,27 @@ export class ServiciosComponent implements OnInit, OnDestroy {
 
   celularesAEnviarRe(lote: RifaEnumeradaLote): number {
     return Math.max(0, lote.validas - (this.incluirRepetidosRe ? 0 : lote.ya_recibieron));
+  }
+
+  cambiarEntregaRe(abierta: boolean) {
+    const anterior = this.rifaEnum.entrega_abierta;
+    this.rifaEnum = { ...this.rifaEnum, entrega_abierta: abierta };
+    this.error.set('');
+    this.ok.set('');
+    this.svc.updateEntregaRifaEnumerada(abierta).subscribe({
+      next: (cfg) => {
+        this.rifaEnum = { ...this.rifaEnum, entrega_abierta: cfg.entrega_abierta };
+        this.ok.set(
+          abierta
+            ? 'Entrega de boletas reanudada.'
+            : 'Entrega interrumpida: quienes pulsen SOLICITAR BOLETAS solo recibirán el aviso de ronda finalizada.',
+        );
+      },
+      error: (err) => {
+        this.rifaEnum = { ...this.rifaEnum, entrega_abierta: anterior };
+        this.error.set(err?.error?.detail || 'No fue posible cambiar la entrega de boletas.');
+      },
+    });
   }
 
   guardarRifaEnum() {
@@ -314,7 +341,7 @@ export class ServiciosComponent implements OnInit, OnDestroy {
     if (b.retirada) return 'Retirada';
     if (b.pagada) return 'Pagada';
     if (b.estado_envio === 'error') return 'No enviada';
-    if (b.estado_envio === 'pendiente') return 'Pendiente de envío';
+    if (b.estado_envio === 'pendiente') return 'Enviando...';
     return 'Sin pagar';
   }
 
@@ -324,19 +351,111 @@ export class ServiciosComponent implements OnInit, OnDestroy {
   }
 
   buscarRetiro() {
-    this.buscandoRetiro.set(true);
-    this.error.set('');
-    this.ok.set('');
-    this.boletasRetiro.set(null);
-    this.seleccionRetiro.set([]);
+    this.cargarBoletasRetiro('nuevo');
+  }
+
+  // 'nuevo': consulta pedida por el usuario; 'tras-accion': conserva el mensaje de éxito; 'refresco': no toca la selección.
+  private cargarBoletasRetiro(modo: 'nuevo' | 'tras-accion' | 'refresco') {
+    if (modo !== 'refresco') {
+      this.buscandoRetiro.set(true);
+      this.error.set('');
+      this.seleccionRetiro.set([]);
+    }
+    if (modo === 'nuevo') {
+      this.ok.set('');
+      this.boletasRetiro.set(null);
+    }
     this.svc.getBoletasCelularRifaEnumerada(this.celularRetiro.trim()).subscribe({
       next: (res) => {
         this.boletasRetiro.set(res.boletas);
         this.buscandoRetiro.set(false);
+        this.programarRefrescoRetiro(res.boletas);
       },
       error: (err) => {
         this.buscandoRetiro.set(false);
-        this.error.set(err?.error?.detail || 'No fue posible consultar las boletas.');
+        if (modo !== 'refresco') this.error.set(err?.error?.detail || 'No fue posible consultar las boletas.');
+      },
+    });
+  }
+
+  // Mientras haya boletas enviándose se vuelve a consultar sola.
+  private programarRefrescoRetiro(boletas: RifaEnumeradaBoleta[]) {
+    if (this.timerRetiro) clearTimeout(this.timerRetiro);
+    this.timerRetiro = boletas.some((b) => b.estado_envio === 'pendiente')
+      ? setTimeout(() => this.cargarBoletasRetiro('refresco'), 5000)
+      : null;
+  }
+
+  private boletasParaReenviarRe(): RifaEnumeradaBoleta[] {
+    return (this.boletasRetiro() || []).filter(
+      (b) => !b.retirada && (b.estado_envio === 'enviada' || b.estado_envio === 'error') && (!this.soloNoPagadasRe || !b.pagada),
+    );
+  }
+
+  conteoReenvioRe(): number {
+    return this.boletasParaReenviarRe().length;
+  }
+
+  enviarManualRe() {
+    const celular = this.celularRetiro.trim();
+    const cantidad = Math.min(100, Math.max(1, Math.floor(Number(this.cantidadManual || 1))));
+    if (!celular) return;
+    if (!confirm(`Se asignarán ${cantidad} boletas nuevas al celular ${celular} y se enviarán por WhatsApp ahora (su ventana de 24 h debe estar abierta). ¿Continuar?`)) return;
+    this.accionRe.set(true);
+    this.error.set('');
+    this.ok.set('');
+    this.svc.enviarManualRifaEnumerada(celular, cantidad).subscribe({
+      next: (res) => {
+        this.accionRe.set(false);
+        this.ok.set(`Boletas asignadas: ${res.numeros.join(', ')}. Se están enviando.`);
+        this.cargarBoletasRetiro('tras-accion');
+      },
+      error: (err) => {
+        this.accionRe.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible enviar las boletas.');
+      },
+    });
+  }
+
+  pagarSeleccionRe() {
+    const boletas = this.boletasRetiro() || [];
+    const ids = this.seleccionRetiro();
+    if (!ids.length) return;
+    const numeros = boletas.filter((b) => ids.includes(b.id)).map((b) => b.numero).join(', ');
+    if (!confirm(`Se marcarán como pagadas las boletas ${numeros} del celular ${this.celularRetiro.trim()} y se le avisará por WhatsApp. ¿Continuar?`)) return;
+    this.accionRe.set(true);
+    this.error.set('');
+    this.ok.set('');
+    this.svc.pagarManualRifaEnumerada(this.celularRetiro.trim(), ids).subscribe({
+      next: (res) => {
+        this.accionRe.set(false);
+        this.ok.set(`Pago registrado para las boletas ${res.numeros.join(', ')}.`);
+        this.cargarBoletasRetiro('tras-accion');
+      },
+      error: (err) => {
+        this.accionRe.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible registrar el pago.');
+      },
+    });
+  }
+
+  reenviarRe() {
+    const total = this.conteoReenvioRe();
+    if (!total) return;
+    const cual = this.soloNoPagadasRe ? 'las boletas sin pagar' : 'todas las boletas';
+    if (!confirm(`Se reenviarán ${cual} (${total}) al celular ${this.celularRetiro.trim()}. Cada una dirá si está pagada o pendiente de pago (su ventana de 24 h debe estar abierta). ¿Continuar?`)) return;
+    this.accionRe.set(true);
+    this.error.set('');
+    this.ok.set('');
+    this.svc.reenviarRifaEnumerada(this.celularRetiro.trim(), this.soloNoPagadasRe).subscribe({
+      next: (res) => {
+        this.accionRe.set(false);
+        this.ok.set(`Reenviando ${res.numeros.length} boletas: ${res.numeros.join(', ')}.`);
+        this.cargarBoletasRetiro('tras-accion');
+      },
+      error: (err) => {
+        this.accionRe.set(false);
+        this.error.set(err?.error?.detail || 'No fue posible reenviar las boletas.');
       },
     });
   }
@@ -354,7 +473,7 @@ export class ServiciosComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.retirando.set(false);
         this.ok.set(`Boletas retiradas: ${res.numeros.join(', ')}.`);
-        this.buscarRetiro();
+        this.cargarBoletasRetiro('tras-accion');
       },
       error: (err) => {
         this.retirando.set(false);

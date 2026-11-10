@@ -20,15 +20,25 @@ from app.models.rifa_enumerada import RifaEnumeradaAviso, RifaEnumeradaBase, Rif
 from app.services.rifa_enumerada import (
     BASE_ID,
     MAX_MPS,
+    boletas_para_reenviar,
+    crear_boletas_manual,
     hay_lote_enviando,
     iniciar_lote,
+    marcar_pagadas_manual,
+    notificar_pago,
     notificar_retiro,
     renombrar_blob_retirada,
     retirar_boletas,
     verificar_blob_publico,
 )
+from app.services.rifa_enumerada_solicitudes import entregar_en_segundo_plano
 from app.services.rifa_enumerada_util import leer_celulares
-from app.services.servicios_config import get_rifa_enumerada_config, set_rifa_enumerada_config
+from app.services.servicios_config import (
+    get_rifa_enumerada_config,
+    get_rifa_enumerada_entrega_abierta,
+    set_rifa_enumerada_config,
+    set_rifa_enumerada_entrega,
+)
 
 router = APIRouter(prefix="/admin/servicios/rifa-enumerada", tags=["Admin Servicios"])
 
@@ -43,6 +53,7 @@ class RifaEnumeradaOut(BaseModel):
     valor: int
     cantidad: int
     tiene_base: bool
+    entrega_abierta: bool
 
 
 class RifaEnumeradaIn(BaseModel):
@@ -53,6 +64,10 @@ class RifaEnumeradaIn(BaseModel):
 
 class EnviarIn(BaseModel):
     incluir_repetidos: bool = False
+
+
+class EntregaIn(BaseModel):
+    abierta: bool
 
 
 class FilaInvalida(BaseModel):
@@ -91,6 +106,7 @@ class BoletaOut(BaseModel):
     pagada: bool
     retirada: bool
     fecha: Optional[str]
+    error: Optional[str]
 
 
 class BoletasCelularOut(BaseModel):
@@ -105,6 +121,21 @@ class RetirarIn(BaseModel):
 
 class RetirarOut(BaseModel):
     numeros: list[str]
+
+
+class EnviarManualIn(BaseModel):
+    celular: str
+    cantidad: int = Field(ge=1, le=100)
+
+
+class PagarManualIn(BaseModel):
+    celular: str
+    boleta_ids: list[int] = Field(min_length=1, max_length=100)
+
+
+class ReenviarIn(BaseModel):
+    celular: str
+    solo_no_pagadas: bool = False
 
 
 def _celular_local(valor: str) -> str:
@@ -122,6 +153,7 @@ def _out(db: Session, cfg) -> RifaEnumeradaOut:
         valor=cfg.valor,
         cantidad=cfg.cantidad,
         tiene_base=db.get(RifaEnumeradaBase, BASE_ID) is not None,
+        entrega_abierta=get_rifa_enumerada_entrega_abierta(db),
     )
 
 
@@ -222,6 +254,25 @@ def put_rifa_enumerada(
     return _out(db, cfg)
 
 
+@router.put("/entrega", response_model=RifaEnumeradaOut)
+def put_entrega(
+    payload: EntregaIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    set_rifa_enumerada_entrega(db, payload.abierta)
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="UPDATE",
+        entity="servicios.rifa_enumerada",
+        entity_id="rifa_enumerada",
+        detail={"entrega_abierta": payload.abierta},
+    ))
+    db.commit()
+    return _out(db, get_rifa_enumerada_config(db))
+
+
 @router.post("/base", response_model=RifaEnumeradaOut)
 def subir_imagen_base(
     imagen: UploadFile = File(...),
@@ -301,7 +352,9 @@ def ultimo_lote(
     db: Session = Depends(get_db),
     _user=Depends(require_admin),
 ):
-    lote = db.execute(select(RifaEnumeradaLote).order_by(RifaEnumeradaLote.id.desc()).limit(1)).scalar_one_or_none()
+    lote = db.execute(
+        select(RifaEnumeradaLote).where(RifaEnumeradaLote.estado != "manual").order_by(RifaEnumeradaLote.id.desc()).limit(1)
+    ).scalar_one_or_none()
     return _lote_out(db, lote) if lote else None
 
 
@@ -405,6 +458,7 @@ def boletas_de_celular(
                 pagada=b.pagada,
                 retirada=b.retirada,
                 fecha=b.enviada_at.astimezone(COL_TZ).strftime("%d/%m/%Y %H:%M") if b.enviada_at else None,
+                error=b.error,
             )
             for b in boletas
         ],
@@ -440,6 +494,100 @@ def retirar(
     notificar_retiro(local, numeros)
     for b in boletas:
         renombrar_blob_retirada(b.celular, b.numero, b.id)
+    return RetirarOut(numeros=numeros)
+
+
+def _verificar_envio_listo(db: Session) -> None:
+    faltantes = [
+        nombre for nombre, valor in (
+            ("RIFA_BLOB_STORAGE_CONNECTION_STRING", settings.RIFA_BLOB_STORAGE_CONNECTION_STRING),
+            ("RIFA_CONTAINER", settings.RIFA_CONTAINER),
+        ) if not valor
+    ]
+    if faltantes:
+        raise HTTPException(status_code=503, detail=f"Falta configurar: {', '.join(faltantes)}")
+    if db.get(RifaEnumeradaBase, BASE_ID) is None:
+        raise HTTPException(status_code=400, detail="Debes subir la imagen base")
+
+
+@router.post("/manual/enviar", response_model=RetirarOut)
+def manual_enviar(
+    payload: EnviarManualIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    local = _celular_local(payload.celular)
+    _verificar_envio_listo(db)
+    boletas = crear_boletas_manual(db, local, payload.cantidad, user.usuario)
+    ids = [b.id for b in boletas]
+    numeros = [b.numero for b in boletas]
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="CREATE",
+        entity="servicios.rifa_enumerada",
+        entity_id=local,
+        detail={"manual_enviar": numeros},
+    ))
+    db.commit()
+
+    entregar_en_segundo_plano(ids)
+    return RetirarOut(numeros=numeros)
+
+
+@router.post("/manual/pagar", response_model=RetirarOut)
+def manual_pagar(
+    payload: PagarManualIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    local = _celular_local(payload.celular)
+    ids = sorted(set(payload.boleta_ids))
+    boletas = marcar_pagadas_manual(db, local, ids, user.usuario)
+    if len(boletas) != len(ids):
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Alguna boleta ya no se puede marcar como pagada (ya está pagada, fue retirada o no se envió). Consulta el celular de nuevo.",
+        )
+    numeros = [b.numero for b in boletas]
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="UPDATE",
+        entity="servicios.rifa_enumerada",
+        entity_id=local,
+        detail={"pago_manual": numeros},
+    ))
+    db.commit()
+
+    notificar_pago(local, numeros)
+    return RetirarOut(numeros=numeros)
+
+
+@router.post("/manual/reenviar", response_model=RetirarOut)
+def manual_reenviar(
+    payload: ReenviarIn,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    local = _celular_local(payload.celular)
+    _verificar_envio_listo(db)
+    boletas = boletas_para_reenviar(db, local, payload.solo_no_pagadas)
+    if not boletas:
+        raise HTTPException(status_code=400, detail="Ese celular no tiene boletas para reenviar")
+    numeros = [n for _, n in boletas]
+    db.add(AuditLog(
+        platform_user_id=user.id,
+        usuario=user.usuario,
+        action="UPDATE",
+        entity="servicios.rifa_enumerada",
+        entity_id=local,
+        detail={"reenvio_boletas": numeros, "solo_no_pagadas": payload.solo_no_pagadas},
+    ))
+    db.commit()
+
+    entregar_en_segundo_plano([i for i, _ in boletas], reenviar=True)
     return RetirarOut(numeros=numeros)
 
 

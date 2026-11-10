@@ -139,9 +139,10 @@ def _contenido_aviso() -> dict:
     }
 
 
-def contenido_boleta(url_imagen: str, numero: str) -> dict:
+def contenido_boleta(url_imagen: str, numero: str, nota: str | None = None) -> dict:
     # Mensaje normal, no plantilla: solo es válido dentro de la ventana de 24 h que abre el botón.
-    return {"type": "image", "image": {"link": url_imagen, "caption": f"Boleta {numero}"}}
+    pie = f"Boleta {numero}" + (f" - {nota}" if nota else "")
+    return {"type": "image", "image": {"link": url_imagen, "caption": pie}}
 
 
 def _enviar_mensaje(http: httpx.Client, limitador: _Limitador, celular: str, contenido: dict):
@@ -402,6 +403,64 @@ def renombrar_blob_retirada(celular: str, numero: str, boleta_id: int) -> None:
             origen.delete_blob()
     except Exception:
         logger.warning("No se pudo renombrar la boleta %s de %s como retirada", numero, celular, exc_info=True)
+
+
+# ── Operaciones manuales ───────────────────────────────────────────────────────────────────────
+
+def crear_boletas_manual(db: Session, celular_local: str, cantidad: int, usuario: str) -> list[RifaEnumeradaBoleta]:
+    """Asigna números nuevos a un celular sin Excel ni aviso. Queda en un lote 'manual' para que el pago use su cantidad.
+    NO hace commit."""
+    ahora = datetime.now(timezone.utc)
+    celular = f"57{celular_local}"
+    lote = RifaEnumeradaLote(
+        usuario=usuario[:100], archivo="Manual", celulares=celular, total_filas=1, validas=1,
+        estado="manual", cantidad=cantidad, incluir_repetidos=True, iniciado_at=ahora, finalizado_at=ahora,
+    )
+    db.add(lote)
+    db.flush()
+    boletas = [
+        RifaEnumeradaBoleta(
+            lote_id=lote.id, celular=celular, celular_local=celular_local, numero=numero, ronda=posicion,
+            estado_envio="pendiente", pagada=False, created_at=ahora,
+        )
+        for posicion, numero in enumerate(tomar_numeros(db, cantidad), start=1)
+    ]
+    db.add_all(boletas)
+    db.flush()
+    return boletas
+
+
+def marcar_pagadas_manual(db: Session, celular_local: str, boleta_ids: list[int], usuario: str) -> list[RifaEnumeradaBoleta]:
+    """Marca como pagadas las boletas elegidas (enviadas, sin pagar y no retiradas). NO hace commit."""
+    boletas = db.execute(
+        select(RifaEnumeradaBoleta)
+        .where(
+            RifaEnumeradaBoleta.id.in_(boleta_ids),
+            RifaEnumeradaBoleta.celular_local == celular_local,
+            RifaEnumeradaBoleta.estado_envio == "enviada",
+            RifaEnumeradaBoleta.pagada.is_(False),
+            RifaEnumeradaBoleta.retirada.is_(False),
+        )
+        .order_by(RifaEnumeradaBoleta.id)
+    ).scalars().all()
+    ahora = datetime.now(timezone.utc)
+    for boleta in boletas:
+        boleta.pagada = True
+        boleta.pagada_at = ahora
+        boleta.comprobante_num = f"MANUAL {usuario}"[:200]
+    return boletas
+
+
+def boletas_para_reenviar(db: Session, celular_local: str, solo_no_pagadas: bool) -> list[tuple[int, str]]:
+    """(id, número) de las boletas vigentes del celular que ya tienen número asignado."""
+    consulta = select(RifaEnumeradaBoleta.id, RifaEnumeradaBoleta.numero).where(
+        RifaEnumeradaBoleta.celular_local == celular_local,
+        RifaEnumeradaBoleta.retirada.is_(False),
+        RifaEnumeradaBoleta.estado_envio.in_(["enviada", "error"]),
+    )
+    if solo_no_pagadas:
+        consulta = consulta.where(RifaEnumeradaBoleta.pagada.is_(False))
+    return [(fila[0], fila[1]) for fila in db.execute(consulta.order_by(RifaEnumeradaBoleta.id)).all()]
 
 
 def subir_comprobante(celular_local: str, comprobante_num: str, imagen_b64: str, mime: str) -> None:

@@ -350,6 +350,17 @@
 
     <div class="form-grid">
       <div class="field">
+        <label>Interrumpir entrega de boletas</label>
+        <label class="check-re">
+          <input type="checkbox" [ngModel]="!rifaEnum.entrega_abierta" (ngModelChange)="cambiarEntregaRe(!$event)" />
+          Interrumpida
+        </label>
+        <small>Activado: quien pulse SOLICITAR BOLETAS no recibe boletas ni se genera nada; solo se le avisa que la ronda de boletería finalizó y que próximamente se enviará de nuevo el mensaje. Se aplica al instante.</small>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
         <label>Excel de celulares (.xlsx)</label>
         <input type="file" accept=".xlsx" [disabled]="cargandoExcelRe() || loteRe()?.estado === 'enviando'" (change)="onExcelRifaEnum($event)" />
         <small>
@@ -427,9 +438,15 @@
 
     <div class="form-grid">
       <div class="field">
-        <label>Retirar boletas — celular</label>
+        <label>Gestión por celular — celular</label>
         <input type="text" inputmode="numeric" [(ngModel)]="celularRetiro" placeholder="3001234567" (keyup.enter)="buscarRetiro()" />
-        <small>Solo se pueden retirar boletas enviadas y sin pagar. Vuelven al pool y se avisa por WhatsApp.</small>
+        <small>Consulta sus boletas para marcar pagos, retirar o reenviar. Enviar y reenviar requieren que su ventana de 24 h esté abierta.</small>
+      </div>
+
+      <div class="field">
+        <label>Enviar boletas nuevas — cantidad</label>
+        <input type="number" min="1" max="100" step="1" [(ngModel)]="cantidadManual" />
+        <small>Asigna números nuevos a este celular y los envía ya.</small>
       </div>
     </div>
 
@@ -437,26 +454,42 @@
       <button class="btn-primary" [disabled]="buscandoRetiro() || !celularRetiro.trim()" (click)="buscarRetiro()">
         @if (buscandoRetiro()) { Consultando... } @else { Consultar boletas }
       </button>
+      <button class="btn-primary" [disabled]="accionRe() || !celularRetiro.trim()" (click)="enviarManualRe()">
+        @if (accionRe()) { Procesando... } @else { Enviar boletas nuevas }
+      </button>
     </div>
 
     @if (boletasRetiro(); as boletas) {
       <div class="lote-re">
         <table class="tabla-re">
-          <thead><tr><th></th><th>Boleta</th><th>Estado</th><th>Enviada</th></tr></thead>
+          <thead><tr><th></th><th>Boleta</th><th>Estado</th><th>Enviada</th><th>Detalle</th></tr></thead>
           <tbody>
             @for (b of boletas; track b.id) {
               <tr>
-                <td><input type="checkbox" [disabled]="!retirable(b) || retirando()" [checked]="seleccionRetiro().includes(b.id)" (change)="toggleRetiro(b.id)" /></td>
+                <td><input type="checkbox" [disabled]="!retirable(b) || retirando() || accionRe()" [checked]="seleccionRetiro().includes(b.id)" (change)="toggleRetiro(b.id)" /></td>
                 <td>{{ b.numero }}</td>
                 <td>{{ estadoBoletaRe(b) }}</td>
                 <td>{{ b.fecha || '' }}</td>
+                <td>{{ b.error || '' }}</td>
               </tr>
             }
           </tbody>
         </table>
         <div class="actions">
-          <button class="btn-primary" [disabled]="retirando() || !seleccionRetiro().length" (click)="retirarSeleccion()">
+          <button class="btn-primary" [disabled]="accionRe() || retirando() || !seleccionRetiro().length" (click)="pagarSeleccionRe()">
+            @if (accionRe()) { Procesando... } @else { Marcar pagadas ({{ seleccionRetiro().length }}) }
+          </button>
+          <button class="btn-primary" [disabled]="retirando() || accionRe() || !seleccionRetiro().length" (click)="retirarSeleccion()">
             @if (retirando()) { Retirando... } @else { Retirar ({{ seleccionRetiro().length }}) }
+          </button>
+        </div>
+        <div class="actions">
+          <label class="check-re">
+            <input type="checkbox" [(ngModel)]="soloNoPagadasRe" />
+            Reenviar solo las no pagadas
+          </label>
+          <button class="btn-primary" [disabled]="accionRe() || retirando() || conteoReenvioRe() === 0" (click)="reenviarRe()">
+            @if (accionRe()) { Procesando... } @else { Reenviar boletas ({{ conteoReenvioRe() }}) }
           </button>
         </div>
       </div>
